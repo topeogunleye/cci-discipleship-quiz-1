@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v3';
+const CACHE_NAME = CACHE_PREFIX + 'v4';
 const CORE_FILES = [
   './',
   'offline.html',
@@ -37,6 +37,22 @@ self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const names = await caches.keys();
     await Promise.all(names.filter(name => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME).map(name => caches.delete(name)));
+    const cache = await caches.open(CACHE_NAME);
+    const manifestResponse = await cache.match(assetUrl('decks/manifest.json'));
+    if (manifestResponse) {
+      const deckFiles = await manifestResponse.json();
+      if (Array.isArray(deckFiles)) {
+        const deckBase = new URL('decks/', self.registration.scope).href;
+        const currentDecks = new Set([assetUrl('decks/manifest.json')]);
+        deckFiles.filter(file => typeof file === 'string' && !file.includes('/') && !file.includes('..'))
+          .forEach(file => currentDecks.add(assetUrl('decks/' + file)));
+        const requests = await cache.keys();
+        await Promise.all(requests.filter(request => {
+          const url = new URL(request.url);
+          return url.href.startsWith(deckBase) && !currentDecks.has(url.href);
+        }).map(request => cache.delete(request)));
+      }
+    }
     await self.clients.claim();
   })());
 });

@@ -58,6 +58,20 @@ function mockLocalStorage(initial) {
   };
 }
 
+test('saves and loads current study state through IndexedDB', async () => {
+  const idb = fakeIndexedDB();
+  const storage = createStorage({ indexedDB: idb.indexedDB, localStorage: mockLocalStorage() });
+  const raw = JSON.stringify({ decks: [{ id: 'd1', cards: [] }], progress: { d1: { cards: {} } } });
+
+  const saved = await storage.save(raw);
+  assert.equal(saved.backend, 'indexedDB');
+  assert.equal(saved.ok, true);
+  const loaded = await storage.load();
+  assert.equal(loaded.raw, raw);
+  assert.equal(loaded.backend, 'indexedDB');
+  assert.equal(loaded.ok, true);
+});
+
 test('migrates flashdecks.v1 to IndexedDB and removes it only after readback confirms', async () => {
   const legacy = JSON.stringify({ decks: [{ id: 'd1' }], progress: { d1: { cards: { 'd1.q1': 'known' } } } });
   const idb = fakeIndexedDB();

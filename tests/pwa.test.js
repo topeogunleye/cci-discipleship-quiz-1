@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
@@ -25,12 +26,64 @@ test('web app manifest declares standalone install metadata and valid icon asset
 test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
   const serviceWorker = read('service-worker.js');
   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v3'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v4'/);
   assert.match(serviceWorker, /decks\/manifest\.json/);
   assert.match(serviceWorker, /cache\.addAll\(deckFiles\.map/);
   assert.match(serviceWorker, /offline\.html/);
   assert.match(serviceWorker, /SKIP_WAITING/);
   assert.match(read('offline.html'), /You are offline/);
+});
+
+test('activation deletes previous app caches and deck assets absent from the current manifest', async () => {
+  const scope = 'https://example.test/app/';
+  const url = file => new URL(file, scope).href;
+  const activeEntries = new Map([
+    [url('./'), {}],
+    [url('decks/manifest.json'), { json: async () => ['current.txt'] }],
+    [url('decks/current.txt'), {}],
+    [url('decks/removed.txt'), {}],
+    [url('settings.json'), {}]
+  ]);
+  const cacheStore = new Map([
+    ['cci-study-pwa-v4', activeEntries],
+    ['cci-study-pwa-v3', new Map()],
+    ['unrelated-app-cache', new Map()]
+  ]);
+  const caches = {
+    keys: async () => Array.from(cacheStore.keys()),
+    delete: async name => cacheStore.delete(name),
+    open: async name => {
+      if (!cacheStore.has(name)) cacheStore.set(name, new Map());
+      const entries = cacheStore.get(name);
+      const key = request => typeof request === 'string' ? request : request.url;
+      return {
+        match: async request => entries.get(key(request)) || null,
+        keys: async () => Array.from(entries.keys()).map(href => ({ url: href })),
+        delete: async request => entries.delete(key(request))
+      };
+    }
+  };
+  const listeners = {};
+  let claimed = false;
+  let activation;
+  const self = {
+    registration: { scope },
+    clients: { claim: async () => { claimed = true; } },
+    addEventListener: (name, handler) => { listeners[name] = handler; },
+    skipWaiting: () => {}
+  };
+
+  vm.runInNewContext(read('service-worker.js'), { self, caches, URL });
+  listeners.activate({ waitUntil: promise => { activation = promise; } });
+  await activation;
+
+  assert.equal(cacheStore.has('cci-study-pwa-v3'), false);
+  assert.equal(cacheStore.has('unrelated-app-cache'), true);
+  assert.equal(activeEntries.has(url('decks/manifest.json')), true);
+  assert.equal(activeEntries.has(url('decks/current.txt')), true);
+  assert.equal(activeEntries.has(url('decks/removed.txt')), false);
+  assert.equal(activeEntries.has(url('settings.json')), true);
+  assert.equal(claimed, true);
 });
 
 test('PWA source and offline build contain their required registration/assets', () => {
