@@ -1,0 +1,56 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+
+const root = path.join(__dirname, '..');
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+const manifest = JSON.parse(read('manifest.webmanifest'));
+
+test('web app manifest declares standalone install metadata and valid icon assets', () => {
+  assert.equal(manifest.display, 'standalone');
+  assert.equal(manifest.start_url, './');
+  assert.equal(manifest.scope, './');
+  for (const size of [192, 512]) {
+    const icon = manifest.icons.find(item => item.sizes === `${size}x${size}`);
+    assert.ok(icon, `Missing ${size}px PNG icon`);
+    const png = fs.readFileSync(path.join(root, icon.src));
+    assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+    assert.equal(png.readUInt32BE(16), size);
+    assert.equal(png.readUInt32BE(20), size);
+  }
+  assert.match(read('index.html'), /rel="manifest" href="manifest\.webmanifest"/);
+});
+
+test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
+  const serviceWorker = read('service-worker.js');
+  assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v3'/);
+  assert.match(serviceWorker, /decks\/manifest\.json/);
+  assert.match(serviceWorker, /cache\.addAll\(deckFiles\.map/);
+  assert.match(serviceWorker, /offline\.html/);
+  assert.match(serviceWorker, /SKIP_WAITING/);
+  assert.match(read('offline.html'), /You are offline/);
+});
+
+test('PWA source and offline build contain their required registration/assets', () => {
+  const app = read('js/app.js');
+  const page = read('index.html');
+  const build = read('scripts/build.js');
+  assert.match(app, /protocol !== 'http:' && protocol !== 'https:'/);
+  assert.match(app, /register\('service-worker\.js'\)/);
+  assert.match(page, /js\/storage\.js/);
+  assert.match(build, /service-worker\.js/);
+  assert.match(build, /manifest\.webmanifest/);
+  assert.match(build, /'icons'/);
+});
+
+test('standalone dist package includes all PWA runtime assets', () => {
+  const dist = path.join(root, 'dist');
+  for (const file of ['index.html', 'manifest.webmanifest', 'service-worker.js', 'offline.html', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'decks/manifest.json']) {
+    assert.ok(fs.existsSync(path.join(dist, file)), `Missing dist/${file}`);
+  }
+  const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
+  assert.doesNotMatch(html, /<script\s+src=|<link rel="stylesheet"/i);
+  assert.match(html, /rel="manifest" href="manifest\.webmanifest"/);
+});

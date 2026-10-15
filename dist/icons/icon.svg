@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CCI Study">
+  <rect width="512" height="512" rx="112" fill="#8B6E2F"/>
+  <path d="M128 146c49-20 92-13 128 12v222c-36-25-79-32-128-12z" fill="#FFFDF9"/>
+  <path d="M384 146c-49-20-92-13-128 12v222c36-25 79-32 128-12z" fill="#F0E6D0"/>
+  <path d="M256 158v222" fill="none" stroke="#6B8F71" stroke-linecap="round" stroke-width="18"/>
+  <path d="m188 274 39 39 93-103" fill="none" stroke="#2D6A4F" stroke-linecap="round" stroke-linejoin="round" stroke-width="24"/>
+</svg>
