@@ -202,6 +202,8 @@ test('stored progress survives starter duplicate removal and renumbering', async
   const section6 = 'd-discipleship-experience-section-6-prayer';
   const section7 = 'd-discipleship-experience-section-7-bible-experience-i';
   const section8 = 'd-discipleship-experience-section-8-bible-experience-ii';
+  const section12 = 'd-discipleship-experience-section-12-church-history';
+  const sourceChurchHistory = parsed.decks.find(deck => deck.title.endsWith('Church History'));
   const makeDeck = (id, duplicateNumber, duplicateText, addCustomCard = false) => {
     const cards = Array.from({ length: 30 }, (_, index) => {
       const number = index + 1;
@@ -227,11 +229,13 @@ test('stored progress survives starter duplicate removal and renumbering', async
       makeDeckMissingQuestion(section1, 27),
       makeDeck(section6, 25, 'Why does the lesson warn against making "God, help me" the entirety of one\'s prayer life?', true),
       makeDeckMissingQuestion(section7, 9),
-      makeDeck(section8, 29, 'What is the danger of reading Scripture without a Christ-centered lens?')
+      makeDeck(section8, 29, 'What is the danger of reading Scripture without a Christ-centered lens?'),
+      { id: section12, title: sourceChurchHistory.title, cards: sourceChurchHistory.questions.slice(0, 19).map(q => ({ id: `${section12}.${q.id}`, question: q.question, options: q.options, answer: q.answer, explanation: '', ref: '' })) }
     ],
     progress: {
       [section6]: { best: null, cards: { [`${section6}.q24`]: 'known', [`${section6}.q25`]: 'unknown', [`${section6}.q26`]: 'known', [`${section6}.q30`]: 'unknown', [`${section6}.ncustom`]: 'known' } },
-      [section8]: { best: null, cards: { [`${section8}.q28`]: 'known', [`${section8}.q29`]: 'unknown', [`${section8}.q30`]: 'known' } }
+      [section8]: { best: null, cards: { [`${section8}.q28`]: 'known', [`${section8}.q29`]: 'unknown', [`${section8}.q30`]: 'known' } },
+      [section12]: { best: null, cards: { [`${section12}.q19`]: 'known' } }
     },
     settings: { theme: 'auto', shuffle: false },
     seeded: true,
@@ -267,7 +271,8 @@ test('stored progress survives starter duplicate removal and renumbering', async
   const prayer = migrated.decks.find(deck => deck.id === section6);
   const bible1 = migrated.decks.find(deck => deck.id === section7);
   const bible = migrated.decks.find(deck => deck.id === section8);
-  assert.equal(migrated.dataVersion, 5);
+  const churchHistory = migrated.decks.find(deck => deck.id === section12);
+  assert.equal(migrated.dataVersion, 6);
   assert.ok(Number.isFinite(migrated.backupReminder.anchorAt));
   assert.equal(migrated.backupReminder.cardsStudied, 0);
   assert.ok(storageKeys.length > 0 && storageKeys.every(key => key === 'flashdecks.v1'));
@@ -287,6 +292,10 @@ test('stored progress survives starter duplicate removal and renumbering', async
   assert.equal(migrated.progress[section8].cards[`${section8}.q28`].box, 2);
   assert.equal(migrated.progress[section8].cards[`${section8}.q29`].box, 2);
   assert.equal(migrated.progress[section8].cards[`${section8}.q30`], undefined);
+  assert.equal(churchHistory.cards.length, 30);
+  assert.equal(churchHistory.cards.find(card => card.id === `${section12}.q20`).question, 'What did Sabellianism teach about the Father, Son and Holy Spirit?');
+  assert.equal(churchHistory.cards.find(card => card.id === `${section12}.q30`).answer, 'C');
+  assert.equal(migrated.progress[section12].cards[`${section12}.q19`].box, 2);
 });
 
 test('HTTP loads split decks with fetch and file URLs use the embedded fallback', async () => {
@@ -327,7 +336,7 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
   assert.deepEqual(httpResult.registrations, ['service-worker.js']);
   assert.deepEqual(fetched, ['decks/manifest.json', ...deckFiles.map(file => `decks/${file}`)]);
   assert.equal(httpState.decks.length, 12);
-  assert.equal(httpState.decks.reduce((count, deck) => count + deck.cards.length, 0), parsed.decks.reduce((count, deck) => count + deck.questions.length, 0));
+  assert.equal(httpState.decks.reduce((count, deck) => count + deck.cards.length, 0), 358);
 
   let fileFetches = 0;
   const fileResult = await boot('file:', () => { fileFetches++; throw new Error('file mode must not fetch'); }, starter);
@@ -335,7 +344,7 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
   assert.equal(fileFetches, 0);
   assert.deepEqual(fileResult.registrations, []);
   assert.equal(fileState.decks.length, 12);
-  assert.equal(fileState.decks.reduce((count, deck) => count + deck.cards.length, 0), parsed.decks.reduce((count, deck) => count + deck.questions.length, 0));
+  assert.equal(fileState.decks.reduce((count, deck) => count + deck.cards.length, 0), 358);
 });
 
 test('quiz and exam keyboard answers store stats and defer exam feedback until review', async () => {

@@ -35,5 +35,5 @@ Q12
 ## Discipleship Experience (Section 11) Believers' Authority/Charisma (0)
 _None._
 
-## Discipleship Experience (Section 12) Church History (4)
-Q2, Q4, Q9, Q17
+## Discipleship Experience (Section 12) Church History (6)
+Q2, Q4, Q9, Q17, Q20, Q25

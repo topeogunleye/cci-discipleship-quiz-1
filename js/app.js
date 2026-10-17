@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 5;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 6;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
   var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false }, seeded: false, dataVersion: 0 };
   var STARTER_DECKS = [];
@@ -207,6 +207,10 @@
           if (!card.ref && sourceCard.ref) card.ref = sourceCard.ref;
         });
       });
+    } },
+    { version: 6, run: function () {
+      var id = 'd-discipleship-experience-section-12-church-history';
+      for (var number = 20; number <= 30; number++) addMigratedCard(id, 'q' + number, number - 1);
     } }
   ];
   function applyDataMigrations() {
