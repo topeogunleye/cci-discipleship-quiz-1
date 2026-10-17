@@ -194,7 +194,7 @@ test('explanations-todo.md lists every starter question without an explanation',
   });
 
   assert.deepEqual(listed, missing);
-  assert.equal(missing.length, 358);
+  assert.equal(missing.length, parsed.decks.reduce((count, deck) => count + deck.questions.filter(question => !question.explanation).length, 0));
 });
 
 test('stored progress survives starter duplicate removal and renumbering', async () => {
@@ -267,12 +267,14 @@ test('stored progress survives starter duplicate removal and renumbering', async
   const prayer = migrated.decks.find(deck => deck.id === section6);
   const bible1 = migrated.decks.find(deck => deck.id === section7);
   const bible = migrated.decks.find(deck => deck.id === section8);
-  assert.equal(migrated.dataVersion, 4);
+  assert.equal(migrated.dataVersion, 5);
   assert.ok(Number.isFinite(migrated.backupReminder.anchorAt));
   assert.equal(migrated.backupReminder.cardsStudied, 0);
   assert.ok(storageKeys.length > 0 && storageKeys.every(key => key === 'flashdecks.v1'));
   assert.equal(soteriology.cards.find(card => card.id === `${section1}.q27`).question, 'Which illustration is used to explain that a person may appear physically alive while lacking spiritual life?');
   assert.equal(soteriology.cards.find(card => card.id === `${section1}.q27`).options[2], 'A funeral where the body looked unchanged');
+  assert.equal(soteriology.cards.find(card => card.id === `${section1}.q1`).explanation, parsed.decks[0].questions[0].explanation);
+  assert.equal(soteriology.cards.find(card => card.id === `${section1}.q1`).ref, parsed.decks[0].questions[0].ref);
   assert.equal(bible1.cards.find(card => card.id === `${section7}.q9`).question, 'The Greek word musterion in Ephesians 3, is explained in the lesson as referring to:');
   assert.deepEqual(prayer.cards.filter(card => /^.+\.q\d+$/.test(card.id)).map(card => card.id), Array.from({ length: 29 }, (_, index) => `${section6}.q${index + 1}`));
   assert.equal(prayer.cards.find(card => card.id === `${section6}.q25`).question, 'Saved card 26');
@@ -325,7 +327,7 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
   assert.deepEqual(httpResult.registrations, ['service-worker.js']);
   assert.deepEqual(fetched, ['decks/manifest.json', ...deckFiles.map(file => `decks/${file}`)]);
   assert.equal(httpState.decks.length, 12);
-  assert.equal(httpState.decks.reduce((count, deck) => count + deck.cards.length, 0), 358);
+  assert.equal(httpState.decks.reduce((count, deck) => count + deck.cards.length, 0), parsed.decks.reduce((count, deck) => count + deck.questions.length, 0));
 
   let fileFetches = 0;
   const fileResult = await boot('file:', () => { fileFetches++; throw new Error('file mode must not fetch'); }, starter);
@@ -333,7 +335,7 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
   assert.equal(fileFetches, 0);
   assert.deepEqual(fileResult.registrations, []);
   assert.equal(fileState.decks.length, 12);
-  assert.equal(fileState.decks.reduce((count, deck) => count + deck.cards.length, 0), 358);
+  assert.equal(fileState.decks.reduce((count, deck) => count + deck.cards.length, 0), parsed.decks.reduce((count, deck) => count + deck.questions.length, 0));
 });
 
 test('quiz and exam keyboard answers store stats and defer exam feedback until review', async () => {
@@ -399,8 +401,8 @@ test('quiz and exam keyboard answers store stats and defer exam feedback until r
   const flashBack = window.studyTestApi.flash();
   assert.match(flashBack, /class="face front" aria-hidden="true"/);
   assert.match(flashBack, /class="face back" aria-hidden="false"/);
-  assert.match(flashBack, /The lesson supports the first answer/);
-  assert.match(flashBack, /Lesson 4, slide 2/);
+  assert.match(flashBack, /<strong>Explanation:<\/strong> The lesson supports the first answer/);
+  assert.match(flashBack, /<strong>Reference:<\/strong> Lesson 4, slide 2/);
   const plainItem = { deckId, card: { ...card, explanation: '', ref: '' }, optionOrder: [0, 1, 2, 3] };
   window.studyTestApi.setSession({ name: 'flash', cards: [plainItem], i: 0, flipped: true, opts: {}, ids: [deckId] });
   assert.doesNotMatch(window.studyTestApi.flash(), /card-note|Lesson 4, slide 2|The lesson supports the first answer/);
@@ -416,6 +418,8 @@ test('quiz and exam keyboard answers store stats and defer exam feedback until r
   const quizFeedback = window.studyTestApi.quiz();
   assert.match(quizFeedback, /class="feedback-answer-letter"[^>]*>A<\/span>/);
   assert.match(quizFeedback, /Correct option A/);
+  assert.match(quizFeedback, /<strong>Explanation:<\/strong> The lesson supports the first answer/);
+  assert.match(quizFeedback, /<strong>Reference:<\/strong> Lesson 4, slide 2/);
   let progress = JSON.parse(stored).progress[deckId].cards[card.id];
   assert.deepEqual({ box: progress.box, attempts: progress.attempts, misses: progress.misses }, { box: 1, attempts: 1, misses: 1 });
   assert.ok(Number.isFinite(progress.lastSeen));
@@ -434,8 +438,8 @@ test('quiz and exam keyboard answers store stats and defer exam feedback until r
   assert.match(elements.app.innerHTML, /Answer review/);
   assert.match(elements.app.innerHTML, /Incorrect/);
   assert.match(elements.app.innerHTML, /class="answer-label">Correct answer<\/span><span class="answer-copy"><b>A<\/b> First answer/);
-  assert.match(elements.app.innerHTML, /The lesson supports the first answer\./);
-  assert.match(elements.app.innerHTML, /Lesson 4, slide 2/);
+  assert.match(elements.app.innerHTML, /<strong>Explanation:<\/strong> The lesson supports the first answer\./);
+  assert.match(elements.app.innerHTML, /<strong>Reference:<\/strong> Lesson 4, slide 2/);
   progress = JSON.parse(stored).progress[deckId].cards[card.id];
   assert.deepEqual({ attempts: progress.attempts, misses: progress.misses }, { attempts: 2, misses: 2 });
   assert.equal(JSON.parse(stored).backupReminder.cardsStudied, 2);

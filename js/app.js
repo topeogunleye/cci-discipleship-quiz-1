@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 4;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 5;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
   var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false }, seeded: false, dataVersion: 0 };
   var STARTER_DECKS = [];
@@ -196,6 +196,17 @@
     } },
     { version: 4, run: function () {
       S.backupReminder = StudyLogic.normalizeBackupReminder(S.backupReminder, Date.now());
+    } },
+    { version: 5, run: function () {
+      S.decks.forEach(function (d) {
+        var source = starterDeck(d.id); if (!source) return;
+        d.cards.forEach(function (card) {
+          var sourceCard = source.questions.filter(function (q) { return card.id === d.id + '.' + q.id || card.question === q.question; })[0];
+          if (!sourceCard) return;
+          if (!card.explanation && sourceCard.explanation) card.explanation = sourceCard.explanation;
+          if (!card.ref && sourceCard.ref) card.ref = sourceCard.ref;
+        });
+      });
     } }
   ];
   function applyDataMigrations() {
@@ -414,7 +425,7 @@
 
   views.flash = function () {
     var it = V.cards[V.i], c = it.card, ai = LET.indexOf(c.answer), d = deck(it.deckId);
-    var notes = (c.explanation ? '<p class="card-note">' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref">' + esc(c.ref) + '</p>' : '');
+    var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '');
     return '<section class="study-shell flash-session" aria-label="Flashcard study session">' + sessionHead('Flashcards', (V.i + 1) + ' / ' + V.cards.length) + progressBar(V.i + 1, V.cards.length) +
       '<button class="flip' + (V.flipped ? ' on' : '') + '" data-act="flip" type="button" aria-pressed="' + V.flipped + '" aria-label="' + (V.flipped ? 'Show question' : 'Reveal answer') + '"><span class="inner">' +
       '<span class="face front" aria-hidden="' + V.flipped + '"><span class="card-face-top"><span class="tag">' + esc(d ? d.title : '') + '</span><span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span></span><span class="q">' + esc(c.question) + '</span><span class="flip-cue"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap, click, Space, or Enter to reveal</span></span>' +
@@ -436,7 +447,7 @@
       if (isExam) fb = '<div class="exam-progress-note" role="status">Answer saved for review after submission.</div><button class="btn primary full" data-act="next">' + (V.i === V.cards.length - 1 ? 'Submit exam' : 'Next question') + '</button>';
       else {
         var ok = picked === answerAt;
-        fb = '<div class="feedback-panel ' + (ok ? 'is-correct' : 'is-incorrect') + '" role="status" aria-live="polite"><p class="fb ' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'Correct.' : 'Not quite.') + '</p>' + (!ok ? '<p class="feedback-answer"><span class="feedback-answer-letter" aria-label="Correct option ' + LET[answerAt] + '">' + LET[answerAt] + '</span><span>' + esc(c.options[order[answerAt]]) + '</span></p>' : '') + (c.explanation ? '<p class="card-note">' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref">' + esc(c.ref) + '</p>' : '') + '</div><button class="btn primary full" data-act="next">' + (V.i === V.cards.length - 1 ? 'See results' : 'Next question') + '</button>';
+        fb = '<div class="feedback-panel ' + (ok ? 'is-correct' : 'is-incorrect') + '" role="status" aria-live="polite"><p class="fb ' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'Correct.' : 'Not quite.') + '</p>' + (!ok ? '<p class="feedback-answer"><span class="feedback-answer-letter" aria-label="Correct option ' + LET[answerAt] + '">' + LET[answerAt] + '</span><span>' + esc(c.options[order[answerAt]]) + '</span></p>' : '') + (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') + '</div><button class="btn primary full" data-act="next">' + (V.i === V.cards.length - 1 ? 'See results' : 'Next question') + '</button>';
       }
     }
     var title = isExam ? 'Exam' : 'Quiz';
@@ -453,7 +464,7 @@
         var card = entry.item.card;
         var selected = entry.selected ? '<p class="answer-review-line selected-answer"><span class="answer-label">Your answer</span><span class="answer-copy"><b>' + entry.selected + '</b> ' + esc(card.options[LET.indexOf(entry.selected)]) + '</span></p>' : '<p class="answer-review-line unanswered"><span class="answer-label">Your answer</span><span class="answer-copy">Unanswered</span></p>';
         var status = entry.ok ? 'Correct' : (entry.selected ? 'Incorrect' : 'Not answered');
-        return '<li class="exam-review-item ' + (entry.ok ? 'review-correct' : 'review-missed') + '"><div class="review-item-head"><h3>Question ' + (index + 1) + ': ' + esc(card.question) + '</h3><span class="review-status ' + (entry.ok ? 'is-correct' : 'is-incorrect') + '">' + status + '</span></div>' + selected + '<p class="answer-review-line correct-answer"><span class="answer-label">Correct answer</span><span class="answer-copy"><b>' + card.answer + '</b> ' + esc(card.options[LET.indexOf(card.answer)]) + '</span></p>' + (card.explanation ? '<p class="card-note">' + esc(card.explanation) + '</p>' : '') + (card.ref ? '<p class="card-note card-ref">' + esc(card.ref) + '</p>' : '') + '</li>';
+        return '<li class="exam-review-item ' + (entry.ok ? 'review-correct' : 'review-missed') + '"><div class="review-item-head"><h3>Question ' + (index + 1) + ': ' + esc(card.question) + '</h3><span class="review-status ' + (entry.ok ? 'is-correct' : 'is-incorrect') + '">' + status + '</span></div>' + selected + '<p class="answer-review-line correct-answer"><span class="answer-label">Correct answer</span><span class="answer-copy"><b>' + card.answer + '</b> ' + esc(card.options[LET.indexOf(card.answer)]) + '</span></p>' + (card.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(card.explanation) + '</p>' : '') + (card.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(card.ref) + '</p>' : '') + '</li>';
       }).join('');
       return '<section class="study-shell results-shell exam-results" aria-label="Exam results"><header class="top results-header"><h1>Exam results</h1><button class="btn sm ghost" data-act="home">Back to decks</button></header><div class="result-hero exam-score"><span class="result-mark" aria-hidden="true">' + examPct + '%</span><div class="result-score"><span class="num">' + R.score + ' <span aria-hidden="true">/</span> ' + R.total + '</span><span class="meta">' + examPct + '% correct · ' + R.answered + ' answered' + (R.expired ? ' · Time expired' : '') + '</span></div></div><section class="exam-review" aria-labelledby="exam-review-title"><div class="review-heading"><div><p class="eyebrow">Learn from the attempt</p><h2 id="exam-review-title">Answer review</h2></div><span class="meta">' + plural(R.review.length, 'question') + '</span></div><ol>' + examRows + '</ol></section><button class="btn full ghost result-home" data-act="home">Return to decks</button></section>';
     }
