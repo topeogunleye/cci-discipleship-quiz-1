@@ -214,7 +214,7 @@ test('stored progress survives starter duplicate removal and renumbering', async
         answer: 'A'
       };
     });
-    if (addCustomCard) cards.push({ id: `${id}.ncustom`, question: 'Custom card', options: ['One', 'Two', 'Three', 'Four'], answer: 'A' });
+    if (addCustomCard) cards.push({ id: `${id}.ncustom`, question: 'Custom card', options: ['One', 'Two', 'Three', 'Four'], answer: 'A', explanation: 'Custom explanation', ref: 'Custom reference' });
     return { id, title: id, cards };
   };
   const makeDeckMissingQuestion = (id, missingNumber) => ({
@@ -230,7 +230,7 @@ test('stored progress survives starter duplicate removal and renumbering', async
       makeDeck(section6, 25, 'Why does the lesson warn against making "God, help me" the entirety of one\'s prayer life?', true),
       makeDeckMissingQuestion(section7, 9),
       makeDeck(section8, 29, 'What is the danger of reading Scripture without a Christ-centered lens?'),
-      { id: section12, title: sourceChurchHistory.title, cards: sourceChurchHistory.questions.slice(0, 19).map(q => ({ id: `${section12}.${q.id}`, question: q.question, options: q.options, answer: q.answer, explanation: '', ref: '' })) }
+      { id: section12, title: sourceChurchHistory.title, cards: sourceChurchHistory.questions.slice(0, 19).map(q => ({ id: `${section12}.${q.id}`, question: q.question, options: q.options, answer: q.answer, explanation: q.id === 'q1' ? 'Stale explanation' : '', ref: q.id === 'q1' ? 'Stale reference' : '' })) }
     ],
     progress: {
       [section6]: { best: null, cards: { [`${section6}.q24`]: 'known', [`${section6}.q25`]: 'unknown', [`${section6}.q26`]: 'known', [`${section6}.q30`]: 'unknown', [`${section6}.ncustom`]: 'known' } },
@@ -272,7 +272,7 @@ test('stored progress survives starter duplicate removal and renumbering', async
   const bible1 = migrated.decks.find(deck => deck.id === section7);
   const bible = migrated.decks.find(deck => deck.id === section8);
   const churchHistory = migrated.decks.find(deck => deck.id === section12);
-  assert.equal(migrated.dataVersion, 6);
+  assert.equal(migrated.dataVersion, 7);
   assert.ok(Number.isFinite(migrated.backupReminder.anchorAt));
   assert.equal(migrated.backupReminder.cardsStudied, 0);
   assert.ok(storageKeys.length > 0 && storageKeys.every(key => key === 'flashdecks.v1'));
@@ -284,6 +284,8 @@ test('stored progress survives starter duplicate removal and renumbering', async
   assert.deepEqual(prayer.cards.filter(card => /^.+\.q\d+$/.test(card.id)).map(card => card.id), Array.from({ length: 29 }, (_, index) => `${section6}.q${index + 1}`));
   assert.equal(prayer.cards.find(card => card.id === `${section6}.q25`).question, 'Saved card 26');
   assert.equal(prayer.cards.find(card => card.id === `${section6}.ncustom`).question, 'Custom card');
+  assert.equal(prayer.cards.find(card => card.id === `${section6}.ncustom`).explanation, 'Custom explanation');
+  assert.equal(prayer.cards.find(card => card.id === `${section6}.ncustom`).ref, 'Custom reference');
   assert.equal(migrated.progress[section6].cards[`${section6}.q25`].box, 2);
   assert.equal(migrated.progress[section6].cards[`${section6}.q29`].box, 1);
   assert.equal(migrated.progress[section6].cards[`${section6}.ncustom`].box, 2);
@@ -295,6 +297,8 @@ test('stored progress survives starter duplicate removal and renumbering', async
   assert.equal(churchHistory.cards.length, 30);
   assert.equal(churchHistory.cards.find(card => card.id === `${section12}.q20`).question, 'What did Sabellianism teach about the Father, Son and Holy Spirit?');
   assert.equal(churchHistory.cards.find(card => card.id === `${section12}.q30`).answer, 'C');
+  assert.equal(churchHistory.cards.find(card => card.id === `${section12}.q1`).explanation, sourceChurchHistory.questions[0].explanation);
+  assert.equal(churchHistory.cards.find(card => card.id === `${section12}.q1`).ref, sourceChurchHistory.questions[0].ref);
   assert.equal(migrated.progress[section12].cards[`${section12}.q19`].box, 2);
 });
 

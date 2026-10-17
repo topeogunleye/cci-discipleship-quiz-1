@@ -2522,7 +2522,7 @@ textarea { resize: vertical; }
 <script>
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 6;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 7;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
   var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false }, seeded: false, dataVersion: 0 };
   var STARTER_DECKS = [];
@@ -2733,6 +2733,17 @@ textarea { resize: vertical; }
     { version: 6, run: function () {
       var id = 'd-discipleship-experience-section-12-church-history';
       for (var number = 20; number <= 30; number++) addMigratedCard(id, 'q' + number, number - 1);
+    } },
+    { version: 7, run: function () {
+      S.decks.forEach(function (d) {
+        var source = starterDeck(d.id); if (!source) return;
+        d.cards.forEach(function (card) {
+          var sourceCard = source.questions.filter(function (q) { return card.id === d.id + '.' + q.id || card.question === q.question; })[0];
+          if (!sourceCard) return;
+          if (sourceCard.explanation && card.explanation !== sourceCard.explanation) card.explanation = sourceCard.explanation;
+          if (sourceCard.ref && card.ref !== sourceCard.ref) card.ref = sourceCard.ref;
+        });
+      });
     } }
   ];
   function applyDataMigrations() {
