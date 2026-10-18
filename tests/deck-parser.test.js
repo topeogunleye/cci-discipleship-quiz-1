@@ -11,7 +11,7 @@ const starter = deckFiles.map(file => fs.readFileSync(path.join(root, 'decks', f
 test('bundled starter decks parse without errors', () => {
   const result = parser.parseDecks(starter);
   assert.equal(result.errors.length, 0, JSON.stringify(result.errors, null, 2));
-  assert.equal(result.decks.length, 12);
+  assert.equal(result.decks.length, (starter.match(/^DECK:/gm) || []).length);
   assert.ok(result.decks.reduce((n, deck) => n + deck.questions.length, 0) >= 300);
   assert.ok(result.decks.every(deck => deck.questions.every(question =>
     question.question && question.options.length === 4 && /^[ABCD]$/.test(question.answer)

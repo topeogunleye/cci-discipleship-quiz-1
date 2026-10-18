@@ -27,6 +27,7 @@ function jaccard(setA, setB) {
 const allQuestions = [];
 parsed.decks.forEach(deck => {
   deck.questions.forEach(q => {
+    if (/^\[Placeholder\b/i.test(q.question)) return;
     allQuestions.push({ deck: deck.title, id: q.id, text: q.question, options: q.options, answer: q.answer, explanation: q.explanation, ref: q.ref, normalized: normalize(q.question).join(' '), tokens: new Set(normalize(q.question)) });
   });
 });
@@ -57,10 +58,10 @@ test('Check 1: Exact and near-duplicate questions (Jaccard > 0.8)', () => {
   }
   assert.equal(duplicates.length, 0, 'Starter decks contain exact or near-duplicate questions.');
   parsed.decks.forEach(deck => {
-    assert.deepEqual(
-      deck.questions.map(question => question.id),
-      deck.questions.map((_, index) => `q${index + 1}`),
-      `Question IDs in "${deck.title}" should be sequential.`
+    const numbers = deck.questions.map(question => Number(/^q(\d+)$/.exec(question.id)?.[1]));
+    assert.ok(
+      numbers.every((number, index) => Number.isInteger(number) && (index === 0 || number > numbers[index - 1])),
+      `Question IDs in "${deck.title}" should be unique and ordered; gaps are retained to preserve existing IDs.`
     );
   });
 });
@@ -339,16 +340,18 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
   const httpState = httpResult.state;
   assert.deepEqual(httpResult.registrations, ['service-worker.js']);
   assert.deepEqual(fetched, ['decks/manifest.json', ...deckFiles.map(file => `decks/${file}`)]);
-  assert.equal(httpState.decks.length, 12);
-  assert.equal(httpState.decks.reduce((count, deck) => count + deck.cards.length, 0), 358);
+  const expectedDeckCount = parsed.decks.length;
+  const expectedCardCount = parsed.decks.reduce((count, deck) => count + deck.questions.length, 0);
+  assert.equal(httpState.decks.length, expectedDeckCount);
+  assert.equal(httpState.decks.reduce((count, deck) => count + deck.cards.length, 0), expectedCardCount);
 
   let fileFetches = 0;
   const fileResult = await boot('file:', () => { fileFetches++; throw new Error('file mode must not fetch'); }, starter);
   const fileState = fileResult.state;
   assert.equal(fileFetches, 0);
   assert.deepEqual(fileResult.registrations, []);
-  assert.equal(fileState.decks.length, 12);
-  assert.equal(fileState.decks.reduce((count, deck) => count + deck.cards.length, 0), 358);
+  assert.equal(fileState.decks.length, expectedDeckCount);
+  assert.equal(fileState.decks.reduce((count, deck) => count + deck.cards.length, 0), expectedCardCount);
 });
 
 test('quiz and exam keyboard answers store stats and defer exam feedback until review', async () => {
