@@ -304,8 +304,8 @@ test('stored progress survives starter duplicate removal and renumbering', async
 });
 
 test('HTTP loads split decks with fetch and file URLs use the embedded fallback', async () => {
-  async function boot(protocol, fetch, fallbackText) {
-    let stored = null;
+  async function boot(protocol, fetch, fallbackText, initialRaw = null) {
+    let stored = initialRaw;
     const registrations = [];
     const elements = {
       app: { innerHTML: '', querySelectorAll: () => [] },
@@ -352,6 +352,50 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
   assert.deepEqual(fileResult.registrations, []);
   assert.equal(fileState.decks.length, expectedDeckCount);
   assert.equal(fileState.decks.reduce((count, deck) => count + deck.cards.length, 0), expectedCardCount);
+});
+
+test('saved starter decks refresh from source while custom cards and matching progress survive', async () => {
+  const source = parsed.decks[0];
+  const deckId = 'd-' + source.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+  const first = source.questions[0];
+  const second = source.questions[1];
+  const existing = {
+    id: deckId,
+    title: source.title,
+    cards: [
+      { id: `${deckId}.${first.id}`, question: first.question, options: first.options, answer: first.answer },
+      { id: `${deckId}.${second.id}`, question: 'Old changed question', options: ['Old A', 'Old B', 'Old C', 'Old D'], answer: 'A' },
+      { id: `${deckId}.custom`, question: 'My custom card', options: ['A', 'B', 'C', 'D'], answer: 'A' }
+    ]
+  };
+  const raw = JSON.stringify({
+    decks: [existing],
+    progress: { [deckId]: { best: { pct: 80 }, cards: { [`${deckId}.${first.id}`]: { box: 2 }, [`${deckId}.${second.id}`]: { box: 3 } } } },
+    settings: { theme: 'auto', shuffle: false },
+    seeded: true,
+    dataVersion: 7
+  });
+  const result = await (async () => {
+    let stored = raw;
+    const elements = {
+      app: { innerHTML: '', querySelectorAll: () => [] },
+      modal: { innerHTML: '' },
+      toast: { textContent: '', className: '' },
+      'starter-fallback': { textContent: JSON.stringify(starter) }
+    };
+    const document = { getElementById: id => elements[id], addEventListener: () => {}, documentElement: { removeAttribute: () => {}, setAttribute: () => {} } };
+    const window = { DeckParser: parser, StudyLogic, StudyStorage, location: { protocol: 'file:' }, scrollTo: () => {} };
+    const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
+    vm.runInNewContext(testAppSource, { window, document, localStorage: { getItem: () => stored, setItem: (_, value) => { stored = value; } } });
+    await window.testAppReady;
+    return JSON.parse(stored);
+  })();
+  const updated = result.decks.find(deck => deck.id === deckId);
+  assert.equal(updated.cards.find(card => card.id === `${deckId}.${first.id}`).question, first.question);
+  assert.equal(updated.cards.find(card => card.id === `${deckId}.${second.id}`).question, second.question);
+  assert.equal(updated.cards.find(card => card.id === `${deckId}.custom`).question, 'My custom card');
+  assert.deepEqual(result.progress[deckId].cards[`${deckId}.${first.id}`], { box: 2 });
+  assert.equal(result.progress[deckId].cards[`${deckId}.${second.id}`], undefined);
 });
 
 test('quiz and exam keyboard answers store stats and defer exam feedback until review', async () => {

@@ -26,11 +26,13 @@ test('web app manifest declares standalone install metadata and valid icon asset
 test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
   const serviceWorker = read('service-worker.js');
   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v7'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v8'/);
   assert.match(serviceWorker, /decks\/manifest\.json/);
   assert.match(serviceWorker, /cache\.addAll\(deckFiles\.map/);
   assert.match(serviceWorker, /offline\.html/);
   assert.match(serviceWorker, /SKIP_WAITING/);
+  assert.match(serviceWorker, /url\.href\.startsWith\(deckBase\)/);
+  assert.match(serviceWorker, /return await cache\.match\(request\) \|\| new Response\('Offline and this deck is not cached\.'/);
   assert.match(read('offline.html'), /You are offline/);
 });
 
@@ -45,7 +47,7 @@ test('activation deletes previous app caches and deck assets absent from the cur
     [url('settings.json'), {}]
   ]);
   const cacheStore = new Map([
-    ['cci-study-pwa-v7', activeEntries],
+    ['cci-study-pwa-v8', activeEntries],
     ['cci-study-pwa-v3', new Map()],
     ['unrelated-app-cache', new Map()]
   ]);
@@ -84,6 +86,47 @@ test('activation deletes previous app caches and deck assets absent from the cur
   assert.equal(activeEntries.has(url('decks/removed.txt')), false);
   assert.equal(activeEntries.has(url('settings.json')), true);
   assert.equal(claimed, true);
+});
+
+test('deck requests refresh from network and fall back to the cached copy offline', async () => {
+  const scope = 'https://example.test/app/';
+  const deckUrl = new URL('decks/section.txt', scope).href;
+  const entries = new Map([[deckUrl, { text: async () => 'old deck' }]]);
+  let offline = false;
+  const cache = {
+    match: async request => entries.get(request.url) || null,
+    put: async (request, response) => entries.set(request.url, response)
+  };
+  const listeners = {};
+  const self = {
+    location: new URL(scope),
+    registration: { scope },
+    addEventListener: (name, handler) => { listeners[name] = handler; }
+  };
+  vm.runInNewContext(read('service-worker.js'), {
+    self,
+    caches: { open: async () => cache },
+    URL,
+    fetch: async () => {
+      if (offline) throw new Error('offline');
+      return { ok: true, text: async () => 'fresh deck', clone() { return this; } };
+    },
+    Response
+  });
+
+  async function requestDeck() {
+    let responsePromise;
+    listeners.fetch({
+      request: { method: 'GET', url: deckUrl, mode: 'cors' },
+      respondWith: promise => { responsePromise = promise; }
+    });
+    return responsePromise;
+  }
+
+  assert.equal(await (await requestDeck()).text(), 'fresh deck');
+  assert.equal(await (await entries.get(deckUrl)).text(), 'fresh deck');
+  offline = true;
+  assert.equal(await (await requestDeck()).text(), 'fresh deck');
 });
 
 test('PWA source and offline build contain their required registration/assets', () => {

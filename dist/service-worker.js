@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v7';
+const CACHE_NAME = CACHE_PREFIX + 'v8';
 const CORE_FILES = [
   './',
   'offline.html',
@@ -68,6 +68,15 @@ self.addEventListener('fetch', event => {
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
+    const deckBase = new URL('decks/', self.registration.scope).href;
+    if (url.href.startsWith(deckBase)) {
+      try {
+        const response = await fetch(request);
+        if (response.ok) await cache.put(request, response.clone());
+        if (response.ok) return response;
+      } catch (error) {}
+      return await cache.match(request) || new Response('Offline and this deck is not cached.', { status: 503, statusText: 'Offline' });
+    }
     if (request.mode === 'navigate') {
       try {
         const response = await fetch(request);

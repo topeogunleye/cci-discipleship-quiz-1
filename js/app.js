@@ -141,6 +141,38 @@
     S.seeded = true; save();
   }
 
+  function syncStarterDecks() {
+    var changed = false;
+    STARTER_DECKS.forEach(function (source) {
+      if (!source.questions.length) return;
+      var id = 'd-' + slug(source.title), saved = deck(id);
+      if (!saved) { addParsed(source, true); changed = true; return; }
+      var previous = Object.create(null), next = [], deckChanged = false;
+      saved.cards.forEach(function (card) { previous[card.id] = card; });
+      source.questions.forEach(function (question) {
+        var cardId = id + '.' + question.id, existing = previous[cardId];
+        if (!existing || existing.question !== question.question) deckChanged = true;
+        if (existing && existing.question !== question.question && S.progress[id] && S.progress[id].cards) delete S.progress[id].cards[cardId];
+        next.push({ id: cardId, question: question.question, options: question.options.slice(), answer: question.answer, explanation: question.explanation || '', ref: question.ref || '' });
+        delete previous[cardId];
+      });
+      saved.cards.forEach(function (card) {
+        if (previous[card.id] && !/^q\d+$/.test(card.id.slice((id + '.').length))) next.push(card);
+      });
+      Object.keys(previous).forEach(function (cardId) {
+        if (cardId.indexOf(id + '.q') === 0) {
+          deckChanged = true;
+          if (S.progress[id] && S.progress[id].cards) delete S.progress[id].cards[cardId];
+        }
+      });
+      if (deckChanged && S.progress[id]) S.progress[id].best = null;
+      if (deckChanged) changed = true;
+      if (JSON.stringify(saved.cards) !== JSON.stringify(next)) changed = true;
+      saved.cards = next;
+    });
+    return changed;
+  }
+
   function starterDeck(deckId) {
     return STARTER_DECKS.filter(function (d) { return 'd-' + slug(d.title) === deckId; })[0];
   }
@@ -787,7 +819,9 @@
     return Promise.all([load(), loadStarterText()]).then(function (results) {
       var text = results[1];
       STARTER_DECKS = P.parseDecks(text).decks;
+      var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION;
       seed();
+      if (reconcileStarters && syncStarterDecks()) save();
       return applyDataMigrations().then(function () {
         applyTheme();
         render();
