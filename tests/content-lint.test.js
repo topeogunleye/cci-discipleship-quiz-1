@@ -14,6 +14,15 @@ const deckFiles = JSON.parse(fs.readFileSync(path.join(root, 'decks', 'manifest.
 const starter = deckFiles.map(file => fs.readFileSync(path.join(root, 'decks', file), 'utf8')).join('\n\n');
 const parsed = parser.parseDecks(starter);
 
+test('deck references omit LMS filenames while preserving timestamp annotations', () => {
+  for (const file of deckFiles) {
+    const text = fs.readFileSync(path.join(root, 'decks', file), 'utf8');
+    assert.doesNotMatch(text, /Celebration Church International - LMS\.(?:mp4|md)/i, `${file} should not expose source filenames`);
+  }
+  assert.match(starter, /REF: ASSURANCE — \[00:16\]–\[01:14\] \(approximate range\)/);
+  assert.match(starter, /REF: Justification — 05:03–06:07; 07:06–08:16/);
+});
+
 function normalize(text) {
   return text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/).filter(Boolean);
 }
