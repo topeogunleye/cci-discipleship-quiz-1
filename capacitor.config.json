@@ -1,0 +1,8 @@
+{
+  "appId": "com.cci.discipleshipstudy",
+  "appName": "CCI Discipleship Study",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "automatic"
+  }
+}

@@ -1,8 +1,8 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 8;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 8;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
-  var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false }, seeded: false, dataVersion: 0 };
+  var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false }, seeded: false, dataVersion: 0, pausedSession: null };
   var STARTER_DECKS = [];
   var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
   var browserLocalStorage = null, browserIndexedDB = null;
@@ -99,6 +99,7 @@
       S.seeded = !!o.seeded;
       S.dataVersion = Number.isInteger(o.dataVersion) && o.dataVersion >= 0 ? o.dataVersion : 0;
       S.backupReminder = o.backupReminder;
+      S.pausedSession = o.pausedSession && typeof o.pausedSession === 'object' && !Array.isArray(o.pausedSession) ? o.pausedSession : null;
     } catch (e) { preserveStorage = true; storageOk = false; storageMessage = 'Saved study data could not be read. To protect it, this app will not overwrite browser storage automatically. Export what you can before deciding whether to clear site data.'; }
   }
   function applyStorageResult(result) {
@@ -131,6 +132,33 @@
       return result;
     });
     return saveQueue;
+  }
+  function isStudySession(name) { return name === 'flash' || name === 'quiz' || name === 'exam'; }
+  function saveActiveSession() {
+    if (!isStudySession(V.name)) return Promise.resolve();
+    S.pausedSession = MobileStudy.snapshot(V);
+    return save();
+  }
+  function pauseStudySession() {
+    if (!isStudySession(V.name)) return;
+    if (V.name === 'exam' && V.deadline) V.remaining = Math.max(0, V.deadline - Date.now());
+    stopExamTimer();
+    S.pausedSession = MobileStudy.snapshot(V);
+    save();
+    go({ name: 'home' });
+    toast('Study paused. Your progress is saved.');
+  }
+  function resumeStudySession() {
+    var session = MobileStudy.restore(S.pausedSession, S.decks);
+    if (!session) { S.pausedSession = null; save(); render(true); toast('That saved session is no longer available.'); return; }
+    go(session);
+    if (session.name === 'exam') startExamTimer();
+    saveActiveSession();
+  }
+  function discardPausedSession() {
+    S.pausedSession = null;
+    save();
+    render(true);
   }
   function addParsed(pd, stable) {
     var id = stable ? 'd-' + slug(pd.title) : 'd' + uid(), n = 2, base = id;
@@ -296,6 +324,12 @@
       try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); }
       catch (e) { toast('Download is not available here.'); }
     };
+    if (window.CciNative && window.CciNative.isNative) {
+      window.CciNative.shareFile(filename, text).then(function (shared) {
+        if (!shared) viaBlob();
+      }).catch(function () { toast('Could not prepare the file to share.'); });
+      return;
+    }
     if (window.claude && window.claude.use) {
       window.claude.use('downloads').then(function (dl) {
         if (!dl) return viaBlob();
@@ -358,6 +392,7 @@
     if (app.innerHTML) render(true);
   }
   function registerServiceWorker() {
+    if (window.CciNative && window.CciNative.isNative) return;
     var protocol = window.location && window.location.protocol;
     var serviceWorker = window.navigator && window.navigator.serviceWorker;
     if ((protocol !== 'http:' && protocol !== 'https:') || !serviceWorker) return;
@@ -424,15 +459,21 @@
     var empty = '<div class="empty"><h2>Welcome to CCI Study Decks</h2><p>Begin your discipleship journey. Add a deck from a text file or paste its content to start studying.</p><button class="btn primary sm" data-act="import" style="margin-top:14px">Add your first deck</button></div>';
     var heroSection = '';
     if (S.decks.length) {
-      if (dueCount > 0) {
-        heroSection = '<section class="hero-action" aria-label="Continue studying">' +
-          '<div class="hero-content"><span class="hero-tag">Daily Review</span><h2 class="hero-title">Cards due for review</h2><p class="hero-desc">' + plural(dueCount, 'card') + ' ' + (dueCount === 1 ? 'is' : 'are') + ' scheduled for review today across your decks.</p></div>' +
-          '<button class="btn primary" data-act="due">Review Now (' + dueCount + ')</button></section>';
+      if (S.pausedSession) {
+        var pausedLabel = S.pausedSession.name === 'exam' ? 'exam' : (S.pausedSession.name === 'quiz' ? 'quiz' : 'flashcard session');
+        var pausedProgress = Math.min((S.pausedSession.i || 0) + 1, (S.pausedSession.cards || []).length);
+        heroSection = '<section class="hero-action" aria-label="Paused study session">' +
+          '<div class="hero-content"><span class="hero-tag">Saved for later</span><h2 class="hero-title">Pick up where you left off</h2><p class="hero-desc">Your ' + pausedLabel + ' is saved at card ' + pausedProgress + ' of ' + S.pausedSession.cards.length + '.</p></div>' +
+          '<div class="row"><button class="btn primary" data-act="resume-study">Resume Study</button><button class="btn sm ghost" data-act="discard-study">End session</button></div></section>';
+      } else if (dueCount > 0) {
+        heroSection = '<section class="hero-action" aria-label="Today’s study">' +
+          '<div class="hero-content"><span class="hero-tag">Today’s Study</span><h2 class="hero-title">A few cards are ready for review</h2><p class="hero-desc">' + plural(dueCount, 'card') + ' ' + (dueCount === 1 ? 'is' : 'are') + ' due. Start with a focused session of up to 10 cards, usually about 5–10 minutes.</p></div>' +
+          '<button class="btn primary" data-act="daily-study">Start today’s study</button></section>';
       } else if (totalKnown < totalCards) {
         var remaining = totalCards - totalKnown;
         heroSection = '<section class="hero-action" aria-label="Continue studying">' +
-          '<div class="hero-content"><span class="hero-tag">In Progress</span><h2 class="hero-title">Continue your study journey</h2><p class="hero-desc">' + plural(remaining, 'card') + ' remaining to master across ' + plural(S.decks.length, 'deck') + '. Steady practice deepens understanding.</p></div>' +
-          '<button class="btn primary" data-act="setup" data-mode="flash" data-id="' + S.decks[0].id + '">Continue Studying</button></section>';
+          '<div class="hero-content"><span class="hero-tag">Today’s Study</span><h2 class="hero-title">Continue your study journey</h2><p class="hero-desc">' + plural(remaining, 'card') + ' not yet mastered across ' + plural(S.decks.length, 'deck') + '. Start with up to 10 cards for a focused 5–10 minute session.</p></div>' +
+          '<button class="btn primary" data-act="daily-study">Continue Studying</button></section>';
       } else {
         heroSection = '<section class="hero-action hero-complete" aria-label="All cards mastered">' +
           '<div class="hero-content"><span class="hero-tag">Milestone Reached</span><h2 class="hero-title">All cards mastered!</h2><p class="hero-desc">You have achieved mastery across all 12 disciple decks. Challenge yourself with a comprehensive timed exam.</p></div>' +
@@ -484,8 +525,9 @@
 
   views.flash = function () {
     var it = V.cards[V.i], c = it.card, ai = LET.indexOf(c.answer), d = deck(it.deckId);
+    var title = V.opts && V.opts.daily ? 'Today’s Study' : 'Flashcards';
     var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') + bibleNote(c);
-    return '<section class="study-shell flash-session" aria-label="Flashcard study session">' + sessionHead('Flashcards', (V.i + 1) + ' / ' + V.cards.length) + progressBar(V.i + 1, V.cards.length) +
+    return '<section class="study-shell flash-session" aria-label="Flashcard study session">' + sessionHead(title, (V.i + 1) + ' / ' + V.cards.length) + progressBar(V.i + 1, V.cards.length) +
       '<button class="flip' + (V.flipped ? ' on' : '') + '" data-act="flip" type="button" aria-pressed="' + V.flipped + '" aria-label="' + (V.flipped ? 'Show question' : 'Reveal answer') + '"><span class="inner">' +
       '<span class="face front" aria-hidden="' + V.flipped + '"><span class="card-face-top"><span class="tag">' + esc(d ? d.title : '') + '</span><span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span></span><span class="q">' + esc(c.question) + '</span><span class="flip-cue"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap, click, Space, or Enter to reveal</span></span>' +
       '<span class="face back" aria-hidden="' + !V.flipped + '"><span class="card-face-top"><span class="tag">Answer · ' + c.answer + '</span><span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span></span><span class="a">' + esc(c.options[ai]) + '</span>' + notes + '<span class="qs">' + esc(c.question) + '</span><span class="flip-cue"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap, click, Space, or Enter to see question</span></span></span></button>' +
@@ -578,7 +620,7 @@
   };
 
   function head(t, right) { return '<header class="top"><button class="btn sm ghost" data-act="home">‹ Exit</button><h1>' + t + '</h1><span class="meta">' + right + '</span></header>'; }
-  function sessionHead(t, right, isExam) { return '<header class="top study-header"><button class="btn sm ghost study-exit" data-act="home" aria-label="Exit study session">‹ Exit</button><div class="study-heading"><span class="eyebrow">CCI · DISCIPLESHIP</span><h1>' + esc(t) + '</h1></div><div class="session-status' + (isExam ? ' is-timer' : '') + '">' + right + '</div></header>'; }
+  function sessionHead(t, right, isExam) { return '<header class="top study-header"><button class="btn sm ghost study-exit" data-act="pause-session" aria-label="Pause and save study session">Pause</button><div class="study-heading"><span class="eyebrow">CCI · DISCIPLESHIP</span><h1>' + esc(t) + '</h1></div><div class="session-status' + (isExam ? ' is-timer' : '') + '">' + right + '</div></header>'; }
   function progressBar(n, t) { var pct = t ? Math.max(0, Math.min(100, Math.round(100 * n / t))) : 0; return '<div class="pbar study-progress" role="progressbar" aria-label="Study session progress" aria-valuemin="0" aria-valuemax="' + t + '" aria-valuenow="' + n + '" aria-valuetext="' + n + ' of ' + t + '"><i style="width:' + pct + '%"></i></div>'; }
   function formatClock(milliseconds) { var seconds = Math.max(0, Math.ceil(milliseconds / 1000)); return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'); }
 
@@ -624,6 +666,12 @@
     if (!cards.length) { toast('No cards are due today.'); return; }
     begin('flash', shuffle(cards), { unk: false, limit: 0, shuf: true }, deckIdsFor(cards));
   }
+  function startDailyStudy() {
+    var all = allCardItems(), due = StudyLogic.dueItems(all, Date.now());
+    var cards = MobileStudy.selectDailyItems(due, all, function (item) { return isMastered(item.deckId, item.card.id); }, 10);
+    if (!cards.length) { toast('All cards are mastered. Try a quiz or exam to review them.'); return; }
+    begin('flash', shuffle(cards), { unk: false, limit: cards.length, shuf: true, daily: true }, deckIdsFor(cards));
+  }
   function startWeakSpots() {
     var cards = StudyLogic.weakSpots(allCardItems(), 10);
     if (!cards.length) { toast('Answer some questions first to build weak-spot stats.'); return; }
@@ -637,13 +685,14 @@
     var session = { name: mode, cards: cards, i: 0, flipped: false, picked: null, score: 0, answers: [], marks: {}, opts: o, ids: ids };
     if (mode === 'exam') session.remaining = o.duration;
     go(session);
+    saveActiveSession();
     if (mode === 'exam') startExamTimer();
   }
   function stopExamTimer() { if (examTimer !== null) { clearInterval(examTimer); examTimer = null; } }
   function startExamTimer() {
     stopExamTimer();
-    V.deadline = Date.now() + V.opts.duration;
-    V.remaining = V.opts.duration;
+    V.remaining = Number.isFinite(V.remaining) ? V.remaining : V.opts.duration;
+    V.deadline = Date.now() + V.remaining;
     examTimer = setInterval(function () {
       if (V.name !== 'exam') return stopExamTimer();
       V.remaining = Math.max(0, V.deadline - Date.now());
@@ -661,6 +710,7 @@
 
   function finishFlash() {
     var learn = V.cards.filter(function (x) { return V.marks[x.card.id] === 'unknown'; }), known = V.cards.filter(function (x) { return V.marks[x.card.id] === 'known'; }).length;
+    S.pausedSession = null; save();
     go({ name: 'results', kind: 'flash', known: known, learning: learn, skipped: V.cards.length - known - learn.length, all: V.cards, opts: V.opts, ids: V.ids });
   }
   function finishQuiz() {
@@ -672,7 +722,7 @@
       var pct = Math.round(100 * p.s / p.t), pr = prog(id);
       if (!pr.best || pct > pr.best.pct) { pr.best = { pct: pct, score: p.s, total: p.t, date: Date.now() }; newBest = true; }
     });
-    save();
+    S.pausedSession = null; save();
     go({ name: 'results', kind: 'quiz', score: V.score, total: V.answers.length, missed: missed, newBest: newBest, all: V.cards, opts: V.opts, ids: V.ids });
   }
   function finishExam(expired) {
@@ -689,7 +739,7 @@
       }
       return { item: item, selected: answer ? answer.selected : null, ok: !!(answer && answer.ok) };
     });
-    save();
+    S.pausedSession = null; save();
     go({ name: 'results', kind: 'exam', score: V.score, total: V.cards.length, answered: V.answers.length, expired: !!expired, review: review });
   }
 
@@ -723,6 +773,10 @@
       case 'theme': S.settings.theme = { auto: 'light', light: 'dark', dark: 'auto' }[S.settings.theme]; applyTheme(); save(); render(true); break;
       case 'setup': if (t.dataset.id === '*' && !SEL.size) return; setup(t.dataset.mode, t.dataset.id); break;
       case 'due': startDue(); break;
+      case 'daily-study': startDailyStudy(); break;
+      case 'resume-study': resumeStudySession(); break;
+      case 'pause-session': pauseStudySession(); break;
+      case 'discard-study': ask('End this saved study session? Your completed card progress will remain saved.', 'End session', discardPausedSession); break;
       case 'weak': startWeakSpots(); break;
       case 'exam': setupExam(); break;
       case 'start': start(); break;
@@ -733,7 +787,7 @@
       case 'iparse': var txt = document.getElementById('paste').value; IMP = { decks: [], errors: [], warnings: [], text: txt, parsed: true, backup: null }; merge(P.parseDecks(txt, { fallbackTitle: 'Pasted deck' }), ''); render(true); break;
       case 'isave':
         var n = 0; IMP.decks.forEach(function (x) { if (x.questions.length) { addParsed(x, false); n++; } }); save(); toast('Saved ' + plural(n, 'deck')); go({ name: 'home' }); break;
-      case 'restore': if (IMP.backup) ask('Replace all current decks, progress, and preferences with the selected backup?', 'Restore backup', function () { S = IMP.backup; SEL.clear(); homeFilter = ''; preserveStorage = false; applyDataMigrations(); save(); applyTheme(); IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null }; toast('Backup restored.'); go({ name: 'home' }); }); break;
+      case 'restore': if (IMP.backup) ask('Replace all current decks, progress, and preferences with the selected backup?', 'Restore backup', function () { S = IMP.backup; S.pausedSession = null; SEL.clear(); homeFilter = ''; preserveStorage = false; applyDataMigrations(); save(); applyTheme(); IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null }; toast('Backup restored.'); go({ name: 'home' }); }); break;
       case 'exportall': download('all-decks.txt', P.serializeDecks(S.decks)); break;
       case 'edit': go({ name: 'edit', id: t.dataset.id, editing: null, filter: '' }); break;
       case 'export': exportDeck(deck(V.id)); break;
@@ -743,7 +797,7 @@
       case 'ccancel': V.editing = null; render(true); break;
       case 'csave': saveCard(); break;
       case 'cdel': d = deck(V.id); var ci = +t.dataset.i; ask('Delete question ' + (ci + 1) + '?', 'Delete card', function () { var c = d.cards.splice(ci, 1)[0], p = prog(d.id); delete p.cards[c.id]; p.best = null; V.editing = null; save(); render(true); }); break;
-      case 'flip': V.flipped = !V.flipped; render(true); break;
+      case 'flip': V.flipped = !V.flipped; saveActiveSession(); render(true); break;
       case 'mark': mark(V.cards[V.i], t.dataset.v); V.marks[V.cards[V.i].card.id] = t.dataset.v; step(1); break;
       case 'next': step(1); break;
       case 'prev': step(-1); break;
@@ -756,7 +810,7 @@
     var n = V.i + dir;
     if (n >= V.cards.length) return V.name === 'flash' ? finishFlash() : (V.name === 'exam' ? finishExam(false) : finishQuiz());
     if (n < 0) return;
-    V.i = n; V.flipped = false; V.picked = null; render();
+    V.i = n; V.flipped = false; V.picked = null; saveActiveSession(); render();
   }
   function pick(k) {
     if (V.picked !== null) return;
@@ -765,6 +819,7 @@
     var p = prog(it.deckId);
     p.cards[it.card.id] = StudyLogic.review(p.cards[it.card.id], ok, Date.now());
     trackStudied(1);
+    S.pausedSession = MobileStudy.snapshot(V);
     save(); render(true);
   }
   function saveCard() {
@@ -828,6 +883,19 @@
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) { e.preventDefault(); step(dx < 0 ? 1 : -1); }
   });
 
+  function registerNativeNavigation() {
+    if (!window.CciNative || !window.CciNative.isNative) return;
+    window.CciNative.onBackButton(function () {
+      if (modal.innerHTML) { closeModal(); return; }
+      if (isStudySession(V.name)) { pauseStudySession(); return; }
+      if (V.name !== 'home') { go({ name: 'home' }); return; }
+      window.CciNative.exitApp().catch(function () {});
+    }).catch(function () {});
+    window.CciNative.onAppStateChange(function (state) {
+      if (!state.isActive && isStudySession(V.name)) pauseStudySession();
+    }).catch(function () {});
+  }
+
   function boot() {
     return Promise.all([load(), loadStarterText()]).then(function (results) {
       var text = results[1];
@@ -836,9 +904,14 @@
       seed();
       if (reconcileStarters && syncStarterDecks()) save();
       return applyDataMigrations().then(function () {
+        if (S.pausedSession) {
+          var restoredSession = MobileStudy.restore(S.pausedSession, S.decks);
+          S.pausedSession = restoredSession ? MobileStudy.snapshot(restoredSession) : null;
+        }
         applyTheme();
         render();
         registerServiceWorker();
+        registerNativeNavigation();
       });
     });
   }

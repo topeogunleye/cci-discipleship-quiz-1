@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v9';
+const CACHE_NAME = CACHE_PREFIX + 'v10';
 const CORE_FILES = [
   './',
   'offline.html',
@@ -13,6 +13,8 @@ const CORE_FILES = [
   'js/parser.js',
   'js/study.js',
   'js/storage.js',
+  'js/native-bridge.bundle.js',
+  'js/mobile-study.js',
   'js/app.js',
   'decks/manifest.json'
 ];

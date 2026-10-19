@@ -26,8 +26,10 @@ test('web app manifest declares standalone install metadata and valid icon asset
 test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
   const serviceWorker = read('service-worker.js');
   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v9'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v10'/);
   assert.match(serviceWorker, /decks\/manifest\.json/);
+  assert.match(serviceWorker, /js\/native-bridge\.bundle\.js/);
+  assert.match(serviceWorker, /js\/mobile-study\.js/);
   assert.match(serviceWorker, /cache\.addAll\(deckFiles\.map/);
   assert.match(serviceWorker, /offline\.html/);
   assert.match(serviceWorker, /SKIP_WAITING/);
@@ -47,7 +49,7 @@ test('activation deletes previous app caches and deck assets absent from the cur
     [url('settings.json'), {}]
   ]);
   const cacheStore = new Map([
-    ['cci-study-pwa-v9', activeEntries],
+    ['cci-study-pwa-v10', activeEntries],
     ['cci-study-pwa-v3', new Map()],
     ['unrelated-app-cache', new Map()]
   ]);
@@ -136,6 +138,8 @@ test('PWA source and offline build contain their required registration/assets', 
   assert.match(app, /protocol !== 'http:' && protocol !== 'https:'/);
   assert.match(app, /register\('service-worker\.js'\)/);
   assert.match(page, /js\/storage\.js/);
+  assert.match(page, /js\/native-bridge\.bundle\.js/);
+  assert.match(page, /js\/mobile-study\.js/);
   assert.match(build, /service-worker\.js/);
   assert.match(build, /manifest\.webmanifest/);
   assert.match(build, /'icons'/);
