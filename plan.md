@@ -22,26 +22,31 @@ Do not publish, sign for store release, or submit to an app store. The user has 
 
 ## Design
 
-**Design Movement:** A guided daily-study rhythm inspired by the calm, step-by-step journey pattern in Fabulous, grounded in the app’s existing editorial learning interface rather than imitating Fabulous branding.
+**Design Movement:** A friendly coaching app interface inspired by Fabulous-style coaching UI interaction and layout patterns (big rounded cards, one task per screen, saturated colour, large tap targets, short encouraging copy). Deliberately replaces the former editorial/cream/serif look with modern coaching UI patterns, while strictly avoiding Fabulous branding (never their logo, mascot, illustrations, name, or wording; own inline SVG landscapes and custom palette).
 
 **Core Principles:** Scripture-study first; short, clear next steps; progress without guilt; offline by default.
 
-**Color Philosophy:** Preserve the warm parchment background, deep blue-green text, muted gold accent, and existing light/dark themes. Use the gold for a single “continue today” action and the sage color for gentle progress, not streak pressure.
+**Color Philosophy:** Saturated, distinct coaching palette (own palette, not Fabulous's):
+- Primary action: crimson `#B5173A` (pill button, full width at the bottom of the screen on mobile).
+- Secondary action: soft grey pill. Link/info: blue `#2F6FED`.
+- Backgrounds: light mode `#F5F6FB`, cards white with soft shadow; dark mode deep indigo `#12103A` with cards `#1D1A55`.
+- Hero gradients (onboarding, Today card, completion): indigo `#3B2BB0` → violet `#7A3FD0`, and sunrise `#FF8A3D` → `#FF4F7A`.
+- 12 per-deck gradients (in `decks/manifest.json` order): vary hue across indigo, violet, magenta, coral, orange, gold, green, teal, cyan, blue, navy, plum (ensuring ≥ 4.5:1 contrast for text).
 
-**Layout Paradigm:** A portrait-first, one-handed reading flow. Put the current recommended study action near the top, followed by mastery and due-review context, then the searchable lesson list and study tools. Respect safe areas and large text.
+**Layout Paradigm:** A portrait-first, one-task-per-screen flow with large tap targets. Big rounded cards (20–24px radii), full-width bottom pill buttons (999px), and 14px inputs. Respect safe-area insets and dynamic text scaling.
 
-**Signature Elements:** A compact “Today’s Study” card with a realistic time estimate; a clear, low-pressure progress indicator; readable scripture-reference and lesson-note blocks.
+**Signature Elements:** A prominent "Today's Plan" card with a realistic time estimate; soft-unlock journey chapters; clean explanation/scripture bottom sheets; encouraging non-shaming completion screens.
 
-**Interaction Philosophy:** Use large touch targets and explicit actions. Let learners start a review, skip a session, pause, and return without losing progress. Never make streaks, reminders, or social features mandatory.
+**Interaction Philosophy:** Large tap targets (≥ 48dp) and explicit actions. Let learners start a review, skip a session, pause, and return without losing progress. Mandatory streaks and reminders stay off; optional streaks and low-pressure daily study plans are allowed.
 
-**Animation:** Keep transitions short and optional; honor reduced-motion settings. Use no celebration animation that blocks returning to study.
+**Animation:** Keep transitions short and optional; honor reduced-motion settings.
 
-**Typography System:** Keep the current system sans-serif for controls and readable body text, with the existing serif heading style for a quiet editorial contrast. Support OS text scaling without clipped controls.
+**Typography System:** System sans stack only (`system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`); offline-first with no web fonts. Headings 700, body 400–500. No serif fonts, no cream/gold paper look, no hairline rules, no small-caps.
 
-**Brand Essence:** A pocket study companion for CCI discipleship learners, built around the actual lesson decks and offline review. Personality: grounded, clear, encouraging.
+**Brand Essence:** A pocket coaching companion for CCI discipleship learners, built around the actual lesson decks and offline review. Personality: grounded, vibrant, encouraging.
 
-**Brand Voice:** Headlines are specific; buttons say what happens; progress language is encouraging rather than judgmental. Examples: “A few cards are ready for review.” “Pick up where you left off.”
+**Brand Voice:** Headlines are specific; buttons say what happens; progress language is encouraging rather than judgmental. Examples: "A few cards are ready for review." "Pick up where you left off."
 
-**Wordmark & Logo:** Reuse the current CCI Discipleship identity and icon assets, refining only native launcher and splash treatments needed for platform masks and dimensions. Do not create a Fabulous lookalike or replace CCI branding.
+**Wordmark & Logo:** Reuse the current CCI Discipleship identity and icon assets, with custom inline SVGs for landscapes and shapes. Do not trace or recreate Fabulous artwork or replace CCI branding.
 
-**Signature Brand Color:** Existing muted CCI gold, `#8B6E2F` in light mode.
+**Signature Brand Color:** Crimson primary `#B5173A` in light mode, paired with deep indigo `#12103A` in dark mode.
