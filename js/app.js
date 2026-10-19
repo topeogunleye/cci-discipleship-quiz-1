@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 7;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 8;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
   var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false }, seeded: false, dataVersion: 0 };
   var STARTER_DECKS = [];
@@ -12,6 +12,8 @@
   var storageAdapter = Storage.createStorage({ indexedDB: browserIndexedDB, localStorage: browserLocalStorage, legacyKey: KEY });
 
   var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var linkify = function (s) { return esc(s).replace(/https?:\/\/[^\s)]+/g, function (u) { return '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + u + '</a>'; }); };
+  var bibleNote = function (c) { return c && c.bible ? '<p class="card-note card-ref card-bible"><strong>Bible References:</strong> ' + linkify(c.bible) + '</p>' : ''; };
   var uid = function () { return Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4); };
   var slug = function (t) { return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'deck'; };
   var shuffle = function (a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
@@ -77,7 +79,7 @@
       }).map(function (d) {
         return { id: d.id, title: d.title, cards: d.cards.filter(function (c) {
           return c && typeof c.id === 'string' && /^[a-zA-Z0-9._-]{1,180}$/.test(c.id) && typeof c.question === 'string' && Array.isArray(c.options) && c.options.length === 4 && c.options.every(function (x) { return typeof x === 'string'; }) && LET.indexOf(c.answer) >= 0;
-        }).map(function (c) { return { id: c.id, question: c.question, options: c.options.slice(), answer: c.answer, explanation: typeof c.explanation === 'string' ? c.explanation : '', ref: typeof c.ref === 'string' ? c.ref : '' }; }) };
+        }).map(function (c) { return { id: c.id, question: c.question, options: c.options.slice(), answer: c.answer, explanation: typeof c.explanation === 'string' ? c.explanation : '', ref: typeof c.ref === 'string' ? c.ref : '', bible: typeof c.bible === 'string' ? c.bible : '' }; }) };
       });
       var savedProgress = o.progress && typeof o.progress === 'object' && !Array.isArray(o.progress) ? o.progress : {};
       S.progress = {};
@@ -133,7 +135,7 @@
   function addParsed(pd, stable) {
     var id = stable ? 'd-' + slug(pd.title) : 'd' + uid(), n = 2, base = id;
     while (deck(id)) id = base + '-' + n++;
-    S.decks.push({ id: id, title: pd.title, cards: pd.questions.map(function (q) { return { id: id + '.' + q.id, question: q.question, options: q.options, answer: q.answer, explanation: q.explanation || '', ref: q.ref || '' }; }) });
+    S.decks.push({ id: id, title: pd.title, cards: pd.questions.map(function (q) { return { id: id + '.' + q.id, question: q.question, options: q.options, answer: q.answer, explanation: q.explanation || '', ref: q.ref || '', bible: q.bible || '' }; }) });
   }
   function seed() {
     if (S.seeded) return;
@@ -153,7 +155,7 @@
         var cardId = id + '.' + question.id, existing = previous[cardId];
         if (!existing || existing.question !== question.question) deckChanged = true;
         if (existing && existing.question !== question.question && S.progress[id] && S.progress[id].cards) delete S.progress[id].cards[cardId];
-        next.push({ id: cardId, question: question.question, options: question.options.slice(), answer: question.answer, explanation: question.explanation || '', ref: question.ref || '' });
+        next.push({ id: cardId, question: question.question, options: question.options.slice(), answer: question.answer, explanation: question.explanation || '', ref: question.ref || '', bible: question.bible || '' });
         delete previous[cardId];
       });
       saved.cards.forEach(function (card) {
@@ -183,7 +185,7 @@
     if (!q || d.cards.some(function (card) { return card.question === q.question; })) return;
     var id = d.id + '.' + q.id;
     if (d.cards.some(function (card) { return card.id === id; })) id += '-migration';
-    d.cards.splice(Math.min(at, d.cards.length), 0, { id: id, question: q.question, options: q.options.slice(), answer: q.answer, explanation: q.explanation || '', ref: q.ref || '' });
+    d.cards.splice(Math.min(at, d.cards.length), 0, { id: id, question: q.question, options: q.options.slice(), answer: q.answer, explanation: q.explanation || '', ref: q.ref || '', bible: q.bible || '' });
   }
   function removeMigratedDuplicate(deckId, questionId, questionText) {
     var d = deck(deckId); if (!d) return;
@@ -254,6 +256,16 @@
           if (sourceCard.ref && card.ref !== sourceCard.ref) card.ref = sourceCard.ref;
         });
       });
+    } },
+    { version: 8, run: function () {
+      S.decks.forEach(function (d) {
+        var source = starterDeck(d.id); if (!source) return;
+        d.cards.forEach(function (card) {
+          var sourceCard = source.questions.filter(function (q) { return card.id === d.id + '.' + q.id || card.question === q.question; })[0];
+          if (!sourceCard) return;
+          if (sourceCard.bible && card.bible !== sourceCard.bible) card.bible = sourceCard.bible;
+        });
+      });
     } }
   ];
   function applyDataMigrations() {
@@ -312,7 +324,7 @@
       var cards = d.cards.map(function (c) {
         if (!c || typeof c.id !== 'string' || !/^[a-zA-Z0-9._-]{1,180}$/.test(c.id) || typeof c.question !== 'string' || !c.question.trim() || !Array.isArray(c.options) || c.options.length !== 4 || !c.options.every(function (x) { return typeof x === 'string' && x.trim(); }) || LET.indexOf(c.answer) < 0) throw new Error('A question in "' + d.title + '" is malformed.');
         if (cardIds.has(c.id)) throw new Error('A deck in this backup contains duplicate question IDs.'); cardIds.add(c.id);
-        return { id: c.id, question: c.question, options: c.options.slice(), answer: c.answer, explanation: typeof c.explanation === 'string' ? c.explanation : '', ref: typeof c.ref === 'string' ? c.ref : '' };
+        return { id: c.id, question: c.question, options: c.options.slice(), answer: c.answer, explanation: typeof c.explanation === 'string' ? c.explanation : '', ref: typeof c.ref === 'string' ? c.ref : '', bible: typeof c.bible === 'string' ? c.bible : '' };
       });
       return { id: d.id, title: d.title, cards: cards };
     });
@@ -472,7 +484,7 @@
 
   views.flash = function () {
     var it = V.cards[V.i], c = it.card, ai = LET.indexOf(c.answer), d = deck(it.deckId);
-    var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '');
+    var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') + bibleNote(c);
     return '<section class="study-shell flash-session" aria-label="Flashcard study session">' + sessionHead('Flashcards', (V.i + 1) + ' / ' + V.cards.length) + progressBar(V.i + 1, V.cards.length) +
       '<button class="flip' + (V.flipped ? ' on' : '') + '" data-act="flip" type="button" aria-pressed="' + V.flipped + '" aria-label="' + (V.flipped ? 'Show question' : 'Reveal answer') + '"><span class="inner">' +
       '<span class="face front" aria-hidden="' + V.flipped + '"><span class="card-face-top"><span class="tag">' + esc(d ? d.title : '') + '</span><span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span></span><span class="q">' + esc(c.question) + '</span><span class="flip-cue"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap, click, Space, or Enter to reveal</span></span>' +
@@ -494,7 +506,7 @@
       if (isExam) fb = '<div class="exam-progress-note" role="status">Answer saved for review after submission.</div><button class="btn primary full" data-act="next">' + (V.i === V.cards.length - 1 ? 'Submit exam' : 'Next question') + '</button>';
       else {
         var ok = picked === answerAt;
-        fb = '<div class="feedback-panel ' + (ok ? 'is-correct' : 'is-incorrect') + '" role="status" aria-live="polite"><p class="fb ' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'Correct.' : 'Not quite.') + '</p>' + (!ok ? '<p class="feedback-answer"><span class="feedback-answer-letter" aria-label="Correct option ' + LET[answerAt] + '">' + LET[answerAt] + '</span><span>' + esc(c.options[order[answerAt]]) + '</span></p>' : '') + (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') + '</div><button class="btn primary full" data-act="next">' + (V.i === V.cards.length - 1 ? 'See results' : 'Next question') + '</button>';
+        fb = '<div class="feedback-panel ' + (ok ? 'is-correct' : 'is-incorrect') + '" role="status" aria-live="polite"><p class="fb ' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'Correct.' : 'Not quite.') + '</p>' + (!ok ? '<p class="feedback-answer"><span class="feedback-answer-letter" aria-label="Correct option ' + LET[answerAt] + '">' + LET[answerAt] + '</span><span>' + esc(c.options[order[answerAt]]) + '</span></p>' : '') + (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') + bibleNote(c) + '</div><button class="btn primary full" data-act="next">' + (V.i === V.cards.length - 1 ? 'See results' : 'Next question') + '</button>';
       }
     }
     var title = isExam ? 'Exam' : 'Quiz';
@@ -511,7 +523,7 @@
         var card = entry.item.card;
         var selected = entry.selected ? '<p class="answer-review-line selected-answer"><span class="answer-label">Your answer</span><span class="answer-copy"><b>' + entry.selected + '</b> ' + esc(card.options[LET.indexOf(entry.selected)]) + '</span></p>' : '<p class="answer-review-line unanswered"><span class="answer-label">Your answer</span><span class="answer-copy">Unanswered</span></p>';
         var status = entry.ok ? 'Correct' : (entry.selected ? 'Incorrect' : 'Not answered');
-        return '<li class="exam-review-item ' + (entry.ok ? 'review-correct' : 'review-missed') + '"><div class="review-item-head"><h3>Question ' + (index + 1) + ': ' + esc(card.question) + '</h3><span class="review-status ' + (entry.ok ? 'is-correct' : 'is-incorrect') + '">' + status + '</span></div>' + selected + '<p class="answer-review-line correct-answer"><span class="answer-label">Correct answer</span><span class="answer-copy"><b>' + card.answer + '</b> ' + esc(card.options[LET.indexOf(card.answer)]) + '</span></p>' + (card.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(card.explanation) + '</p>' : '') + (card.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(card.ref) + '</p>' : '') + '</li>';
+        return '<li class="exam-review-item ' + (entry.ok ? 'review-correct' : 'review-missed') + '"><div class="review-item-head"><h3>Question ' + (index + 1) + ': ' + esc(card.question) + '</h3><span class="review-status ' + (entry.ok ? 'is-correct' : 'is-incorrect') + '">' + status + '</span></div>' + selected + '<p class="answer-review-line correct-answer"><span class="answer-label">Correct answer</span><span class="answer-copy"><b>' + card.answer + '</b> ' + esc(card.options[LET.indexOf(card.answer)]) + '</span></p>' + (card.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(card.explanation) + '</p>' : '') + (card.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(card.ref) + '</p>' : '') + bibleNote(card) + '</li>';
       }).join('');
       return '<section class="study-shell results-shell exam-results" aria-label="Exam results"><header class="top results-header"><h1>Exam results</h1><button class="btn sm ghost" data-act="home">Back to decks</button></header><div class="result-hero exam-score"><span class="result-mark" aria-hidden="true">' + examPct + '%</span><div class="result-score"><span class="num">' + R.score + ' <span aria-hidden="true">/</span> ' + R.total + '</span><span class="meta">' + examPct + '% correct · ' + R.answered + ' answered' + (R.expired ? ' · Time expired' : '') + '</span></div></div><section class="exam-review" aria-labelledby="exam-review-title"><div class="review-heading"><div><p class="eyebrow">Learn from the attempt</p><h2 id="exam-review-title">Answer review</h2></div><span class="meta">' + plural(R.review.length, 'question') + '</span></div><ol>' + examRows + '</ol></section><button class="btn full ghost result-home" data-act="home">Return to decks</button></section>';
     }
@@ -542,6 +554,7 @@
       c.options.map(function (o, k) { return '<div class="orow"><label class="radio"><input type="radio" name="ans" value="' + LET[k] + '"' + (c.answer === LET[k] ? ' checked' : '') + '><b>' + LET[k] + '</b></label><input name="o' + k + '" value="' + esc(o) + '" aria-label="Option ' + LET[k] + '"></div>'; }).join('') +
       '<label class="field"><span>Explanation (optional)</span><textarea name="explanation" rows="3">' + esc(c.explanation || '') + '</textarea></label>' +
       '<label class="field"><span>Reference (optional)</span><input name="ref" value="' + esc(c.ref || '') + '" placeholder="Lesson, slide, or Scripture"></label>' +
+      '<label class="field"><span>Bible references (optional)</span><input name="bible" value="' + esc(c.bible || '') + '" placeholder="e.g. John 3:16; Romans 5:12"></label>' +
       '<p class="hintline">Select the radio button next to the correct answer.</p><p class="err" id="ferr"></p><div class="row end"><button class="btn" data-act="ccancel">Cancel</button><button class="btn primary" data-act="csave">Save card</button></div></form>';
   }
 
@@ -755,15 +768,15 @@
     save(); render(true);
   }
   function saveCard() {
-    var f = app.querySelector('form'), q = f.q.value.trim(), o = [0, 1, 2, 3].map(function (k) { return f['o' + k].value.trim(); }), a = (f.querySelector('input[name=ans]:checked') || {}).value, explanation = f.explanation.value.trim(), ref = f.ref.value.trim();
+    var f = app.querySelector('form'), q = f.q.value.trim(), o = [0, 1, 2, 3].map(function (k) { return f['o' + k].value.trim(); }), a = (f.querySelector('input[name=ans]:checked') || {}).value, explanation = f.explanation.value.trim(), ref = f.ref.value.trim(), bible = f.bible.value.trim();
     var err = !q ? 'Enter the question.' : o.some(function (x) { return !x; }) ? 'Fill in all four options.' : !a ? 'Select the correct answer.' : '';
     if (err) { document.getElementById('ferr').textContent = err; return; }
     var d = deck(V.id);
-    if (V.editing === 'new') { d.cards.push({ id: d.id + '.n' + uid(), question: q, options: o, answer: a, explanation: explanation, ref: ref }); prog(d.id).best = null; }
+    if (V.editing === 'new') { d.cards.push({ id: d.id + '.n' + uid(), question: q, options: o, answer: a, explanation: explanation, ref: ref, bible: bible }); prog(d.id).best = null; }
     else {
       var c = d.cards[V.editing], changed = c.question !== q || c.answer !== a || c.options.some(function (x, k) { return x !== o[k]; });
       if (changed) { delete prog(d.id).cards[c.id]; prog(d.id).best = null; }
-      c.question = q; c.options = o; c.answer = a; c.explanation = explanation; c.ref = ref;
+      c.question = q; c.options = o; c.answer = a; c.explanation = explanation; c.ref = ref; c.bible = bible;
     }
     V.editing = null; save(); render(true); toast('Card saved');
   }

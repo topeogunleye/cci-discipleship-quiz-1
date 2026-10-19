@@ -11,6 +11,7 @@
   var RE_ANS = /^ANSWER\s*:\s*(.*)$/i;
   var RE_EXPLANATION = /^EXPLANATION\s*:\s*(.*)$/i;
   var RE_REF = /^REF\s*:\s*(.*)$/i;
+  var RE_BIBLE = /^BIBLE(?:\s+REFERENCES|\s+REFS)?\s*:\s*(.*)$/i;
 
   function parseDecks(text, opts) {
     opts = opts || {};
@@ -88,14 +89,15 @@
       return { errors: errors, warnings: warnings };
     }
     var num = parseInt(m[2], 10), label = 'Q' + num, bare = !m[1];
-    var qText = [m[3]], opts = {}, order = [], curOpt = null, answerRaw = null, answerLine = 0, explanation = '', ref = '', extra = [], phase = 'q';
+    var qText = [m[3]], opts = {}, order = [], curOpt = null, answerRaw = null, answerLine = 0, explanation = '', ref = '', bible = '', extra = [], phase = 'q';
 
     b.lines.slice(1).forEach(function (l) {
       var t = l.t.trim(), a = RE_ANS.exec(t), o = RE_OPT.exec(t);
       if (phase === 'done') {
-        var e = RE_EXPLANATION.exec(t), r = RE_REF.exec(t);
+        var e = RE_EXPLANATION.exec(t), r = RE_REF.exec(t), bb = RE_BIBLE.exec(t);
         if (e) { explanation = e[1].trim(); return; }
         if (r) { ref = r[1].trim(); return; }
+        if (bb) { bible = bb[1].trim(); return; }
         extra.push(l.n); return;
       }
       if (a) { answerRaw = a[1].trim(); answerLine = l.n; phase = 'done'; curOpt = null; return; }
@@ -129,7 +131,7 @@
     }
     if (extra.length) warnings.push({ deck: deck, line: extra[0], message: label + ' has extra text after ANSWER (line ' + extra[0] + '); ignored' });
     if (bad) return { errors: errors, warnings: warnings };
-    return { q: { id: '', question: question, options: LETTERS.map(function (L) { return opts[L]; }), answer: ans, explanation: explanation, ref: ref }, num: num, bare: bare, errors: errors, warnings: warnings };
+    return { q: { id: '', question: question, options: LETTERS.map(function (L) { return opts[L]; }), answer: ans, explanation: explanation, ref: ref, bible: bible }, num: num, bare: bare, errors: errors, warnings: warnings };
   }
 
   function clip(s) { s = String(s).trim(); return s.length > 60 ? s.slice(0, 57) + '…' : s; }
@@ -145,6 +147,7 @@
       out.push('ANSWER: ' + c.answer);
       if (flat(c.explanation)) out.push('EXPLANATION: ' + flat(c.explanation));
       if (flat(c.ref)) out.push('REF: ' + flat(c.ref));
+      if (flat(c.bible)) out.push('BIBLE: ' + flat(c.bible));
       out.push('');
     });
     return out.join('\n');
