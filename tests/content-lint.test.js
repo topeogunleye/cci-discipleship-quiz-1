@@ -282,7 +282,7 @@ test('stored progress survives starter duplicate removal and renumbering', async
   const bible1 = migrated.decks.find(deck => deck.id === section7);
   const bible = migrated.decks.find(deck => deck.id === section8);
   const churchHistory = migrated.decks.find(deck => deck.id === section12);
-  assert.equal(migrated.dataVersion, 7);
+  assert.equal(migrated.dataVersion, 8);
   assert.ok(Number.isFinite(migrated.backupReminder.anchorAt));
   assert.equal(migrated.backupReminder.cardsStudied, 0);
   assert.ok(storageKeys.length > 0 && storageKeys.every(key => key === 'flashdecks.v1'));
@@ -382,7 +382,7 @@ test('saved starter decks refresh from source while custom cards and matching pr
     progress: { [deckId]: { best: { pct: 80 }, cards: { [`${deckId}.${first.id}`]: { box: 2 }, [`${deckId}.${second.id}`]: { box: 3 } } } },
     settings: { theme: 'auto', shuffle: false },
     seeded: true,
-    dataVersion: 7
+    dataVersion: 8
   });
   const result = await (async () => {
     let stored = raw;

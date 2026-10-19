@@ -58,8 +58,8 @@ test('starter BIBLE lines use the documented labels and link every online-resear
     const segments = question.bible.split(' | ');
     segments.forEach(segment => assert.match(segment, /^(Confirmed in lesson and deck|Also cited in lesson segment|Added from online research): \S/));
     segments.filter(segment => segment.startsWith('Added from online research')).forEach(segment => {
-      const entries = segment.replace('Added from online research: ', '').split('; ');
-      entries.forEach(entry => assert.match(entry, /\(https:\/\/[^\s)]+\)$/, `researched entry needs a source link: ${entry}`));
+      const body = segment.replace('Added from online research: ', '');
+      assert.match(body, /^(.+? \(https:\/\/[^\s)]+\))(; .+? \(https:\/\/[^\s)]+\))*$/, `every researched entry needs a source link: ${body}`);
     });
   });
 });
