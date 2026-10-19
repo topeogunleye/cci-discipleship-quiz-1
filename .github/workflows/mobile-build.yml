@@ -115,15 +115,16 @@ jobs:
           -target App
           -configuration Debug
           -sdk iphonesimulator
-          -derivedDataPath "$RUNNER_TEMP/cci-ios-derived"
           CODE_SIGNING_ALLOWED=NO
           build
 
       - name: Package iOS Simulator app
-        run: >-
-          ditto -c -k --sequesterRsrc --keepParent
-          "$RUNNER_TEMP/cci-ios-derived/Build/Products/Debug-iphonesimulator/App.app"
-          "$RUNNER_TEMP/CCI-DiscipleshipStudy-iOS-Simulator.zip"
+        run: |
+          app_path="$(find "$HOME/Library/Developer/Xcode/DerivedData" -type d -path '*/Build/Products/Debug-iphonesimulator/App.app' -print -quit)"
+          test -n "$app_path"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$app_path" \
+            "$RUNNER_TEMP/CCI-DiscipleshipStudy-iOS-Simulator.zip"
 
       - name: Upload iOS Simulator app
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
