@@ -726,6 +726,12 @@ a:hover { color: var(--accent-hover); }
   font-style: italic;
 }
 
+.card-bible a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .hint {
   color: var(--faint);
   font-size: var(--text-xs);

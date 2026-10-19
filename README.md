@@ -58,9 +58,10 @@ D) Fourth option
 ANSWER: A
 EXPLANATION: The explanation text goes here and is strictly optional.
 REF: Lesson 2, Page 4 (also optional)
+BIBLE: John 3:16; Romans 5:12 (also optional)
 ```
 
-`EXPLANATION:` and `REF:` are optional single-line fields that may follow `ANSWER:`. Use the explanation for why the answer is correct, and the reference for a lesson, slide, or Scripture passage. Decks and backups created before these fields were added remain importable.
+`EXPLANATION:`, `REF:` and `BIBLE:` are optional single-line fields that may follow `ANSWER:`. Use the explanation for why the answer is correct, the reference for a lesson, slide, or Scripture passage, and `BIBLE:` for the Bible references cited in the lesson. In the starter decks, `BIBLE:` separates what the lessons and decks confirm (`Confirmed in lesson and deck:`, `Also cited in lesson segment:`) from anything added through online research (`Added from online research:`, with source links). It is shown as **Bible References** beneath **Reference**. Decks and backups created before these fields were added remain importable.
 
 Question numbers may also use `1.` instead of `Q1.`. Blank lines are optional between questions. Invalid questions are reported and skipped.
 

@@ -37,3 +37,29 @@ test('exported deck text can be parsed back without changing card content', () =
   assert.match(exported, /ANSWER: C\nEXPLANATION: Because gamma is stated in the lesson\.\nREF: Lesson 1, slide 3/);
   assert.doesNotMatch(exported, /EXPLANATION:\s*\n|REF:\s*\n/);
 });
+
+test('optional BIBLE field round-trips through parse and export', () => {
+  const source = `DECK: Bible refs\n\nQ1. First question?\nA. Alpha\nB. Beta\nC. Gamma\nD. Delta\nANSWER: C\nREF: Lesson 1 — 01:00\nBIBLE: Confirmed in lesson and deck: John 3:16\n\nQ2. Second question?\nA. Red\nB. Green\nC. Blue\nD. Gold\nANSWER: B\n`;
+  const parsed = parser.parseDecks(source);
+  assert.equal(parsed.errors.length, 0);
+  assert.equal(parsed.warnings.length, 0);
+  assert.equal(parsed.decks[0].questions[0].bible, 'Confirmed in lesson and deck: John 3:16');
+  assert.equal(parsed.decks[0].questions[1].bible, '');
+  const exported = parser.serializeDeck(parsed.decks[0]);
+  assert.match(exported, /REF: Lesson 1 — 01:00\nBIBLE: Confirmed in lesson and deck: John 3:16/);
+  assert.equal(parser.parseDecks(exported).decks[0].questions[0].bible, 'Confirmed in lesson and deck: John 3:16');
+});
+
+test('starter BIBLE lines use the documented labels and link every online-research addition', () => {
+  const result = parser.parseDecks(starter);
+  const withBible = result.decks.flatMap(deck => deck.questions.filter(question => question.bible));
+  assert.ok(withBible.length >= 700, `expected many BIBLE lines, found ${withBible.length}`);
+  withBible.forEach(question => {
+    const segments = question.bible.split(' | ');
+    segments.forEach(segment => assert.match(segment, /^(Confirmed in lesson and deck|Also cited in lesson segment|Added from online research): \S/));
+    segments.filter(segment => segment.startsWith('Added from online research')).forEach(segment => {
+      const body = segment.replace('Added from online research: ', '');
+      assert.match(body, /^(.+? \(https:\/\/[^\s)]+\))(; .+? \(https:\/\/[^\s)]+\))*$/, `every researched entry needs a source link: ${body}`);
+    });
+  });
+});
