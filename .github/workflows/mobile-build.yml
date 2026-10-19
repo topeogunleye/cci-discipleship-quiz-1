@@ -115,6 +115,7 @@ jobs:
           -target App
           -configuration Debug
           -sdk iphonesimulator
+          -arch arm64
           CODE_SIGNING_ALLOWED=NO
           build
 
