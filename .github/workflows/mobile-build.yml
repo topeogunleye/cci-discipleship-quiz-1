@@ -112,16 +112,16 @@ jobs:
         run: >-
           xcodebuild
           -project ios/App/App.xcodeproj
-          -target App
+          -scheme App
           -configuration Debug
-          -sdk iphonesimulator
-          -arch arm64
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/cci-ios-derived"
           CODE_SIGNING_ALLOWED=NO
           build
 
       - name: Package iOS Simulator app
         run: |
-          app_path="$(find "$HOME/Library/Developer/Xcode/DerivedData" -type d -path '*/Build/Products/Debug-iphonesimulator/App.app' -print -quit)"
+          app_path="$(find "$RUNNER_TEMP/cci-ios-derived" "$HOME/Library/Developer/Xcode/DerivedData" -type d -path '*/Build/Products/Debug-iphonesimulator/App.app' -print -quit 2>/dev/null)"
           test -n "$app_path"
           ditto -c -k --sequesterRsrc --keepParent \
             "$app_path" \
