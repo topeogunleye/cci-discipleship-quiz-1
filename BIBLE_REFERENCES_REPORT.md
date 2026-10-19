@@ -68,7 +68,12 @@ Found and fixed:
 - `Romans 16:16, 1` (next book's "1" read as a verse) and `Jude 24` read as chapter 24 → both fixed.
 - Transcript "John 4:1" is 1 John 4:1 → corrected and sourced online.
 
-Remaining after review: about 3 of 44 sampled lines had factual errors (now fixed, ~7%); about 2 of 44 had a lesson-only reference only loosely related to the question (e.g. a passing mention of Genesis 3). **The fixed generator was not re-sampled**, so a residual error rate is likely.
+Before fixes: about 3 of 44 sampled lines had factual errors (~7%) and about 2 had a lesson-only reference only loosely related to the question (e.g. a passing mention of Genesis 3).
+
+### Re-review after fixes (fresh random sample of 30, seed 99)
+- Factual errors (wrong verse, wrong book, impossible chapter, truncated range): **0 of 30**.
+- Loosely related `Also cited in lesson segment:` entries: **3 of 30** (Section 9 Q79 Mormon destiny, Section 8 Q43 woman as first witness, Section 10 Q50 Megiddo mosaic with a tangential John 5:1). They are real citations from the cited timestamp window, but the speaker was not making that point for this question. They are labelled lesson-only so readers can discount them.
+- Small sample: this is an indication, not a guarantee.
 
 ## Could not be verified / known limitations
 - 2 Timothy 3:16: only "correction" (epanorthosis) confirmed (Blue Letter Bible lexicon G1882); the "reproof = conviction" claim is unverified.
