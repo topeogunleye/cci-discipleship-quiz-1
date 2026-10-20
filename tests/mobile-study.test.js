@@ -184,3 +184,22 @@ test('getChapterSteps returns four study steps with soft unlock states', () => {
   assert.equal(masteredSteps[2].state, 'complete');
   assert.equal(masteredSteps[3].state, 'complete');
 });
+
+test('formatCompletionFeedback generates positive coaching titles and stats', () => {
+  const quiz100 = MobileStudy.formatCompletionFeedback({ kind: 'quiz', score: 10, total: 10, minutes: 2.3, cardsMastered: 4 });
+  assert.equal(quiz100.title, 'Perfect Score!');
+  assert.equal(quiz100.pct, 100);
+  assert.equal(quiz100.minutes, 2);
+  assert.equal(quiz100.cardsMastered, 4);
+
+  const quiz70 = MobileStudy.formatCompletionFeedback({ kind: 'quiz', score: 7, total: 10, minutes: 1 });
+  assert.equal(quiz70.title, 'Well done!');
+  assert.equal(quiz70.pct, 70);
+
+  const exam85 = MobileStudy.formatCompletionFeedback({ kind: 'exam', score: 17, total: 20, minutes: 12 });
+  assert.equal(exam85.title, 'Exceptional Mastery!');
+
+  const flash = MobileStudy.formatCompletionFeedback({ kind: 'flash', score: 8, total: 10, cardsMastered: 3 });
+  assert.equal(flash.title, 'Session Complete!');
+  assert.equal(flash.cardsMastered, 3);
+});

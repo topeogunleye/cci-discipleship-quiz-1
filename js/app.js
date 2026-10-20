@@ -913,58 +913,225 @@
 
   views.flash = function () {
     var it = V.cards[V.i], c = it.card, ai = LET.indexOf(c.answer), d = deck(it.deckId);
-    var title = V.opts && V.opts.daily ? 'Today’s Study' : 'Flashcards';
+    var title = V.opts && V.opts.daily ? 'Today’s Study' : (d ? d.title : 'Flashcards');
+    var parsed = MobileStudy.parseChapterTitle(title);
+    var displayTitle = parsed.topic || title;
     var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') + bibleNote(c);
-    return '<section class="study-shell flash-session" aria-label="Flashcard study session">' + sessionHead(title, (V.i + 1) + ' / ' + V.cards.length) + progressBar(V.i + 1, V.cards.length) +
-      '<button class="flip' + (V.flipped ? ' on' : '') + '" data-act="flip" type="button" aria-pressed="' + V.flipped + '" aria-label="' + (V.flipped ? 'Show question' : 'Reveal answer') + '"><span class="inner">' +
-      '<span class="face front" aria-hidden="' + V.flipped + '"><span class="card-face-top"><span class="tag">' + esc(d ? d.title : '') + '</span><span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span></span><span class="q">' + esc(c.question) + '</span><span class="flip-cue"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap, click, Space, or Enter to reveal</span></span>' +
-      '<span class="face back" aria-hidden="' + !V.flipped + '"><span class="card-face-top"><span class="tag">Answer · ' + c.answer + '</span><span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span></span><span class="a">' + esc(c.options[ai]) + '</span>' + notes + '<span class="qs">' + esc(c.question) + '</span><span class="flip-cue"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap, click, Space, or Enter to see question</span></span></span></button>' +
-      (V.flipped ? '<div class="flash-rating row grow" role="group" aria-label="Mark your confidence"><button class="btn" data-act="mark" data-v="unknown">Still learning</button><button class="btn primary" data-act="mark" data-v="known">I know it</button></div>' : '') +
-      '<div class="row grow nav study-navigation"><button class="btn" data-act="prev"' + (V.i ? '' : ' disabled') + '>Previous</button><button class="btn" data-act="next">' + (V.i === V.cards.length - 1 ? 'Finish session' : (V.flipped ? 'Next card' : 'Skip card')) + '</button></div><p class="study-shortcuts">Use ← / → to move between cards</p></section>';
+    var isLast = V.i === V.cards.length - 1;
+
+    return '<section class="study-shell flash-session coaching-study-flow" aria-label="Flashcard study session">' +
+      sessionHead(displayTitle, (V.i + 1) + ' / ' + V.cards.length) +
+      progressBar(V.i + 1, V.cards.length) +
+      '<div class="coaching-question-container">' +
+        '<button class="flip' + (V.flipped ? ' on' : '') + '" data-act="flip" type="button" aria-pressed="' + V.flipped + '" aria-label="' + (V.flipped ? 'Show question' : 'Reveal answer') + '">' +
+          '<span class="inner">' +
+            '<span class="face front" aria-hidden="' + V.flipped + '">' +
+              '<span class="card-face-top">' +
+                '<span class="tag">' + esc(d ? d.title : '') + '</span>' +
+                '<span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span>' +
+              '</span>' +
+              '<span class="q">' + esc(c.question) + '</span>' +
+              '<span class="flip-cue"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap or Space to flip</span>' +
+            '</span>' +
+            '<span class="face back" aria-hidden="' + !V.flipped + '">' +
+              '<span class="card-face-top">' +
+                '<span class="tag">Answer · ' + c.answer + '</span>' +
+                '<span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span>' +
+              '</span>' +
+              '<span class="a">' + esc(c.options[ai]) + '</span>' +
+              notes +
+              '<span class="qs">' + esc(c.question) + '</span>' +
+              '<span class="flip-cue"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap or Space to see question</span>' +
+            '</span>' +
+          '</span>' +
+        '</button>' +
+      '</div>' +
+      (V.flipped ? '<div class="flash-rating row grow" role="group" aria-label="Mark your confidence">' +
+        '<button class="btn btn-confidence" data-act="mark" data-v="unknown">Still learning</button>' +
+        '<button class="btn primary btn-confidence" data-act="mark" data-v="known">I know it</button>' +
+      '</div>' : '') +
+      '<div class="study-bottom-bar">' +
+        '<div class="row grow nav study-navigation">' +
+          '<button class="btn ghost btn-prev" data-act="prev"' + (V.i ? '' : ' disabled') + '>Previous</button>' +
+          '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'Finish session' : (V.flipped ? 'Next card' : 'Skip card')) + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<p class="study-shortcuts">Use ← / → to move between cards</p>' +
+    '</section>';
   };
 
   views.quiz = function () {
     var isExam = V.name === 'exam', it = V.cards[V.i], c = it.card, picked = V.picked, done = picked !== null;
+    var d = deck(it.deckId);
     var order = it.optionOrder || [0, 1, 2, 3];
+    var isLast = V.i === V.cards.length - 1;
+    var parsed = d ? MobileStudy.parseChapterTitle(d.title) : { topic: isExam ? 'Timed Exam' : 'Quiz' };
+    var sessionTitle = isExam ? 'Timed Exam' : parsed.topic;
+
+    var hasSeenTooltip = false;
+    try { hasSeenTooltip = !!window.localStorage.getItem('cci_seen_answer_tooltip'); } catch (e) {}
+    var showTooltip = !hasSeenTooltip && !done && V.i === 0;
+
     var opts = order.map(function (source, k) {
-      var cls = 'opt'; if (done && isExam && k === picked) cls += ' selected'; else if (done && !isExam) { if (LET[source] === c.answer) cls += ' right'; else if (k === picked) cls += ' wrong'; }
-      return '<button class="' + cls + '" data-act="pick" data-i="' + k + '" aria-label="' + LET[k] + '. ' + esc(c.options[source]) + '" aria-pressed="' + (done && k === picked) + '"' + (done ? ' disabled' : '') + '><b aria-hidden="true">' + LET[k] + '</b><span>' + esc(c.options[source]) + '</span></button>';
+      var cls = 'opt';
+      if (done && isExam && k === picked) cls += ' selected';
+      else if (done && !isExam) {
+        if (LET[source] === c.answer) cls += ' right';
+        else if (k === picked) cls += ' wrong';
+      }
+      return '<button class="' + cls + '" data-act="pick" data-i="' + k + '" aria-label="' + LET[k] + '. ' + esc(c.options[source]) + '" aria-pressed="' + (done && k === picked) + '"' + (done ? ' disabled' : '') + '>' +
+        '<span class="opt-badge" aria-hidden="true">' + LET[k] + '</span>' +
+        '<span class="opt-text">' + esc(c.options[source]) + '</span>' +
+      '</button>';
     }).join('');
-    var fb = '';
+
+    var fbSheet = '';
     if (done) {
       var answerAt = order.indexOf(LET.indexOf(c.answer));
-      if (isExam) fb = '<div class="exam-progress-note" role="status">Answer saved for review after submission.</div><button class="btn primary full" data-act="next">' + (V.i === V.cards.length - 1 ? 'Submit exam' : 'Next question') + '</button>';
-      else {
+      if (isExam) {
+        fbSheet = '<div class="coaching-bottom-sheet exam-sheet" role="status">' +
+          '<div class="sheet-drag-handle" aria-hidden="true"></div>' +
+          '<p class="exam-progress-note">Answer recorded for review after submission.</p>' +
+          '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'Submit exam' : 'Next question') + '</button>' +
+        '</div>';
+      } else {
         var ok = picked === answerAt;
-        fb = '<div class="feedback-panel ' + (ok ? 'is-correct' : 'is-incorrect') + '" role="status" aria-live="polite"><p class="fb ' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'Correct.' : 'Not quite.') + '</p>' + (!ok ? '<p class="feedback-answer"><span class="feedback-answer-letter" aria-label="Correct option ' + LET[answerAt] + '">' + LET[answerAt] + '</span><span>' + esc(c.options[order[answerAt]]) + '</span></p>' : '') + (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') + bibleNote(c) + '</div><button class="btn primary full" data-act="next">' + (V.i === V.cards.length - 1 ? 'See results' : 'Next question') + '</button>';
+        fbSheet = '<div class="coaching-bottom-sheet ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '" role="status" aria-live="polite">' +
+          '<div class="sheet-drag-handle" aria-hidden="true"></div>' +
+          '<div class="sheet-content">' +
+            '<div class="feedback-panel ' + (ok ? 'is-correct' : 'is-incorrect') + '">' +
+              '<div class="feedback-header">' +
+                '<span class="feedback-mark-icon" aria-hidden="true">' + (ok ? '✓' : '✗') + '</span>' +
+                '<p class="fb ' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'Correct.' : 'Not quite.') + '</p>' +
+              '</div>' +
+              (!ok ? '<p class="feedback-answer"><span class="feedback-answer-letter" aria-label="Correct option ' + LET[answerAt] + '">' + LET[answerAt] + '</span><span>' + esc(c.options[order[answerAt]]) + '</span></p>' : '') +
+              (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') +
+              (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') +
+              bibleNote(c) +
+            '</div>' +
+            '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Next question') + '</button>' +
+          '</div>' +
+        '</div>';
       }
     }
+
     var title = isExam ? 'Exam' : 'Quiz';
-    var status = isExam ? '<span id="exam-clock" role="timer" aria-label="Time remaining ' + formatClock(V.remaining) + '">' + formatClock(V.remaining) + '</span>' : '<span class="score-inline">' + V.score + '<span aria-hidden="true"> / </span><span class="sr-only">out of</span>' + V.answers.length + '</span>';
-    return '<section class="study-shell ' + (isExam ? 'exam-session' : 'quiz-session') + '" aria-label="' + (isExam ? 'Timed exam' : 'Quiz') + '">' + sessionHead(title, status, isExam) + progressBar(V.i + (done ? 1 : 0), V.cards.length) +
-      '<article class="question-panel"><p class="count">Question ' + (V.i + 1) + ' of ' + V.cards.length + '</p><h2 class="qtext" id="question-prompt" tabindex="-1">' + esc(c.question) + '</h2><div class="opts" role="group" aria-labelledby="question-prompt">' + opts + '</div>' + (fb ? '<div class="study-feedback">' + fb + '</div>' : '') + '</article><p class="study-shortcuts">Choose A–D or 1–4' + (done ? '' : ' · Enter a selection to continue') + '</p></section>';
+    var status = isExam
+      ? '<span id="exam-clock" role="timer" aria-label="Time remaining ' + formatClock(V.remaining) + '">' + formatClock(V.remaining) + '</span>'
+      : '<span class="score-inline">' + V.score + '<span aria-hidden="true"> / </span><span class="sr-only">out of</span>' + V.answers.length + '</span>';
+
+    return '<section class="study-shell ' + (isExam ? 'exam-session' : 'quiz-session') + ' coaching-study-flow" aria-label="' + (isExam ? 'Timed exam' : 'Quiz') + '">' +
+      sessionHead(sessionTitle, status, isExam) +
+      progressBar(V.i + (done ? 1 : 0), V.cards.length) +
+      '<article class="question-panel coaching-question-panel">' +
+        '<div class="question-meta-row">' +
+          '<span class="count">Question ' + (V.i + 1) + ' of ' + V.cards.length + '</span>' +
+          (showTooltip ? '<div class="coaching-first-tooltip" role="tooltip"><span class="tooltip-dot" aria-hidden="true"></span>Tap an answer to check it</div>' : '') +
+        '</div>' +
+        '<h2 class="qtext coaching-question-text" id="question-prompt" tabindex="-1">' + esc(c.question) + '</h2>' +
+        '<div class="opts coaching-opts-group" role="group" aria-labelledby="question-prompt">' + opts + '</div>' +
+        (done ? fbSheet : '') +
+      '</article>' +
+      '<p class="study-shortcuts">Choose A–D or 1–4' + (done ? '' : ' · Enter a selection to continue') + '</p>' +
+    '</section>';
   };
 
   views.results = function () {
-    var R = V, h;
+    var R = V;
+    var durationMs = (R.finishedAt || Date.now()) - (R.startedAt || (Date.now() - 60000));
+    var minutes = Math.max(1, Math.round(durationMs / 60000));
+    var cardsMastered = 0;
+    (R.all || R.cards || []).forEach(function (it) {
+      if (isMastered(it.deckId, it.card.id)) cardsMastered++;
+    });
+
+    var feedback = MobileStudy.formatCompletionFeedback({
+      kind: R.kind,
+      score: R.score,
+      total: R.total,
+      minutes: minutes,
+      cardsMastered: cardsMastered
+    });
+
     if (R.kind === 'exam') {
-      var examPct = R.total ? Math.round(100 * R.score / R.total) : 0;
+      var examPct = feedback.pct;
       var examRows = R.review.map(function (entry, index) {
         var card = entry.item.card;
         var selected = entry.selected ? '<p class="answer-review-line selected-answer"><span class="answer-label">Your answer</span><span class="answer-copy"><b>' + entry.selected + '</b> ' + esc(card.options[LET.indexOf(entry.selected)]) + '</span></p>' : '<p class="answer-review-line unanswered"><span class="answer-label">Your answer</span><span class="answer-copy">Unanswered</span></p>';
         var status = entry.ok ? 'Correct' : (entry.selected ? 'Incorrect' : 'Not answered');
-        return '<li class="exam-review-item ' + (entry.ok ? 'review-correct' : 'review-missed') + '"><div class="review-item-head"><h3>Question ' + (index + 1) + ': ' + esc(card.question) + '</h3><span class="review-status ' + (entry.ok ? 'is-correct' : 'is-incorrect') + '">' + status + '</span></div>' + selected + '<p class="answer-review-line correct-answer"><span class="answer-label">Correct answer</span><span class="answer-copy"><b>' + card.answer + '</b> ' + esc(card.options[LET.indexOf(card.answer)]) + '</span></p>' + (card.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(card.explanation) + '</p>' : '') + (card.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(card.ref) + '</p>' : '') + bibleNote(card) + '</li>';
+        return '<li class="exam-review-item ' + (entry.ok ? 'review-correct' : 'review-missed') + '">' +
+          '<div class="review-item-head">' +
+            '<h3>Question ' + (index + 1) + ': ' + esc(card.question) + '</h3>' +
+            '<span class="review-status ' + (entry.ok ? 'is-correct' : 'is-incorrect') + '">' + status + '</span>' +
+          '</div>' +
+          selected +
+          '<p class="answer-review-line correct-answer"><span class="answer-label">Correct answer</span><span class="answer-copy"><b>' + card.answer + '</b> ' + esc(card.options[LET.indexOf(card.answer)]) + '</span></p>' +
+          (card.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(card.explanation) + '</p>' : '') +
+          (card.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(card.ref) + '</p>' : '') +
+          bibleNote(card) +
+        '</li>';
       }).join('');
-      return '<section class="study-shell results-shell exam-results" aria-label="Exam results"><header class="top results-header"><h1>Exam results</h1><button class="btn sm ghost" data-act="home">Back to decks</button></header><div class="result-hero exam-score"><span class="result-mark" aria-hidden="true">' + examPct + '%</span><div class="result-score"><span class="num">' + R.score + ' <span aria-hidden="true">/</span> ' + R.total + '</span><span class="meta">' + examPct + '% correct · ' + R.answered + ' answered' + (R.expired ? ' · Time expired' : '') + '</span></div></div><section class="exam-review" aria-labelledby="exam-review-title"><div class="review-heading"><div><p class="eyebrow">Learn from the attempt</p><h2 id="exam-review-title">Answer review</h2></div><span class="meta">' + plural(R.review.length, 'question') + '</span></div><ol>' + examRows + '</ol></section><button class="btn full ghost result-home" data-act="home">Return to decks</button></section>';
+
+      return '<section class="study-shell results-shell exam-results coaching-completion-screen" aria-label="Exam results">' +
+        '<header class="top results-header">' +
+          '<button class="study-close-btn" data-act="home" aria-label="Return home">' +
+            '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+          '</button>' +
+          '<h1>' + esc(feedback.title) + '</h1>' +
+          '<span class="meta">' + examPct + '%</span>' +
+        '</header>' +
+        '<div class="coaching-completion-hero">' +
+          '<div class="completion-hero-card">' +
+            '<div class="completion-score-badge">' + examPct + '%</div>' +
+            '<h2 class="completion-hero-title">' + esc(feedback.title) + '</h2>' +
+            '<p class="completion-hero-message">' + esc(feedback.message) + (R.expired ? ' <span class="expired-tag">(Time expired)</span>' : '') + '</p>' +
+            '<div class="completion-stats-row">' +
+              '<div class="stat-pill"><b>' + R.score + ' / ' + R.total + '</b><span>Score</span></div>' +
+              '<div class="stat-pill"><b>' + minutes + ' min</b><span>Time</span></div>' +
+              '<div class="stat-pill"><b>' + cardsMastered + '</b><span>Mastered</span></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<section class="exam-review" aria-labelledby="exam-review-title">' +
+          '<div class="review-heading">' +
+            '<div><p class="eyebrow">Learn from the attempt</p><h2 id="exam-review-title">Answer review</h2></div>' +
+            '<span class="meta">' + plural(R.review.length, 'question') + '</span>' +
+          '</div>' +
+          '<ol>' + examRows + '</ol>' +
+        '</section>' +
+        '<div class="completion-actions-bar">' +
+          '<button class="btn primary full btn-continue" data-act="home">Continue</button>' +
+        '</div>' +
+      '</section>';
     }
-    if (R.kind === 'quiz') {
-      var pct = Math.round(100 * R.score / R.total);
-      h = '<div class="result-hero"><span class="result-mark" aria-hidden="true">' + pct + '%</span><div class="result-score"><span class="num">' + R.score + ' <span aria-hidden="true">/</span> ' + R.total + '</span><span class="meta">' + pct + '% correct</span>' + (R.newBest ? '<span class="new-best">New best</span>' : '') + '</div></div>';
-    } else h = '<div class="result-hero flash-result"><span class="result-mark" aria-hidden="true">' + R.known + '</span><div class="result-score"><span class="num">' + R.known + ' known</span><span class="meta">' + R.learning.length + ' still learning · ' + R.skipped + ' not marked</span></div></div>';
+
     var miss = R.kind === 'quiz' ? R.missed : R.learning;
-    return '<section class="study-shell results-shell" aria-label="' + (R.kind === 'quiz' ? 'Quiz results' : 'Flashcard session results') + '"><header class="top results-header"><h1>' + (R.kind === 'quiz' ? 'Quiz results' : 'Session complete') + '</h1><button class="btn sm ghost" data-act="home">Back to decks</button></header>' + h +
-      '<div class="result-actions">' + (miss.length ? '<button class="btn primary full" data-act="review">Review ' + plural(miss.length, R.kind === 'quiz' ? 'missed card' : 'card') + '</button>' : '<p class="note result-note">' + (R.kind === 'quiz' ? 'No missed cards. Nice work.' : 'Nothing left marked as still learning.') + '</p>') +
-      '<button class="btn full" data-act="again">' + (R.kind === 'quiz' ? 'Retake quiz' : 'Study again') + '</button><button class="btn full ghost" data-act="home">Return to decks</button></div></section>';
+    return '<section class="study-shell results-shell coaching-completion-screen" aria-label="' + (R.kind === 'quiz' ? 'Quiz results' : 'Flashcard session results') + '">' +
+      '<header class="top results-header">' +
+        '<button class="study-close-btn" data-act="home" aria-label="Return home">' +
+          '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button>' +
+        '<h1>' + esc(feedback.title) + '</h1>' +
+        '<span class="meta">' + (R.kind === 'quiz' ? feedback.pct + '%' : R.known + ' known') + '</span>' +
+      '</header>' +
+      '<div class="coaching-completion-hero">' +
+        '<div class="completion-hero-card">' +
+          '<div class="completion-score-badge">' + (R.kind === 'quiz' ? feedback.pct + '%' : '✓') + '</div>' +
+          '<h2 class="completion-hero-title">' + esc(feedback.title) + '</h2>' +
+          '<p class="completion-hero-message">' + esc(feedback.message) + '</p>' +
+          '<div class="completion-stats-row">' +
+            (R.kind === 'quiz' ? '<div class="stat-pill"><b>' + R.score + ' / ' + R.total + '</b><span>Score</span></div>' : '<div class="stat-pill"><b>' + R.known + '</b><span>Known</span></div>') +
+            '<div class="stat-pill"><b>' + minutes + ' min</b><span>Study Time</span></div>' +
+            '<div class="stat-pill"><b>' + cardsMastered + '</b><span>Cards Mastered</span></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="result-actions completion-actions-bar">' +
+        (miss.length ? '<button class="btn primary full" data-act="review">Review ' + plural(miss.length, R.kind === 'quiz' ? 'missed card' : 'card') + '</button>' : '<p class="note result-note">' + (R.kind === 'quiz' ? 'No missed cards. Outstanding work!' : 'Nothing left marked as still learning.') + '</p>') +
+        '<button class="btn full" data-act="again">' + (R.kind === 'quiz' ? 'Retake quiz' : 'Study again') + '</button>' +
+        '<button class="btn full ghost btn-continue" data-act="home">Continue</button>' +
+      '</div>' +
+    '</section>';
   };
 
   views.edit = function () {
@@ -1008,7 +1175,29 @@
   };
 
   function head(t, right) { return '<header class="top"><button class="btn sm ghost" data-act="home">‹ Exit</button><h1>' + t + '</h1><span class="meta">' + right + '</span></header>'; }
-  function sessionHead(t, right, isExam) { return '<header class="top study-header"><button class="btn sm ghost study-exit" data-act="pause-session" aria-label="Pause and save study session">Pause</button><div class="study-heading"><span class="eyebrow">CCI · DISCIPLESHIP</span><h1>' + esc(t) + '</h1></div><div class="session-status' + (isExam ? ' is-timer' : '') + '">' + right + '</div></header>'; }
+  
+  function triggerHaptic(type) {
+    try {
+      if (window.navigator && typeof window.navigator.vibrate === 'function') {
+        if (type === 'correct') window.navigator.vibrate([30]);
+        else if (type === 'wrong') window.navigator.vibrate([40, 60, 40]);
+        else window.navigator.vibrate(20);
+      }
+    } catch (e) {}
+  }
+
+  function sessionHead(t, right, isExam) {
+    return '<header class="top study-header coaching-study-header">' +
+      '<button class="study-close-btn" data-act="pause-session" aria-label="Close study session">' +
+        '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+      '</button>' +
+      '<div class="study-heading">' +
+        '<span class="eyebrow">CCI · DISCIPLESHIP</span>' +
+        '<h1>' + esc(t) + '</h1>' +
+      '</div>' +
+      '<div class="session-status' + (isExam ? ' is-timer' : '') + '">' + right + '</div>' +
+    '</header>';
+  }
   function progressBar(n, t) { var pct = t ? Math.max(0, Math.min(100, Math.round(100 * n / t))) : 0; return '<div class="pbar study-progress" role="progressbar" aria-label="Study session progress" aria-valuemin="0" aria-valuemax="' + t + '" aria-valuenow="' + n + '" aria-valuetext="' + n + ' of ' + t + '"><i style="width:' + pct + '%"></i></div>'; }
   function formatClock(milliseconds) { var seconds = Math.max(0, Math.ceil(milliseconds / 1000)); return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'); }
 
@@ -1112,7 +1301,7 @@
       cards = cards.map(function (it) { return { deckId: it.deckId, card: it.card, optionOrder: shuffle([0, 1, 2, 3]) }; });
       if (mode === 'quiz' && o.limit && o.limit < cards.length) cards = cards.slice(0, o.limit);
     }
-    var session = { name: mode, cards: cards, i: 0, flipped: false, picked: null, score: 0, answers: [], marks: {}, opts: o, ids: ids };
+    var session = { name: mode, cards: cards, i: 0, flipped: false, picked: null, score: 0, answers: [], marks: {}, opts: o, ids: ids, startedAt: Date.now() };
     if (mode === 'exam') session.remaining = o.duration;
     go(session);
     saveActiveSession();
@@ -1308,7 +1497,9 @@
   }
   function pick(k) {
     if (V.picked !== null) return;
+    try { window.localStorage.setItem('cci_seen_answer_tooltip', 'true'); } catch (e) {}
     var it = V.cards[V.i], selected = LET[(it.optionOrder || [0, 1, 2, 3])[k]], ok = selected === it.card.answer;
+    triggerHaptic(ok ? 'correct' : 'wrong');
     V.picked = k; V.answers.push({ item: it, ok: ok, selected: selected }); if (ok) V.score++;
     var p = prog(it.deckId);
     p.cards[it.card.id] = StudyLogic.review(p.cards[it.card.id], ok, Date.now());

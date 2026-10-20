@@ -347,7 +347,63 @@
     ];
   }
 
+  
+  function formatCompletionFeedback(stats) {
+    stats = stats || {};
+    var kind = stats.kind || 'quiz';
+    var score = Number.isInteger(stats.score) ? stats.score : 0;
+    var total = Number.isInteger(stats.total) ? stats.total : 0;
+    var minutes = stats.minutes !== undefined ? stats.minutes : 1;
+    var cardsMastered = Number.isInteger(stats.cardsMastered) ? stats.cardsMastered : 0;
+    var pct = total > 0 ? Math.round(100 * score / total) : 0;
+
+    var title = 'Well done!';
+    var message = 'Every review builds and strengthens your discipleship foundation.';
+
+    if (kind === 'flash') {
+      title = 'Session Complete!';
+      if (cardsMastered > 0) {
+        message = 'Outstanding dedication! You are developing strong grasp of these Scriptures.';
+      } else {
+        message = 'Great effort! Re-reading and reviewing is how deep understanding takes root.';
+      }
+    } else if (kind === 'exam') {
+      if (pct >= 80) {
+        title = 'Exceptional Mastery!';
+        message = 'You demonstrated comprehensive discipleship knowledge under exam conditions.';
+      } else if (pct >= 50) {
+        title = 'Well Done!';
+        message = 'Solid work! Review the explanations below to turn missed items into strengths.';
+      } else {
+        title = 'Good Effort!';
+        message = 'Challenging questions reveal exactly what to focus on next. Keep pressing forward!';
+      }
+    } else {
+      if (pct === 100) {
+        title = 'Perfect Score!';
+        message = 'Flawless recall! Your knowledge of this discipleship chapter is rock solid.';
+      } else if (pct >= 70) {
+        title = 'Well done!';
+        message = 'Terrific progress! You have a firm grasp of the core doctrines and teachings.';
+      } else {
+        title = 'Good practice session!';
+        message = 'Mistakes are simply stepping stones in discipleship. Check the explanations and review!';
+      }
+    }
+
+    return {
+      title: title,
+      message: message,
+      pct: pct,
+      score: score,
+      total: total,
+      minutes: Math.max(1, Math.round(minutes)),
+      cardsMastered: cardsMastered
+    };
+  }
+
   return Object.freeze({
+    formatCompletionFeedback: formatCompletionFeedback,
     parseChapterTitle: parseChapterTitle,
     getChapterSteps: getChapterSteps,
     selectDailyItems: selectDailyItems,
