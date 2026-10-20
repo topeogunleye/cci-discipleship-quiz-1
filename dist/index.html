@@ -2114,6 +2114,617 @@ a:hover { color: var(--link-hover); }
 .deck-grad-11 { background: var(--deck-grad-11); color: #FFFFFF; }
 .deck-grad-12 { background: var(--deck-grad-12); color: #FFFFFF; }
 
+/* ============================================================
+   Navigation Shell & Tab Bar (Prompt 2)
+   ============================================================ */
+
+/* Top bar (Home) */
+.home-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+  padding: var(--space-xs) 0;
+}
+
+.home-brand {
+  min-width: 0;
+}
+
+.home-title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.home-top-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+/* Streak Flame Button */
+.streak-flame-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--duration-fast) ease, box-shadow var(--duration-fast) ease, background var(--duration-fast) ease;
+}
+
+.streak-flame-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.streak-flame-btn .flame-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+/* Top Icon Button (Settings etc) */
+.top-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  background: var(--surface);
+  color: var(--ink-secondary);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease, transform var(--duration-fast) ease;
+}
+
+.top-icon-btn:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+
+.top-icon-btn svg {
+  display: block;
+}
+
+/* View Header */
+.view-header {
+  margin-bottom: var(--space-xl);
+}
+
+.view-header h1 {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.view-sub {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+/* Hero Cards (Continue / Today Focus) */
+.hero-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  color: #FFFFFF;
+}
+
+.hero-continue {
+  background: var(--grad-hero-indigo);
+}
+
+.hero-today {
+  background: var(--grad-hero-sunrise);
+}
+
+.hero-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.hero-chip {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.22);
+  color: #FFFFFF;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+}
+
+.hero-meta {
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+}
+
+.hero-card-title {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.25;
+  color: #FFFFFF;
+  margin: 0;
+}
+
+.hero-card-desc {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0;
+}
+
+.hero-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.hero-card-actions .btn.primary {
+  background: #FFFFFF;
+  color: var(--accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.hero-card-actions .btn.primary:hover {
+  background: #F5F6FB;
+  transform: translateY(-1px);
+}
+
+.hero-card-actions .btn.ghost {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.hero-card-actions .btn.ghost:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Plan for Today Section */
+.plan-section {
+  margin-bottom: var(--space-2xl);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+}
+
+.section-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.section-sub {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.plan-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.plan-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: var(--space-md) var(--space-lg);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--duration-fast) ease, box-shadow var(--duration-fast) ease, border-color var(--duration-fast) ease;
+  width: 100%;
+}
+
+.plan-card:hover {
+  border-color: var(--muted);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-1px);
+}
+
+.plan-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.plan-card.state-done .plan-card-icon {
+  background: var(--okbg);
+  color: var(--ok);
+}
+
+.plan-card-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.plan-card-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.35;
+  margin-bottom: 2px;
+}
+
+.plan-card-meta {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.plan-card-badge {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.plan-card-badge.ready {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.plan-card-badge.done {
+  background: var(--okbg);
+  color: var(--ok);
+}
+
+/* Home Milestone Preview */
+.home-milestone-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-card);
+  padding: var(--space-md) var(--space-lg);
+  margin-top: var(--space-lg);
+}
+
+.milestone-content {
+  min-width: 0;
+}
+
+.milestone-title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+
+.milestone-stats {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+/* Practice Grid */
+.practice-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.practice-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--duration-fast) ease, box-shadow var(--duration-fast) ease, border-color var(--duration-fast) ease;
+  width: 100%;
+}
+
+.practice-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-1px);
+}
+
+.practice-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.practice-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.practice-title {
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.practice-desc {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.practice-arrow {
+  font-size: 1.25rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* Progress View Components */
+.streak-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: var(--space-md) var(--space-lg);
+  margin-bottom: var(--space-xl);
+}
+
+.streak-card .flame-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.streak-card b {
+  display: block;
+  font-size: var(--text-base);
+  color: var(--ink);
+}
+
+.streak-card p {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.progress-decks-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: var(--space-xl);
+}
+
+.progress-deck-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.progress-deck-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progress-deck-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.progress-deck-head strong {
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.progress-deck-head .meta {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+/* Settings View Components */
+.settings-group {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: var(--space-lg) var(--space-xl);
+  margin-bottom: var(--space-lg);
+}
+
+.settings-group-title {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid var(--line-subtle);
+  padding-top: var(--space-md);
+}
+
+.settings-row strong {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.settings-row .meta {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.theme-pill-group {
+  display: inline-flex;
+  background: var(--bg);
+  padding: 3px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--line);
+  gap: 2px;
+}
+
+.theme-pill {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+.theme-pill.active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   Bottom Tab Bar (Mobile Navigation Shell)
+   ============================================================ */
+.bottom-tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding: 8px var(--space-sm) calc(8px + env(safe-area-inset-bottom, 0px));
+  z-index: 100;
+  box-shadow: 0 -4px 16px rgba(22, 21, 43, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.tab-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 4px var(--space-sm);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  min-width: 56px;
+  transition: color var(--duration-fast) ease, transform var(--duration-fast) ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tab-btn:hover {
+  color: var(--ink);
+}
+
+.tab-btn.active {
+  color: var(--accent);
+}
+
+.tab-btn.active svg {
+  stroke: var(--accent);
+}
+
+.tab-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* Responsive Shell (Desktop Rail / Centered column) */
+@media (min-width: 768px) {
+  #app {
+    padding-top: var(--space-2xl);
+    padding-bottom: 90px;
+  }
+
+  .bottom-tab-bar {
+    max-width: 540px;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: var(--radius-full);
+    border: 1px solid var(--line);
+    padding: 8px var(--space-lg);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .hero-card-actions {
+    flex-direction: row;
+  }
+
+  .hero-card-actions .btn {
+    width: auto;
+    padding-inline: 24px;
+  }
+}
+
+
 </style>
 </head>
 <body>
@@ -2669,7 +3280,171 @@ a:hover { color: var(--link-hover); }
     };
   }
 
-  return Object.freeze({ selectDailyItems: selectDailyItems, snapshot: snapshot, restore: restore });
+  function calculateStreak(timestamps, now) {
+    now = Number.isFinite(now) ? now : Date.now();
+    if (!Array.isArray(timestamps) || !timestamps.length) return 0;
+    var nowDate = new Date(now);
+    var todayStr = nowDate.getFullYear() + '-' + String(nowDate.getMonth() + 1).padStart(2, '0') + '-' + String(nowDate.getDate()).padStart(2, '0');
+    var yesterdayDate = new Date(now - 86400000);
+    var yesterdayStr = yesterdayDate.getFullYear() + '-' + String(yesterdayDate.getMonth() + 1).padStart(2, '0') + '-' + String(yesterdayDate.getDate()).padStart(2, '0');
+
+    var daysSet = new Set();
+    timestamps.forEach(function (ts) {
+      if (!Number.isFinite(ts) || ts <= 0) return;
+      var d = new Date(ts);
+      daysSet.add(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+    });
+
+    var currentCheckDate = daysSet.has(todayStr) ? nowDate : (daysSet.has(yesterdayStr) ? yesterdayDate : null);
+    if (!currentCheckDate) return 0;
+
+    var streak = 0;
+    var cursor = new Date(currentCheckDate.getFullYear(), currentCheckDate.getMonth(), currentCheckDate.getDate());
+    while (true) {
+      var key = cursor.getFullYear() + '-' + String(cursor.getMonth() + 1).padStart(2, '0') + '-' + String(cursor.getDate()).padStart(2, '0');
+      if (daysSet.has(key)) {
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  function selectPlanCards(options) {
+    options = options || {};
+    var dueItems = Array.isArray(options.dueItems) ? options.dueItems : [];
+    var weakItems = Array.isArray(options.weakItems) ? options.weakItems : [];
+    var allItems = Array.isArray(options.allItems) ? options.allItems : [];
+    var isMastered = typeof options.isMastered === 'function' ? options.isMastered : function () { return false; };
+    var decks = Array.isArray(options.decks) ? options.decks : [];
+    var completedToday = options.completedToday || {};
+
+    var cards = [];
+
+    // 1. Due / Daily Review Card
+    var dueLimit = 10;
+    var countDue = dueItems.length;
+    if (countDue > 0) {
+      var countToReview = Math.min(countDue, dueLimit);
+      var estMinutes = Math.max(1, Math.round(countToReview * 0.35));
+      cards.push({
+        id: 'due',
+        type: 'review',
+        title: 'Review ' + countToReview + ' due ' + (countToReview === 1 ? 'card' : 'cards'),
+        oneLine: 'Review ' + countToReview + ' due ' + (countToReview === 1 ? 'card' : 'cards') + ' · ' + estMinutes + ' min',
+        minuteEstimate: estMinutes,
+        state: completedToday.due ? 'done' : 'ready',
+        action: 'daily-study',
+        icon: 'review'
+      });
+    } else {
+      var unmastered = selectDailyItems([], allItems, isMastered, dueLimit);
+      if (unmastered.length > 0) {
+        var countStudy = Math.min(unmastered.length, dueLimit);
+        var estStudyMin = Math.max(1, Math.round(countStudy * 0.35));
+        cards.push({
+          id: 'due',
+          type: 'review',
+          title: 'Study ' + countStudy + ' unmastered cards',
+          oneLine: 'Study ' + countStudy + ' cards · ' + estStudyMin + ' min',
+          minuteEstimate: estStudyMin,
+          state: completedToday.due ? 'done' : 'ready',
+          action: 'daily-study',
+          icon: 'review'
+        });
+      } else {
+        cards.push({
+          id: 'due',
+          type: 'review',
+          title: 'All due cards reviewed',
+          oneLine: 'Review cards · All caught up',
+          minuteEstimate: 0,
+          state: 'done',
+          action: 'daily-study',
+          icon: 'review'
+        });
+      }
+    }
+
+    // 2. Weak spots Card
+    var weakLimit = 5;
+    var countWeak = weakItems.length;
+    if (countWeak > 0) {
+      var countWeakToStudy = Math.min(countWeak, weakLimit);
+      var estWeakMin = Math.max(1, Math.round(countWeakToStudy * 0.4));
+      cards.push({
+        id: 'weak',
+        type: 'weak',
+        title: 'Weak spots (' + countWeakToStudy + ')',
+        oneLine: 'Weak spots · ' + estWeakMin + ' min',
+        minuteEstimate: estWeakMin,
+        state: completedToday.weak ? 'done' : 'ready',
+        action: 'weak',
+        icon: 'target'
+      });
+    } else {
+      cards.push({
+        id: 'weak',
+        type: 'weak',
+        title: 'No weak spots',
+        oneLine: 'Weak spots · 0 min',
+        minuteEstimate: 0,
+        state: 'done',
+        action: 'weak',
+        icon: 'target'
+      });
+    }
+
+    // 3. New lesson Card
+    var nextDeck = null;
+    for (var i = 0; i < decks.length; i++) {
+      var d = decks[i];
+      var unmasteredInDeck = (d.cards || []).filter(function (c) { return !isMastered({ deckId: d.id, card: c }); });
+      if (unmasteredInDeck.length > 0) {
+        nextDeck = d;
+        break;
+      }
+    }
+
+    if (nextDeck) {
+      var cleanTitle = nextDeck.title.replace(/^(?:Discipleship Experience\s*)?(?:\(Section\s*\d+\)\s*)?/i, '').trim();
+      cards.push({
+        id: 'lesson',
+        type: 'lesson',
+        title: 'Try a new lesson',
+        oneLine: 'Try a new lesson · ' + cleanTitle,
+        minuteEstimate: 4,
+        state: completedToday.lesson ? 'done' : 'ready',
+        action: 'setup',
+        mode: 'flash',
+        deckId: nextDeck.id,
+        icon: 'spark'
+      });
+    } else {
+      cards.push({
+        id: 'exam',
+        type: 'exam',
+        title: 'Challenge exam',
+        oneLine: 'Challenge exam · 15 min',
+        minuteEstimate: 15,
+        state: 'ready',
+        action: 'exam',
+        icon: 'trophy'
+      });
+    }
+
+    return cards;
+  }
+
+  return Object.freeze({
+    selectDailyItems: selectDailyItems,
+    selectPlanCards: selectPlanCards,
+    calculateStreak: calculateStreak,
+    snapshot: snapshot,
+    restore: restore
+  });
 });
 
 </script>
@@ -2678,7 +3453,7 @@ a:hover { color: var(--link-hover); }
   'use strict';
   var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 8;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
-  var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false }, seeded: false, dataVersion: 0, pausedSession: null };
+  var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false, showStreak: true }, seeded: false, dataVersion: 0, pausedSession: null };
   var STARTER_DECKS = [];
   var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
   var browserLocalStorage = null, browserIndexedDB = null;
@@ -2769,9 +3544,10 @@ a:hover { color: var(--link-hover); }
         var best = old.best && Number.isFinite(+old.best.pct) && +old.best.pct >= 0 && +old.best.pct <= 100 ? old.best : null;
         S.progress[d.id] = { best: best, cards: cards };
       });
-      S.settings = Object.assign({ theme: 'auto', shuffle: false }, o.settings && typeof o.settings === 'object' ? o.settings : {});
+      S.settings = Object.assign({ theme: 'auto', shuffle: false, showStreak: true }, o.settings && typeof o.settings === 'object' ? o.settings : {});
       if (['auto', 'light', 'dark'].indexOf(S.settings.theme) < 0) S.settings.theme = 'auto';
       S.settings.shuffle = !!S.settings.shuffle;
+      S.settings.showStreak = S.settings.showStreak !== false;
       S.seeded = !!o.seeded;
       S.dataVersion = Number.isInteger(o.dataVersion) && o.dataVersion >= 0 ? o.dataVersion : 0;
       S.backupReminder = o.backupReminder;
@@ -3095,15 +3871,186 @@ a:hover { color: var(--link-hover); }
     return '<span class="deck-topic">' + esc(title) + '</span>';
   }
 
+  var MAIN_TABS = ['home', 'journey', 'practice', 'progress', 'settings'];
+
+  function getStudyTimestamps() {
+    var timestamps = [];
+    S.decks.forEach(function (d) {
+      var p = prog(d.id);
+      Object.keys(p.cards).forEach(function (cardId) {
+        var r = p.cards[cardId];
+        if (r && typeof r === 'object' && r.lastSeen) timestamps.push(r.lastSeen);
+      });
+    });
+    return timestamps;
+  }
+
+  function tabIconSvg(icon) {
+    switch (icon) {
+      case 'home':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>';
+      case 'journey':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>';
+      case 'practice':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="9" x2="12" y2="9.01"/><line x1="12" y1="15" x2="12" y2="15.01"/></svg>';
+      case 'progress':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>';
+      case 'settings':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+      default:
+        return '';
+    }
+  }
+
+  function planIconSvg(icon) {
+    switch (icon) {
+      case 'review':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>';
+      case 'target':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>';
+      case 'spark':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>';
+      case 'trophy':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3M18 9h3a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-3M4 3h16v8a8 8 0 0 1-16 0V3zM12 17v4M8 21h8"/></svg>';
+      default:
+        return '';
+    }
+  }
+
+  function renderTabBar(currentTab) {
+    var tabs = [
+      { id: 'home', label: 'Home', icon: 'home' },
+      { id: 'journey', label: 'Journey', icon: 'journey' },
+      { id: 'practice', label: 'Practice', icon: 'practice' },
+      { id: 'progress', label: 'Progress', icon: 'progress' },
+      { id: 'settings', label: 'Settings', icon: 'settings' }
+    ];
+    return '<nav class="bottom-tab-bar" aria-label="Main Navigation">' +
+      tabs.map(function (tab) {
+        var isActive = tab.id === currentTab;
+        return '<button class="tab-btn' + (isActive ? ' active' : '') + '" data-act="nav-tab" data-tab="' + tab.id + '" aria-selected="' + (isActive ? 'true' : 'false') + '" aria-label="' + tab.label + ' tab">' +
+          tabIconSvg(tab.icon) +
+          '<span class="tab-label">' + tab.label + '</span>' +
+        '</button>';
+      }).join('') +
+    '</nav>';
+  }
+
   views.home = function () {
     var totalCards = S.decks.reduce(function (n, d) { return n + d.cards.length; }, 0);
     var totalKnown = S.decks.reduce(function (n, d) { return n + d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length; }, 0);
     var now = Date.now();
-    var dueCount = StudyLogic.dueItems(allCardItems(), now).length;
+    var all = allCardItems();
+    var dueCount = StudyLogic.dueItems(all, now).length;
     var masterPct = totalCards ? Math.round(100 * totalKnown / totalCards) : 0;
+    var streak = MobileStudy.calculateStreak(getStudyTimestamps(), now);
+    var showStreak = S.settings.showStreak !== false;
+
     var backupReminder = StudyLogic.backupReminderDue(S.backupReminder, now)
       ? '<aside class="note backup-reminder" role="status" aria-labelledby="backup-reminder-title"><div><b id="backup-reminder-title">Back up now?</b><p>Keep a copy of your decks and study progress safe.</p></div><div class="row"><button class="btn sm primary" data-act="backup">Back up now</button><button class="btn sm ghost" data-act="backup-dismiss">Dismiss</button></div></aside>'
       : '';
+
+    // Top bar: title, streak flame counter, settings icon
+    var topBar = '<header class="home-top-bar">' +
+      '<div class="home-brand">' +
+        '<h1 class="home-title">CCI Discipleship</h1>' +
+      '</div>' +
+      '<div class="home-top-actions">' +
+        (showStreak ? '<button class="streak-flame-btn" data-act="streak-info" aria-label="Streak: ' + streak + ' days"><span class="flame-icon" aria-hidden="true">🔥</span><span class="streak-count">' + streak + '</span></button>' : '') +
+        '<button class="top-icon-btn" data-act="nav-tab" data-tab="settings" aria-label="Settings">' +
+          tabIconSvg('settings') +
+        '</button>' +
+      '</div>' +
+    '</header>';
+
+    // Hero Card: Continue (resumes saved session if there is one) or Today Focus
+    var heroCard = '';
+    if (S.pausedSession) {
+      var pausedLabel = S.pausedSession.name === 'exam' ? 'exam' : (S.pausedSession.name === 'quiz' ? 'quiz' : 'flashcard session');
+      var pausedCardNum = Math.min((S.pausedSession.i || 0) + 1, (S.pausedSession.cards || []).length);
+      heroCard = '<section class="hero-card hero-continue" aria-label="Continue saved study">' +
+        '<div class="hero-card-header">' +
+          '<span class="hero-chip">CONTINUE</span>' +
+          '<span class="hero-meta">Card ' + pausedCardNum + ' of ' + S.pausedSession.cards.length + '</span>' +
+        '</div>' +
+        '<h2 class="hero-card-title">Pick up where you left off</h2>' +
+        '<p class="hero-card-desc">Your ' + pausedLabel + ' is waiting right where you stopped.</p>' +
+        '<div class="hero-card-actions">' +
+          '<button class="btn primary full" data-act="resume-study">Resume Study</button>' +
+          '<button class="btn sm ghost" data-act="discard-study">End session</button>' +
+        '</div>' +
+      '</section>';
+    } else if (S.decks.length) {
+      var heroTitle = dueCount > 0 ? 'Start Today’s Focus' : (totalKnown < totalCards ? 'Continue Your Journey' : 'All Cards Mastered!');
+      var heroDesc = dueCount > 0
+        ? dueCount + ' ' + (dueCount === 1 ? 'card is' : 'cards are') + ' ready for review today (~5 min).'
+        : (totalKnown < totalCards
+          ? 'Build your discipleship foundation with a quick 10-card session.'
+          : 'Outstanding! You have mastered all 12 lesson decks. Challenge yourself with a comprehensive exam.');
+      var heroBtnText = dueCount > 0 ? 'Start Today’s Review' : (totalKnown < totalCards ? 'Start 10-Card Session' : 'Take Comprehensive Exam');
+      var heroAction = (totalKnown >= totalCards && totalCards > 0) ? 'exam' : 'daily-study';
+      heroCard = '<section class="hero-card hero-today" aria-label="Today’s focus">' +
+        '<div class="hero-card-header">' +
+          '<span class="hero-chip">TODAY’S FOCUS</span>' +
+          (dueCount > 0 ? '<span class="hero-meta">' + dueCount + ' due</span>' : '<span class="hero-meta">~5 min</span>') +
+        '</div>' +
+        '<h2 class="hero-card-title">' + heroTitle + '</h2>' +
+        '<p class="hero-card-desc">' + heroDesc + '</p>' +
+        '<div class="hero-card-actions">' +
+          '<button class="btn primary full" data-act="' + heroAction + '">' + heroBtnText + '</button>' +
+        '</div>' +
+      '</section>';
+    } else {
+      heroCard = '<div class="empty"><h2>Welcome to CCI Study Decks</h2><p>Begin your discipleship journey. Add a deck from a text file or paste its content to start studying.</p><button class="btn primary sm" data-act="import" style="margin-top:14px">Add your first deck</button></div>';
+    }
+
+    // Your Plan for Today: short cards with icon, one-line title, minute estimate and state
+    var planCards = MobileStudy.selectPlanCards({
+      dueItems: StudyLogic.dueItems(all, now),
+      weakItems: StudyLogic.weakSpots(all, 10),
+      allItems: all,
+      isMastered: function (it) { return isMastered(it.deckId, it.card.id); },
+      decks: S.decks,
+      completedToday: S.completedToday || {}
+    });
+
+    var planSection = '<section class="plan-section" aria-labelledby="plan-section-title">' +
+      '<div class="section-head">' +
+        '<h2 id="plan-section-title" class="section-title">Your Plan for Today</h2>' +
+        '<span class="section-sub">Personalized coaching</span>' +
+      '</div>' +
+      '<div class="plan-card-list">' +
+        planCards.map(function (c) {
+          return '<button class="plan-card state-' + c.state + '" data-act="' + c.action + '"' + (c.mode ? ' data-mode="' + c.mode + '"' : '') + (c.deckId ? ' data-id="' + c.deckId + '"' : '') + ' aria-label="' + esc(c.oneLine) + '">' +
+            '<div class="plan-card-icon" aria-hidden="true">' + planIconSvg(c.icon) + '</div>' +
+            '<div class="plan-card-body">' +
+              '<div class="plan-card-title">' + esc(c.title) + '</div>' +
+              '<div class="plan-card-meta">' + (c.minuteEstimate ? c.minuteEstimate + ' min estimate' : (c.state === 'done' ? 'Completed today' : 'Ready')) + '</div>' +
+            '</div>' +
+            '<div class="plan-card-badge ' + c.state + '">' + (c.state === 'done' ? 'Done ✓' : 'Ready') + '</div>' +
+          '</button>';
+        }).join('') +
+      '</div>' +
+    '</section>';
+
+    var milestoneCard = S.decks.length ? '<section class="home-milestone-card">' +
+      '<div class="milestone-content">' +
+        '<div class="milestone-title">Progress Overview</div>' +
+        '<div class="milestone-stats">' +
+          '<span>' + S.decks.length + ' Lessons</span> · ' +
+          '<span>' + totalCards + ' Cards</span> · ' +
+          '<span>' + masterPct + '% Mastered</span>' +
+        '</div>' +
+      '</div>' +
+      '<button class="btn sm ghost" data-act="nav-tab" data-tab="progress">View Details →</button>' +
+    '</section>' : '';
+
+    return topBar + backupReminder + heroCard + (S.decks.length ? planSection + milestoneCard : '');
+  };
+
+  views.journey = function () {
+    var totalCards = S.decks.reduce(function (n, d) { return n + d.cards.length; }, 0);
+    var now = Date.now();
     var rows = S.decks.map(function (d) {
       var p = prog(d.id), mastered = d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length;
       var pct = d.cards.length ? Math.round(100 * mastered / d.cards.length) : 0;
@@ -3133,65 +4080,165 @@ a:hover { color: var(--link-hover); }
         '</div></article>';
     }).join('');
     var empty = '<div class="empty"><h2>Welcome to CCI Study Decks</h2><p>Begin your discipleship journey. Add a deck from a text file or paste its content to start studying.</p><button class="btn primary sm" data-act="import" style="margin-top:14px">Add your first deck</button></div>';
-    var heroSection = '';
-    if (S.decks.length) {
-      if (S.pausedSession) {
-        var pausedLabel = S.pausedSession.name === 'exam' ? 'exam' : (S.pausedSession.name === 'quiz' ? 'quiz' : 'flashcard session');
-        var pausedProgress = Math.min((S.pausedSession.i || 0) + 1, (S.pausedSession.cards || []).length);
-        heroSection = '<section class="hero-action" aria-label="Paused study session">' +
-          '<div class="hero-content"><span class="hero-tag">Saved for later</span><h2 class="hero-title">Pick up where you left off</h2><p class="hero-desc">Your ' + pausedLabel + ' is saved at card ' + pausedProgress + ' of ' + S.pausedSession.cards.length + '.</p></div>' +
-          '<div class="row"><button class="btn primary" data-act="resume-study">Resume Study</button><button class="btn sm ghost" data-act="discard-study">End session</button></div></section>';
-      } else if (dueCount > 0) {
-        heroSection = '<section class="hero-action" aria-label="Today’s study">' +
-          '<div class="hero-content"><span class="hero-tag">Today’s Study</span><h2 class="hero-title">A few cards are ready for review</h2><p class="hero-desc">' + plural(dueCount, 'card') + ' ' + (dueCount === 1 ? 'is' : 'are') + ' due. Start with a focused session of up to 10 cards, usually about 5–10 minutes.</p></div>' +
-          '<button class="btn primary" data-act="daily-study">Start today’s study</button></section>';
-      } else if (totalKnown < totalCards) {
-        var remaining = totalCards - totalKnown;
-        heroSection = '<section class="hero-action" aria-label="Continue studying">' +
-          '<div class="hero-content"><span class="hero-tag">Today’s Study</span><h2 class="hero-title">Continue your study journey</h2><p class="hero-desc">' + plural(remaining, 'card') + ' not yet mastered across ' + plural(S.decks.length, 'deck') + '. Start with up to 10 cards for a focused 5–10 minute session.</p></div>' +
-          '<button class="btn primary" data-act="daily-study">Continue Studying</button></section>';
-      } else {
-        heroSection = '<section class="hero-action hero-complete" aria-label="All cards mastered">' +
-          '<div class="hero-content"><span class="hero-tag">Milestone Reached</span><h2 class="hero-title">All cards mastered!</h2><p class="hero-desc">You have achieved mastery across all 12 disciple decks. Challenge yourself with a comprehensive timed exam.</p></div>' +
-          '<button class="btn primary" data-act="exam">Take Exam</button></section>';
-      }
-    }
-    return '<header class="top home-top">' +
-      '<div class="brand-block">' +
-        '<h1>CCI Discipleship</h1>' +
-        '<p class="brand-sub">Rooted in Truth · Growing in Faith</p>' +
+    return '<header class="view-header">' +
+      '<div class="row spread">' +
+        '<div><h1>Journey</h1><p class="view-sub">12 Discipleship Chapters · ' + plural(S.decks.length, 'deck') + ' · ' + plural(totalCards, 'card') + '</p></div>' +
+        '<button class="btn sm" data-act="import">Add deck</button>' +
       '</div>' +
-      '<div class="row header-acts">' +
-        '<button class="btn sm ghost" data-act="theme" aria-label="Change color theme">Theme: ' + S.settings.theme + '</button>' +
-        (S.decks.length ? '<button class="btn sm ghost" data-act="exportall">Export all</button><button class="btn sm ghost" data-act="backup">Backup</button>' : '') +
-        '<button class="btn sm ghost" data-act="import">Add deck</button>' +
-      '</div></header>' +
-      backupReminder + heroSection +
-      (S.decks.length ? '<div class="statline">' +
-        '<div class="stat"><b>' + S.decks.length + '</b><span>Lessons</span></div>' +
-        '<div class="stat"><b>' + totalCards + '</b><span>Cards</span></div>' +
-        '<div class="stat"><b>' + masterPct + '%</b><span>Mastered</span></div>' +
-        (dueCount ? '<div class="stat stat-due"><b>' + dueCount + '</b><span>Due Today</span></div>' : '') +
-      '</div>' : '') +
-      (S.decks.length ? '<nav class="row study-modes" aria-label="Study modes">' +
-        '<button class="btn sm" data-act="due" aria-label="Study due today, ' + dueCount + ' cards">Due today <span class="badge" aria-hidden="true">' + dueCount + '</span></button>' +
-        '<button class="btn sm" data-act="weak">Weak spots</button>' +
-        '<button class="btn sm" data-act="exam">Exam</button>' +
-      '</nav>' : '') +
-      (S.decks.length ? '<div class="decks-section-bar">' +
-        '<div class="row spread-mid">' +
-          '<h2 class="decks-heading">Lesson Decks</h2>' +
-          '<div class="row sel-all"><label><input type="checkbox" data-selall' + (SEL.size === S.decks.length ? ' checked' : '') + '> Select all</label><span class="meta">' + plural(S.decks.length, 'deck') + ' · ' + plural(totalCards, 'card') + '</span></div>' +
+    '</header>' +
+    (S.decks.length ? '<div class="decks-section-bar">' +
+      '<div class="row spread-mid">' +
+        '<h2 class="decks-heading">Lesson Decks</h2>' +
+        '<div class="row sel-all"><label><input type="checkbox" data-selall' + (SEL.size === S.decks.length ? ' checked' : '') + '> Select all</label><span class="meta">' + plural(S.decks.length, 'deck') + ' · ' + plural(totalCards, 'card') + '</span></div>' +
+      '</div>' +
+      '<div class="home-tools">' +
+        '<label class="sr-only" for="deck-search">Search decks</label>' +
+        '<input id="deck-search" type="search" placeholder="Search lessons by topic or section…" value="' + esc(homeFilter) + '" autocomplete="off">' +
+        '<span class="meta" id="deck-result-count">' + S.decks.length + ' ' + (S.decks.length === 1 ? 'deck' : 'decks') + '</span>' +
+      '</div>' +
+      '<p class="search-empty" id="search-empty">No decks match that search. Try searching by section or topic.</p>' +
+    '</div>' : '') +
+    (rows ? '<div class="deck-grid">' + rows + '</div>' : empty) +
+    '<div id="bar" class="bar">' + bar() + '</div>';
+  };
+
+  views.practice = function () {
+    var now = Date.now();
+    var all = allCardItems();
+    var dueCount = StudyLogic.dueItems(all, now).length;
+    var weakCount = StudyLogic.weakSpots(all, 10).length;
+    return '<header class="view-header">' +
+      '<h1>Practice</h1>' +
+      '<p class="view-sub">Master your questions through focused study modes</p>' +
+    '</header>' +
+    '<div class="practice-grid">' +
+      '<button class="practice-card" data-act="daily-study">' +
+        '<div class="practice-icon">' + planIconSvg('review') + '</div>' +
+        '<div class="practice-body">' +
+          '<div class="practice-title">Today’s Focus Study</div>' +
+          '<div class="practice-desc">Focused 10-card daily review prioritized by spaced repetition.</div>' +
         '</div>' +
-        '<div class="home-tools">' +
-          '<label class="sr-only" for="deck-search">Search decks</label>' +
-          '<input id="deck-search" type="search" placeholder="Search lessons by topic or section…" value="' + esc(homeFilter) + '" autocomplete="off">' +
-          '<span class="meta" id="deck-result-count">' + S.decks.length + ' ' + (S.decks.length === 1 ? 'deck' : 'decks') + '</span>' +
+        '<span class="practice-arrow" aria-hidden="true">→</span>' +
+      '</button>' +
+      '<button class="practice-card" data-act="due">' +
+        '<div class="practice-icon">' + planIconSvg('review') + '</div>' +
+        '<div class="practice-body">' +
+          '<div class="practice-title">Due Cards Review ' + (dueCount ? '<span class="badge">' + dueCount + '</span>' : '') + '</div>' +
+          '<div class="practice-desc">' + (dueCount ? plural(dueCount, 'card') + ' scheduled for review today.' : 'All caught up! No cards currently due.') + '</div>' +
         '</div>' +
-        '<p class="search-empty" id="search-empty">No decks match that search. Try searching by section or topic.</p>' +
-      '</div>' : '') +
-      (rows ? '<div class="deck-grid">' + rows + '</div>' : empty) +
-      '<div id="bar" class="bar">' + bar() + '</div>';
+        '<span class="practice-arrow" aria-hidden="true">→</span>' +
+      '</button>' +
+      '<button class="practice-card" data-act="weak">' +
+        '<div class="practice-icon">' + planIconSvg('target') + '</div>' +
+        '<div class="practice-body">' +
+          '<div class="practice-title">Weak Spots</div>' +
+          '<div class="practice-desc">' + (weakCount ? 'Practice questions you have missed most frequently.' : 'Build stats by studying cards to surface weak spots.') + '</div>' +
+        '</div>' +
+        '<span class="practice-arrow" aria-hidden="true">→</span>' +
+      '</button>' +
+      '<button class="practice-card" data-act="exam">' +
+        '<div class="practice-icon">' + planIconSvg('trophy') + '</div>' +
+        '<div class="practice-body">' +
+          '<div class="practice-title">Comprehensive Timed Exam</div>' +
+          '<div class="practice-desc">Timed exam across all 12 decks with complete answer review upon submission.</div>' +
+        '</div>' +
+        '<span class="practice-arrow" aria-hidden="true">→</span>' +
+      '</button>' +
+    '</div>';
+  };
+
+  views.progress = function () {
+    var totalCards = S.decks.reduce(function (n, d) { return n + d.cards.length; }, 0);
+    var totalKnown = S.decks.reduce(function (n, d) { return n + d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length; }, 0);
+    var now = Date.now();
+    var dueCount = StudyLogic.dueItems(allCardItems(), now).length;
+    var masterPct = totalCards ? Math.round(100 * totalKnown / totalCards) : 0;
+    var streak = MobileStudy.calculateStreak(getStudyTimestamps(), now);
+    var backupReminder = StudyLogic.backupReminderDue(S.backupReminder, now)
+      ? '<aside class="note backup-reminder" role="status" aria-labelledby="backup-reminder-title-p"><div><b id="backup-reminder-title-p">Back up now?</b><p>Keep a copy of your decks and study progress safe.</p></div><div class="row"><button class="btn sm primary" data-act="backup">Back up now</button><button class="btn sm ghost" data-act="backup-dismiss">Dismiss</button></div></aside>'
+      : '';
+
+    var deckRows = S.decks.map(function (d) {
+      var p = prog(d.id);
+      var mastered = d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length;
+      var pct = d.cards.length ? Math.round(100 * mastered / d.cards.length) : 0;
+      var bestText = p.best ? 'Best ' + p.best.pct + '%' : 'Not taken';
+      return '<li class="progress-deck-item">' +
+        '<div class="progress-deck-head">' +
+          '<strong>' + esc(d.title) + '</strong>' +
+          '<span class="meta">' + pct + '% · ' + bestText + '</span>' +
+        '</div>' +
+        '<div class="deck-progress" role="progressbar" aria-label="' + esc(d.title) + '" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
+      '</li>';
+    }).join('');
+
+    return '<header class="view-header">' +
+      '<h1>Progress &amp; Stats</h1>' +
+      '<p class="view-sub">Track your discipleship knowledge and retention</p>' +
+    '</header>' +
+    backupReminder +
+    '<div class="statline">' +
+      '<div class="stat"><b>' + S.decks.length + '</b><span>Lessons</span></div>' +
+      '<div class="stat"><b>' + totalCards + '</b><span>Cards</span></div>' +
+      '<div class="stat"><b>' + masterPct + '%</b><span>Mastered</span></div>' +
+      '<div class="stat stat-due"><b>' + dueCount + '</b><span>Due Today</span></div>' +
+    '</div>' +
+    (streak > 0 ? '<div class="streak-card"><span class="flame-icon">🔥</span><div><b>' + streak + ' Day Study Streak</b><p>Keep studying daily to maintain momentum.</p></div></div>' : '') +
+    '<div class="progress-decks-card">' +
+      '<h2 class="decks-heading">Chapter Mastery</h2>' +
+      '<ul class="progress-deck-list">' + deckRows + '</ul>' +
+    '</div>';
+  };
+
+  views.settings = function () {
+    var theme = S.settings.theme;
+    var showStreak = S.settings.showStreak !== false;
+    return '<header class="view-header">' +
+      '<h1>Settings</h1>' +
+      '<p class="view-sub">Preferences, backups, and app information</p>' +
+    '</header>' +
+    '<div class="settings-group">' +
+      '<h2 class="settings-group-title">Appearance</h2>' +
+      '<div class="settings-row">' +
+        '<div><strong>Theme</strong><p class="meta">Select light, dark, or follow system</p></div>' +
+        '<div class="theme-pill-group" role="group" aria-label="Theme selection">' +
+          '<button class="theme-pill' + (theme === 'auto' ? ' active' : '') + '" data-act="set-theme" data-theme="auto">Auto</button>' +
+          '<button class="theme-pill' + (theme === 'light' ? ' active' : '') + '" data-act="set-theme" data-theme="light">Light</button>' +
+          '<button class="theme-pill' + (theme === 'dark' ? ' active' : '') + '" data-act="set-theme" data-theme="dark">Dark</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="settings-group">' +
+      '<h2 class="settings-group-title">Study Preferences</h2>' +
+      '<div class="settings-row">' +
+        '<div><strong>Daily Streak Counter</strong><p class="meta">Show flame counter in top bar</p></div>' +
+        '<button class="btn sm' + (showStreak ? ' primary' : '') + '" data-act="toggle-streak">' + (showStreak ? 'Enabled' : 'Off') + '</button>' +
+      '</div>' +
+      '<div class="settings-row">' +
+        '<div><strong>Shuffle Flashcards</strong><p class="meta">Randomize card order on start</p></div>' +
+        '<button class="btn sm' + (S.settings.shuffle ? ' primary' : '') + '" data-act="toggle-shuffle">' + (S.settings.shuffle ? 'Enabled' : 'Off') + '</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="settings-group">' +
+      '<h2 class="settings-group-title">Data &amp; Backup</h2>' +
+      '<div class="settings-row">' +
+        '<div><strong>Export JSON Backup</strong><p class="meta">Save all decks, history, and settings</p></div>' +
+        '<button class="btn sm" data-act="backup">Back up now</button>' +
+      '</div>' +
+      '<div class="settings-row">' +
+        '<div><strong>Restore Backup</strong><p class="meta">Import a previously saved .json backup file</p></div>' +
+        '<button class="btn sm" data-act="import">Restore</button>' +
+      '</div>' +
+      '<div class="settings-row">' +
+        '<div><strong>Export All as Text</strong><p class="meta">Download .txt format of all decks</p></div>' +
+        '<button class="btn sm" data-act="exportall">Export .txt</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="settings-group">' +
+      '<h2 class="settings-group-title">About</h2>' +
+      '<p class="meta">CCI Discipleship Quiz &amp; Study App · Offline PWA</p>' +
+      '<p class="meta">Storage engine: ' + esc(storageBackend) + '</p>' +
+    '</div>';
   };
   function bar() {
     if (!SEL.size) return '';
@@ -3301,8 +4348,50 @@ a:hover { color: var(--link-hover); }
   function formatClock(milliseconds) { var seconds = Math.max(0, Math.ceil(milliseconds / 1000)); return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'); }
 
   /* ---------- render ---------- */
-  function render(keep) { var view = V.name === 'exam' ? views.quiz : views[V.name]; app.innerHTML = banner() + view(); if (!keep) window.scrollTo(0, 0); if (V.name === 'flash') { var f = app.querySelector('.flip'); if (f) f.focus({ preventScroll: true }); } else if (V.name === 'quiz' || V.name === 'exam') { var q = app.querySelector('.qtext'); if (q) q.focus({ preventScroll: true }); } }
-  function go(v) { if (V.name === 'exam' && v.name !== 'exam') stopExamTimer(); V = v; render(); }
+  function render(keep) {
+    var isMainTab = MAIN_TABS.indexOf(V.name) >= 0;
+    var view = V.name === 'exam' ? views.quiz : views[V.name];
+    if (typeof view !== 'function') view = views.home;
+    var tabBarHtml = isMainTab ? renderTabBar(V.name) : '';
+    app.innerHTML = banner() + view() + tabBarHtml;
+    if (!keep) window.scrollTo(0, 0);
+    if (V.name === 'flash') {
+      var f = app.querySelector('.flip');
+      if (f) f.focus({ preventScroll: true });
+    } else if (V.name === 'quiz' || V.name === 'exam') {
+      var q = app.querySelector('.qtext');
+      if (q) q.focus({ preventScroll: true });
+    }
+  }
+
+  function go(v, replace) {
+    if (V.name === 'exam' && v.name !== 'exam') stopExamTimer();
+    var prev = V;
+    V = v;
+    try {
+      if (window.history && window.history.pushState) {
+        var stateObj = { name: V.name, id: V.id || null };
+        if (replace) {
+          window.history.replaceState(stateObj, '', window.location.href);
+        } else if (!prev || prev.name !== V.name || prev.id !== V.id) {
+          window.history.pushState(stateObj, '', window.location.href);
+        }
+      }
+    } catch (e) {}
+    render();
+  }
+
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('popstate', function (e) {
+      if (e.state && e.state.name) {
+        if (isStudySession(V.name)) {
+          pauseStudySession();
+        }
+        V = { name: e.state.name, id: e.state.id };
+        render();
+      }
+    });
+  }
 
   /* ---------- sessions ---------- */
   function setup(mode, id) {
@@ -3444,6 +4533,14 @@ a:hover { color: var(--link-hover); }
     var a = t.dataset.act, d;
     switch (a) {
       case 'home': closeModal(); go({ name: 'home' }); break;
+      case 'nav-tab': closeModal(); if (t.dataset.tab) go({ name: t.dataset.tab }); break;
+      case 'set-theme': if (t.dataset.theme) { S.settings.theme = t.dataset.theme; applyTheme(); save(); render(true); } break;
+      case 'toggle-streak': S.settings.showStreak = S.settings.showStreak === false; save(); render(true); break;
+      case 'toggle-shuffle': S.settings.shuffle = !S.settings.shuffle; save(); render(true); break;
+      case 'streak-info':
+        var curStreak = MobileStudy.calculateStreak(getStudyTimestamps(), Date.now());
+        toast(curStreak > 0 ? (curStreak + ' day streak! Keep studying daily to maintain momentum.') : 'Study cards today to start your streak!');
+        break;
       case 'close': closeModal(); break;
       case 'askok': var fn = pendingAsk; closeModal(); if (fn) fn(); break;
       case 'theme': S.settings.theme = { auto: 'light', light: 'dark', dark: 'auto' }[S.settings.theme]; applyTheme(); save(); render(true); break;

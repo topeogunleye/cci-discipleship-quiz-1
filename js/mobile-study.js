@@ -98,5 +98,169 @@
     };
   }
 
-  return Object.freeze({ selectDailyItems: selectDailyItems, snapshot: snapshot, restore: restore });
+  function calculateStreak(timestamps, now) {
+    now = Number.isFinite(now) ? now : Date.now();
+    if (!Array.isArray(timestamps) || !timestamps.length) return 0;
+    var nowDate = new Date(now);
+    var todayStr = nowDate.getFullYear() + '-' + String(nowDate.getMonth() + 1).padStart(2, '0') + '-' + String(nowDate.getDate()).padStart(2, '0');
+    var yesterdayDate = new Date(now - 86400000);
+    var yesterdayStr = yesterdayDate.getFullYear() + '-' + String(yesterdayDate.getMonth() + 1).padStart(2, '0') + '-' + String(yesterdayDate.getDate()).padStart(2, '0');
+
+    var daysSet = new Set();
+    timestamps.forEach(function (ts) {
+      if (!Number.isFinite(ts) || ts <= 0) return;
+      var d = new Date(ts);
+      daysSet.add(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+    });
+
+    var currentCheckDate = daysSet.has(todayStr) ? nowDate : (daysSet.has(yesterdayStr) ? yesterdayDate : null);
+    if (!currentCheckDate) return 0;
+
+    var streak = 0;
+    var cursor = new Date(currentCheckDate.getFullYear(), currentCheckDate.getMonth(), currentCheckDate.getDate());
+    while (true) {
+      var key = cursor.getFullYear() + '-' + String(cursor.getMonth() + 1).padStart(2, '0') + '-' + String(cursor.getDate()).padStart(2, '0');
+      if (daysSet.has(key)) {
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  function selectPlanCards(options) {
+    options = options || {};
+    var dueItems = Array.isArray(options.dueItems) ? options.dueItems : [];
+    var weakItems = Array.isArray(options.weakItems) ? options.weakItems : [];
+    var allItems = Array.isArray(options.allItems) ? options.allItems : [];
+    var isMastered = typeof options.isMastered === 'function' ? options.isMastered : function () { return false; };
+    var decks = Array.isArray(options.decks) ? options.decks : [];
+    var completedToday = options.completedToday || {};
+
+    var cards = [];
+
+    // 1. Due / Daily Review Card
+    var dueLimit = 10;
+    var countDue = dueItems.length;
+    if (countDue > 0) {
+      var countToReview = Math.min(countDue, dueLimit);
+      var estMinutes = Math.max(1, Math.round(countToReview * 0.35));
+      cards.push({
+        id: 'due',
+        type: 'review',
+        title: 'Review ' + countToReview + ' due ' + (countToReview === 1 ? 'card' : 'cards'),
+        oneLine: 'Review ' + countToReview + ' due ' + (countToReview === 1 ? 'card' : 'cards') + ' · ' + estMinutes + ' min',
+        minuteEstimate: estMinutes,
+        state: completedToday.due ? 'done' : 'ready',
+        action: 'daily-study',
+        icon: 'review'
+      });
+    } else {
+      var unmastered = selectDailyItems([], allItems, isMastered, dueLimit);
+      if (unmastered.length > 0) {
+        var countStudy = Math.min(unmastered.length, dueLimit);
+        var estStudyMin = Math.max(1, Math.round(countStudy * 0.35));
+        cards.push({
+          id: 'due',
+          type: 'review',
+          title: 'Study ' + countStudy + ' unmastered cards',
+          oneLine: 'Study ' + countStudy + ' cards · ' + estStudyMin + ' min',
+          minuteEstimate: estStudyMin,
+          state: completedToday.due ? 'done' : 'ready',
+          action: 'daily-study',
+          icon: 'review'
+        });
+      } else {
+        cards.push({
+          id: 'due',
+          type: 'review',
+          title: 'All due cards reviewed',
+          oneLine: 'Review cards · All caught up',
+          minuteEstimate: 0,
+          state: 'done',
+          action: 'daily-study',
+          icon: 'review'
+        });
+      }
+    }
+
+    // 2. Weak spots Card
+    var weakLimit = 5;
+    var countWeak = weakItems.length;
+    if (countWeak > 0) {
+      var countWeakToStudy = Math.min(countWeak, weakLimit);
+      var estWeakMin = Math.max(1, Math.round(countWeakToStudy * 0.4));
+      cards.push({
+        id: 'weak',
+        type: 'weak',
+        title: 'Weak spots (' + countWeakToStudy + ')',
+        oneLine: 'Weak spots · ' + estWeakMin + ' min',
+        minuteEstimate: estWeakMin,
+        state: completedToday.weak ? 'done' : 'ready',
+        action: 'weak',
+        icon: 'target'
+      });
+    } else {
+      cards.push({
+        id: 'weak',
+        type: 'weak',
+        title: 'No weak spots',
+        oneLine: 'Weak spots · 0 min',
+        minuteEstimate: 0,
+        state: 'done',
+        action: 'weak',
+        icon: 'target'
+      });
+    }
+
+    // 3. New lesson Card
+    var nextDeck = null;
+    for (var i = 0; i < decks.length; i++) {
+      var d = decks[i];
+      var unmasteredInDeck = (d.cards || []).filter(function (c) { return !isMastered({ deckId: d.id, card: c }); });
+      if (unmasteredInDeck.length > 0) {
+        nextDeck = d;
+        break;
+      }
+    }
+
+    if (nextDeck) {
+      var cleanTitle = nextDeck.title.replace(/^(?:Discipleship Experience\s*)?(?:\(Section\s*\d+\)\s*)?/i, '').trim();
+      cards.push({
+        id: 'lesson',
+        type: 'lesson',
+        title: 'Try a new lesson',
+        oneLine: 'Try a new lesson · ' + cleanTitle,
+        minuteEstimate: 4,
+        state: completedToday.lesson ? 'done' : 'ready',
+        action: 'setup',
+        mode: 'flash',
+        deckId: nextDeck.id,
+        icon: 'spark'
+      });
+    } else {
+      cards.push({
+        id: 'exam',
+        type: 'exam',
+        title: 'Challenge exam',
+        oneLine: 'Challenge exam · 15 min',
+        minuteEstimate: 15,
+        state: 'ready',
+        action: 'exam',
+        icon: 'trophy'
+      });
+    }
+
+    return cards;
+  }
+
+  return Object.freeze({
+    selectDailyItems: selectDailyItems,
+    selectPlanCards: selectPlanCards,
+    calculateStreak: calculateStreak,
+    snapshot: snapshot,
+    restore: restore
+  });
 });
