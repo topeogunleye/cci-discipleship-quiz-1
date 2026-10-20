@@ -1,8 +1,8 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 8;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 9;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
-  var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false, showStreak: true }, seeded: false, dataVersion: 0, pausedSession: null };
+  var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false, showStreak: true }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, seeded: false, dataVersion: 0, pausedSession: null };
   var STARTER_DECKS = [];
   var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
   var browserLocalStorage = null, browserIndexedDB = null;
@@ -97,6 +97,9 @@
       if (['auto', 'light', 'dark'].indexOf(S.settings.theme) < 0) S.settings.theme = 'auto';
       S.settings.shuffle = !!S.settings.shuffle;
       S.settings.showStreak = S.settings.showStreak !== false;
+      var hasPriorData = !!o.seeded || (Array.isArray(o.decks) && o.decks.length > 0);
+      S.onboarding = MobileStudy.normalizeOnboarding(o.onboarding, hasPriorData);
+      S.streak = MobileStudy.normalizeStreak(o.streak);
       S.seeded = !!o.seeded;
       S.dataVersion = Number.isInteger(o.dataVersion) && o.dataVersion >= 0 ? o.dataVersion : 0;
       S.backupReminder = o.backupReminder;
@@ -295,6 +298,11 @@
           if (sourceCard.bible && card.bible !== sourceCard.bible) card.bible = sourceCard.bible;
         });
       });
+    } },
+    { version: 9, run: function () {
+      var hasActivity = (S.decks && S.decks.length > 0) || Object.keys(S.progress || {}).length > 0;
+      S.onboarding = MobileStudy.normalizeOnboarding(S.onboarding, hasActivity);
+      S.streak = MobileStudy.normalizeStreak(S.streak);
     } }
   ];
   function applyDataMigrations() {
@@ -340,7 +348,7 @@
   }
   function exportDeck(d) { download(slug(d.title) + '.txt', P.serializeDeck(d)); }
   function exportBackup() {
-    var payload = { format: 'cci-discipleship-quiz-backup', version: 1, exportedAt: new Date().toISOString(), data: { decks: S.decks, progress: S.progress, settings: S.settings, seeded: S.seeded, dataVersion: S.dataVersion, backupReminder: S.backupReminder } };
+    var payload = { format: 'cci-discipleship-quiz-backup', version: 1, exportedAt: new Date().toISOString(), data: { decks: S.decks, progress: S.progress, settings: S.settings, seeded: S.seeded, dataVersion: S.dataVersion, backupReminder: S.backupReminder, onboarding: S.onboarding, streak: S.streak } };
     download('cci-study-backup-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(payload, null, 2));
   }
   function resetBackupReminder() {
@@ -376,7 +384,7 @@
     });
     var settings = Object.assign({ theme: 'auto', shuffle: false }, raw.data.settings && typeof raw.data.settings === 'object' ? raw.data.settings : {});
     if (['auto', 'light', 'dark'].indexOf(settings.theme) < 0) settings.theme = 'auto'; settings.shuffle = !!settings.shuffle;
-    return { decks: decks, progress: progress, settings: settings, seeded: !!raw.data.seeded, dataVersion: dataVersion, backupReminder: StudyLogic.normalizeBackupReminder(raw.data.backupReminder) };
+    return { decks: decks, progress: progress, settings: settings, seeded: !!raw.data.seeded, dataVersion: dataVersion, backupReminder: StudyLogic.normalizeBackupReminder(raw.data.backupReminder), onboarding: MobileStudy.normalizeOnboarding(raw.data.onboarding, true), streak: MobileStudy.normalizeStreak(raw.data.streak) };
   }
 
   /* ---------- views ---------- */
@@ -560,7 +568,9 @@
       allItems: all,
       isMastered: function (it) { return isMastered(it.deckId, it.card.id); },
       decks: S.decks,
-      completedToday: S.completedToday || {}
+      completedToday: S.completedToday || {},
+      dailyMinutes: (S.onboarding && S.onboarding.dailyMinutes) || 10,
+      startingTopic: (S.onboarding && S.onboarding.startingTopic) || 'soteriology'
     });
 
     var planSection = '<section class="plan-section" aria-labelledby="plan-section-title">' +
@@ -876,6 +886,10 @@
     '<div class="settings-group">' +
       '<h2 class="settings-group-title">Study Preferences</h2>' +
       '<div class="settings-row">' +
+        '<div><strong>Personal Study Plan</strong><p class="meta">' + (S.onboarding ? S.onboarding.dailyMinutes + ' min/day · ' + esc(S.onboarding.goal) : 'Customize pace &amp; goals') + '</p></div>' +
+        '<button class="btn sm" data-act="retake-onboarding">Update Plan</button>' +
+      '</div>' +
+      '<div class="settings-row">' +
         '<div><strong>Daily Streak Counter</strong><p class="meta">Show flame counter in top bar</p></div>' +
         '<button class="btn sm' + (showStreak ? ' primary' : '') + '" data-act="toggle-streak">' + (showStreak ? 'Enabled' : 'Off') + '</button>' +
       '</div>' +
@@ -1108,7 +1122,7 @@
     var miss = R.kind === 'quiz' ? R.missed : R.learning;
     return '<section class="study-shell results-shell coaching-completion-screen" aria-label="' + (R.kind === 'quiz' ? 'Quiz results' : 'Flashcard session results') + '">' +
       '<header class="top results-header">' +
-        '<button class="study-close-btn" data-act="home" aria-label="Return home">' +
+        '<button class="study-close-btn" data-act="results-continue" aria-label="Return home">' +
           '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
         '</button>' +
         '<h1>' + esc(feedback.title) + '</h1>' +
@@ -1129,9 +1143,315 @@
       '<div class="result-actions completion-actions-bar">' +
         (miss.length ? '<button class="btn primary full" data-act="review">Review ' + plural(miss.length, R.kind === 'quiz' ? 'missed card' : 'card') + '</button>' : '<p class="note result-note">' + (R.kind === 'quiz' ? 'No missed cards. Outstanding work!' : 'Nothing left marked as still learning.') + '</p>') +
         '<button class="btn full" data-act="again">' + (R.kind === 'quiz' ? 'Retake quiz' : 'Study again') + '</button>' +
-        '<button class="btn full ghost btn-continue" data-act="home">Continue</button>' +
+        '<button class="btn full ghost btn-continue" data-act="results-continue">Continue</button>' +
       '</div>' +
     '</section>';
+  };
+
+  views.streak = function () {
+    var now = Date.now();
+    var streak = MobileStudy.calculateStreak(getStudyTimestamps(), now);
+    if (streak < 1) streak = 1;
+
+    var title = streak === 1 ? "You're showing up!" : (streak + ' Days in a Row!');
+    var subtitle = streak === 1
+      ? "Day 1 of your study habit. Small, faithful steps build enduring spiritual depth."
+      : (streak + ' consecutive days of study. Steady growth in faith and understanding.');
+
+    var dayNames = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    var todayDay = 0;
+    if (typeof Date === 'function') {
+      try {
+        var today = new Date(now);
+        todayDay = (today.getDay() + 6) % 7;
+      } catch (e) {}
+    } else {
+      var daysSinceEpoch = Math.floor(now / 86400000);
+      todayDay = (daysSinceEpoch + 3) % 7;
+    }
+    var weekDots = dayNames.map(function (dName, idx) {
+      var isCurrent = idx === todayDay;
+      var isPast = idx < todayDay;
+      var isStudied = isCurrent || (isPast && (todayDay - idx < streak));
+      var cls = 'streak-day-dot';
+      if (isCurrent) cls += ' current';
+      if (isStudied) cls += ' done';
+      return '<div class="' + cls + '"><span class="streak-day-name">' + dName + '</span><span class="streak-day-mark">' + (isStudied ? '✓' : '·') + '</span></div>';
+    }).join('');
+
+    return '<div class="streak-screen-container" role="main" aria-labelledby="streak-title">' +
+      '<div class="streak-hero-card">' +
+        '<div class="streak-flame-hero" aria-hidden="true">' +
+          '<div class="streak-flame-circle"><span class="flame-emoji">🔥</span></div>' +
+        '</div>' +
+        '<div class="streak-number">' + streak + '</div>' +
+        '<h1 id="streak-title" class="streak-title">' + esc(title) + '</h1>' +
+        '<p class="streak-subtitle">' + esc(subtitle) + '</p>' +
+        '<div class="streak-week-row" aria-label="Study days this week">' + weekDots + '</div>' +
+      '</div>' +
+      '<div class="streak-gentle-card">' +
+        '<div class="streak-gentle-title">Daily Grace</div>' +
+        '<p class="streak-gentle-text">No guilt, no pressure. If life gets busy, your progress and learning will be right here waiting for you.</p>' +
+      '</div>' +
+      '<div class="streak-bottom-bar">' +
+        '<button class="btn primary full btn-continue" data-act="close-streak">Continue</button>' +
+        '<div class="streak-opt-out-hint">Streaks are optional · Toggle in Settings anytime</div>' +
+      '</div>' +
+    '</div>';
+  };
+
+  views.onboarding = function () {
+    var step = Number.isInteger(V.step) ? V.step : 0;
+    var answers = V.answers || (V.answers = Object.assign({}, MobileStudy.defaultOnboarding(false)));
+
+    if (step === 0) {
+      return '<div class="onboarding-screen splash-screen" role="main">' +
+        '<div class="onboarding-hero-art" aria-hidden="true">' +
+          '<div class="splash-icon-wrapper">' +
+            '<svg viewBox="0 0 100 100" class="splash-svg" width="90" height="90">' +
+              '<circle cx="50" cy="50" r="46" fill="url(#splash-grad)" />' +
+              '<path d="M50 22v56M32 38h36" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>' +
+              '<defs>' +
+                '<linearGradient id="splash-grad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">' +
+                  '<stop stop-color="#3B2BB0" />' +
+                  '<stop offset="1" stop-color="#B5173A" />' +
+                '</linearGradient>' +
+              '</defs>' +
+            '</svg>' +
+          '</div>' +
+        '</div>' +
+        '<h1 class="onboarding-title">CCI Discipleship</h1>' +
+        '<p class="onboarding-lead">A steady, thoughtful rhythm for spiritual growth and doctrinal mastery.</p>' +
+        '<div class="onboarding-bottom-bar">' +
+          '<button class="btn primary full btn-continue" data-act="onboarding-next">Get Started</button>' +
+          '<button class="btn-text-skip" data-act="onboarding-skip">Skip intro</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    if (step === 1) {
+      return '<div class="onboarding-screen welcome-screen" role="main">' +
+        '<div class="onboarding-top-nav">' +
+          '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
+          '<button class="btn-text-skip" data-act="onboarding-skip">Skip</button>' +
+        '</div>' +
+        '<h1 class="onboarding-title">Welcome to Your Journey</h1>' +
+        '<p class="onboarding-lead">We\'ll help you build a personalized study rhythm that fits into your day without overwhelming you.</p>' +
+        '<div class="onboarding-feature-list">' +
+          '<div class="onboarding-feature-card">' +
+            '<div class="feature-icon">⏱️</div>' +
+            '<div class="feature-text"><b>Bite-Sized Sessions</b><p>5–15 minutes of structured active recall designed for busy lives.</p></div>' +
+          '</div>' +
+          '<div class="onboarding-feature-card">' +
+            '<div class="feature-icon">🧠</div>' +
+            '<div class="feature-text"><b>Smart Spaced Repetition</b><p>Systematic review reinforces core theology so it sticks.</p></div>' +
+          '</div>' +
+          '<div class="onboarding-feature-card">' +
+            '<div class="feature-icon">📖</div>' +
+            '<div class="feature-text"><b>Rooted in Scripture</b><p>All questions link directly to biblical references and study notes.</p></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="onboarding-bottom-bar">' +
+          '<button class="btn primary full btn-continue" data-act="onboarding-next">Personalize My Plan</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    if (step === 2) {
+      var goals = [
+        { id: 'habit', title: 'Build a Daily Habit', desc: 'A steady, faithful rhythm of study every day', icon: '🌱' },
+        { id: 'exam', title: 'Prepare for Exam', desc: 'Master all 12 modules and ace discipleship exams', icon: '🎓' },
+        { id: 'theology', title: 'Deepen Core Theology', desc: 'Grasp salvation, Christology, and sound doctrine', icon: '🏛️' },
+        { id: 'review', title: 'Brush Up & Review', desc: 'Target weak spots and review key doctrinal concepts', icon: '🎯' }
+      ];
+      var goalCards = goals.map(function (g) {
+        var sel = answers.goal === g.id;
+        return '<button class="onboarding-choice-card' + (sel ? ' selected' : '') + '" data-act="onboarding-pick" data-key="goal" data-val="' + g.id + '" aria-pressed="' + sel + '">' +
+          '<div class="choice-icon" aria-hidden="true">' + g.icon + '</div>' +
+          '<div class="choice-body">' +
+            '<div class="choice-title">' + esc(g.title) + '</div>' +
+            '<div class="choice-desc">' + esc(g.desc) + '</div>' +
+          '</div>' +
+          '<div class="choice-indicator">' + (sel ? '✓' : '') + '</div>' +
+        '</button>';
+      }).join('');
+
+      return '<div class="onboarding-screen question-screen" role="main">' +
+        '<div class="onboarding-top-nav">' +
+          '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
+          '<span class="onboarding-step-counter">1 of 4</span>' +
+          '<button class="btn-text-skip" data-act="onboarding-skip">Skip</button>' +
+        '</div>' +
+        '<div class="onboarding-progress-bar"><div class="onboarding-progress-fill" style="width:25%"></div></div>' +
+        '<h1 class="onboarding-title">What is your primary study goal?</h1>' +
+        '<p class="onboarding-lead">Choose the focus that matters most to you right now.</p>' +
+        '<div class="onboarding-choices-list">' + goalCards + '</div>' +
+        '<div class="onboarding-bottom-bar">' +
+          '<button class="btn primary full btn-continue" data-act="onboarding-next">Continue</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    if (step === 3) {
+      var minutesOptions = [
+        { mins: 5, title: '5 minutes / day', desc: 'Quick & focused: 5 cards per session', icon: '⚡' },
+        { mins: 10, title: '10 minutes / day (Recommended)', desc: 'Balanced & steady: 10 cards per session', icon: '⭐' },
+        { mins: 15, title: '15 minutes / day', desc: 'Deep dive: 15 cards per session', icon: '🌊' },
+        { mins: 20, title: '20 minutes / day', desc: 'Intensive study: 20 cards per session', icon: '🔥' }
+      ];
+      var minCards = minutesOptions.map(function (m) {
+        var sel = answers.dailyMinutes === m.mins;
+        return '<button class="onboarding-choice-card' + (sel ? ' selected' : '') + '" data-act="onboarding-pick" data-key="dailyMinutes" data-val="' + m.mins + '" aria-pressed="' + sel + '">' +
+          '<div class="choice-icon" aria-hidden="true">' + m.icon + '</div>' +
+          '<div class="choice-body">' +
+            '<div class="choice-title">' + esc(m.title) + '</div>' +
+            '<div class="choice-desc">' + esc(m.desc) + '</div>' +
+          '</div>' +
+          '<div class="choice-indicator">' + (sel ? '✓' : '') + '</div>' +
+        '</button>';
+      }).join('');
+
+      return '<div class="onboarding-screen question-screen" role="main">' +
+        '<div class="onboarding-top-nav">' +
+          '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
+          '<span class="onboarding-step-counter">2 of 4</span>' +
+          '<button class="btn-text-skip" data-act="onboarding-skip">Skip</button>' +
+        '</div>' +
+        '<div class="onboarding-progress-bar"><div class="onboarding-progress-fill" style="width:50%"></div></div>' +
+        '<h1 class="onboarding-title">How much time can you commit daily?</h1>' +
+        '<p class="onboarding-lead">This sets your daily study plan length. Consistency beats intensity.</p>' +
+        '<div class="onboarding-choices-list">' + minCards + '</div>' +
+        '<div class="onboarding-bottom-bar">' +
+          '<button class="btn primary full btn-continue" data-act="onboarding-next">Continue</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    if (step === 4) {
+      var topics = [
+        { id: 'soteriology', title: 'Soteriology & Salvation', desc: 'Sections 1 & 2 · Grace, faith, and eternal redemption', icon: '✝️' },
+        { id: 'christology', title: 'Christology & Trinity', desc: 'Sections 3 & 4 · Deity of Christ and the Godhead', icon: '👑' },
+        { id: 'conduct', title: 'Christian Conduct & Prayer', desc: 'Sections 5 & 6 · Daily holy living and spiritual communion', icon: '🙏' },
+        { id: 'bible', title: 'Bible Foundations & Church History', desc: 'Sections 7, 8 & 12 · Scripture roots and heritage', icon: '📜' }
+      ];
+      var topicCards = topics.map(function (t) {
+        var sel = answers.startingTopic === t.id;
+        return '<button class="onboarding-choice-card' + (sel ? ' selected' : '') + '" data-act="onboarding-pick" data-key="startingTopic" data-val="' + t.id + '" aria-pressed="' + sel + '">' +
+          '<div class="choice-icon" aria-hidden="true">' + t.icon + '</div>' +
+          '<div class="choice-body">' +
+            '<div class="choice-title">' + esc(t.title) + '</div>' +
+            '<div class="choice-desc">' + esc(t.desc) + '</div>' +
+          '</div>' +
+          '<div class="choice-indicator">' + (sel ? '✓' : '') + '</div>' +
+        '</button>';
+      }).join('');
+
+      return '<div class="onboarding-screen question-screen" role="main">' +
+        '<div class="onboarding-top-nav">' +
+          '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
+          '<span class="onboarding-step-counter">3 of 4</span>' +
+          '<button class="btn-text-skip" data-act="onboarding-skip">Skip</button>' +
+        '</div>' +
+        '<div class="onboarding-progress-bar"><div class="onboarding-progress-fill" style="width:75%"></div></div>' +
+        '<h1 class="onboarding-title">Which topic would you like to start with?</h1>' +
+        '<p class="onboarding-lead">You will explore all 12 modules on your journey.</p>' +
+        '<div class="onboarding-choices-list">' + topicCards + '</div>' +
+        '<div class="onboarding-bottom-bar">' +
+          '<button class="btn primary full btn-continue" data-act="onboarding-next">Continue</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    if (step === 5) {
+      var times = [
+        { id: 'morning', title: 'Morning Sunrise', desc: 'Start the day grounded in scripture', icon: '🌅' },
+        { id: 'midday', title: 'Midday Break', desc: 'A quiet pause and reflection in the afternoon', icon: '☀️' },
+        { id: 'evening', title: 'Evening Quiet', desc: 'Wind down and reflect before sleep', icon: '🌙' },
+        { id: 'anytime', title: 'Flexible / Anytime', desc: 'Whenever a quiet window opens during the day', icon: '🧭' }
+      ];
+      var timeCards = times.map(function (ti) {
+        var sel = answers.preferredTime === ti.id;
+        return '<button class="onboarding-choice-card' + (sel ? ' selected' : '') + '" data-act="onboarding-pick" data-key="preferredTime" data-val="' + ti.id + '" aria-pressed="' + sel + '">' +
+          '<div class="choice-icon" aria-hidden="true">' + ti.icon + '</div>' +
+          '<div class="choice-body">' +
+            '<div class="choice-title">' + esc(ti.title) + '</div>' +
+            '<div class="choice-desc">' + esc(ti.desc) + '</div>' +
+          '</div>' +
+          '<div class="choice-indicator">' + (sel ? '✓' : '') + '</div>' +
+        '</button>';
+      }).join('');
+
+      return '<div class="onboarding-screen question-screen" role="main">' +
+        '<div class="onboarding-top-nav">' +
+          '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
+          '<span class="onboarding-step-counter">4 of 4</span>' +
+          '<button class="btn-text-skip" data-act="onboarding-skip">Skip</button>' +
+        '</div>' +
+        '<div class="onboarding-progress-bar"><div class="onboarding-progress-fill" style="width:100%"></div></div>' +
+        '<h1 class="onboarding-title">When do you prefer to study?</h1>' +
+        '<p class="onboarding-lead">Choose a rhythm that fits naturally into your routine.</p>' +
+        '<div class="onboarding-choices-list">' + timeCards + '</div>' +
+        '<div class="onboarding-bottom-bar">' +
+          '<button class="btn primary full btn-continue" data-act="onboarding-next">See My Plan</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    if (step === 6) {
+      var goalLabels = { habit: 'Build a Daily Habit', exam: 'Exam Preparation', theology: 'Core Theology', review: 'Weak-Spot Review' };
+      var topicLabels = { soteriology: 'Soteriology & Salvation', christology: 'Christology & Trinity', conduct: 'Conduct & Prayer', bible: 'Bible Foundations' };
+      var timeLabels = { morning: 'Morning Sunrise', midday: 'Midday Break', evening: 'Evening Quiet', anytime: 'Flexible Anytime' };
+
+      return '<div class="onboarding-screen summary-screen" role="main">' +
+        '<div class="onboarding-top-nav">' +
+          '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
+          '<button class="btn-text-skip" data-act="onboarding-skip">Skip</button>' +
+        '</div>' +
+        '<div class="plan-summary-hero-card">' +
+          '<div class="summary-badge">Custom Plan</div>' +
+          '<h1 class="summary-hero-title">Your Study Plan</h1>' +
+          '<p class="summary-hero-sub">Tailored to help you grow steadily in grace and knowledge.</p>' +
+          '<div class="summary-pills-grid">' +
+            '<div class="summary-pill"><span class="pill-k">🎯 Goal</span><span class="pill-v">' + esc(goalLabels[answers.goal] || 'Daily Habit') + '</span></div>' +
+            '<div class="summary-pill"><span class="pill-k">⏱️ Daily Pace</span><span class="pill-v">' + answers.dailyMinutes + ' min (' + answers.dailyMinutes + ' cards)</span></div>' +
+            '<div class="summary-pill"><span class="pill-k">📖 Starting Topic</span><span class="pill-v">' + esc(topicLabels[answers.startingTopic] || 'Soteriology') + '</span></div>' +
+            '<div class="summary-pill"><span class="pill-k">☀️ Preferred Time</span><span class="pill-v">' + esc(timeLabels[answers.preferredTime] || 'Flexible') + '</span></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="summary-coaching-card">' +
+          '<div class="summary-coaching-icon">🌱</div>' +
+          '<p class="summary-coaching-text">Small, faithful daily habits bear fruit for a lifetime. Your daily review cards are ready when you are.</p>' +
+        '</div>' +
+        '<div class="onboarding-bottom-bar">' +
+          '<button class="btn primary full btn-continue" data-act="onboarding-next">Continue</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    return '<div class="onboarding-screen commit-screen" role="main">' +
+      '<div class="onboarding-top-nav">' +
+        '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
+        '<button class="btn-text-skip" data-act="commit-finish">Skip to Home</button>' +
+      '</div>' +
+      '<h1 class="onboarding-title">Make a Promise to Yourself</h1>' +
+      '<p class="onboarding-lead">Discipleship is an act of devotion. Take a moment to commit to showing up for your spiritual growth.</p>' +
+      '<div class="commit-hold-wrapper">' +
+        '<button class="commit-hold-btn" data-act="commit-hold" aria-label="Press and hold to commit to your daily study rhythm">' +
+          '<div class="commit-hold-ring">' +
+            '<svg viewBox="0 0 120 120" class="commit-ring-svg">' +
+              '<circle cx="60" cy="60" r="52" class="ring-bg"/>' +
+              '<circle cx="60" cy="60" r="52" class="ring-fill"/>' +
+            '</svg>' +
+            '<div class="commit-center-icon"><span class="commit-emoji">🤝</span></div>' +
+          '</div>' +
+          '<span class="commit-btn-label">Press &amp; Hold to Commit</span>' +
+          '<span class="commit-btn-hint">(or tap once to commit)</span>' +
+        '</button>' +
+      '</div>' +
+      '<div class="onboarding-bottom-bar">' +
+        '<button class="btn primary full btn-continue" data-act="commit-finish">I Commit · Start Studying</button>' +
+      '</div>' +
+    '</div>';
   };
 
   views.edit = function () {
@@ -1287,7 +1607,8 @@
   }
   function startDailyStudy() {
     var all = allCardItems(), due = StudyLogic.dueItems(all, Date.now());
-    var cards = MobileStudy.selectDailyItems(due, all, function (item) { return isMastered(item.deckId, item.card.id); }, 10);
+    var dailyLimit = (S.onboarding && S.onboarding.dailyMinutes) ? S.onboarding.dailyMinutes : 10;
+    var cards = MobileStudy.selectDailyItems(due, all, function (item) { return isMastered(item.deckId, item.card.id); }, dailyLimit);
     if (!cards.length) { toast('All cards are mastered. Try a quiz or exam to review them.'); return; }
     begin('flash', shuffle(cards), { unk: false, limit: cards.length, shuf: true, daily: true }, deckIdsFor(cards));
   }
@@ -1327,10 +1648,44 @@
     save();
   }
 
+  function todayString(ts) {
+    var ms = Number.isFinite(ts) ? ts : (typeof Date !== 'undefined' && Date.now ? Date.now() : 0);
+    if (typeof Date === 'function') {
+      try {
+        var d = new Date(ms);
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      } catch (e) {}
+    }
+    var days = Math.floor(ms / 86400000);
+    var z = days + 719468;
+    var era = Math.floor((z >= 0 ? z : z - 146096) / 146097);
+    var doe = z - era * 146097;
+    var yoe = Math.floor((doe - Math.floor(doe / 1460) + Math.floor(doe / 36524) - Math.floor(doe / 146096)) / 365);
+    var y = yoe + era * 400;
+    var doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100));
+    var mp = Math.floor((5 * doy + 2) / 153);
+    var dNum = doy - Math.floor((153 * mp + 2) / 5) + 1;
+    var mNum = mp < 10 ? mp + 3 : mp - 9;
+    if (mNum <= 2) y++;
+    return y + '-' + String(mNum).padStart(2, '0') + '-' + String(dNum).padStart(2, '0');
+  }
+
+  function checkAndRecordFirstSessionToday() {
+    var todayStr = todayString();
+    if (!S.streak) S.streak = { lastStreakDate: null };
+    if (S.streak.lastStreakDate === todayStr) {
+      return false;
+    }
+    S.streak.lastStreakDate = todayStr;
+    save();
+    return true;
+  }
+
   function finishFlash() {
     var learn = V.cards.filter(function (x) { return V.marks[x.card.id] === 'unknown'; }), known = V.cards.filter(function (x) { return V.marks[x.card.id] === 'known'; }).length;
+    var isFirst = checkAndRecordFirstSessionToday();
     S.pausedSession = null; save();
-    go({ name: 'results', kind: 'flash', known: known, learning: learn, skipped: V.cards.length - known - learn.length, all: V.cards, opts: V.opts, ids: V.ids });
+    go({ name: 'results', kind: 'flash', known: known, learning: learn, skipped: V.cards.length - known - learn.length, all: V.cards, opts: V.opts, ids: V.ids, isFirstSessionToday: isFirst });
   }
   function finishQuiz() {
     var per = {}, missed = [];
@@ -1341,8 +1696,9 @@
       var pct = Math.round(100 * p.s / p.t), pr = prog(id);
       if (!pr.best || pct > pr.best.pct) { pr.best = { pct: pct, score: p.s, total: p.t, date: Date.now() }; newBest = true; }
     });
+    var isFirst = checkAndRecordFirstSessionToday();
     S.pausedSession = null; save();
-    go({ name: 'results', kind: 'quiz', score: V.score, total: V.answers.length, missed: missed, newBest: newBest, all: V.cards, opts: V.opts, ids: V.ids });
+    go({ name: 'results', kind: 'quiz', score: V.score, total: V.answers.length, missed: missed, newBest: newBest, all: V.cards, opts: V.opts, ids: V.ids, isFirstSessionToday: isFirst });
   }
   function finishExam(expired) {
     if (V.name !== 'exam') return;
@@ -1358,8 +1714,9 @@
       }
       return { item: item, selected: answer ? answer.selected : null, ok: !!(answer && answer.ok) };
     });
+    var isFirst = checkAndRecordFirstSessionToday();
     S.pausedSession = null; save();
-    go({ name: 'results', kind: 'exam', score: V.score, total: V.cards.length, answered: V.answers.length, expired: !!expired, review: review });
+    go({ name: 'results', kind: 'exam', score: V.score, total: V.cards.length, answered: V.answers.length, expired: !!expired, review: review, isFirstSessionToday: isFirst });
   }
 
   /* ---------- import ---------- */
@@ -1448,8 +1805,51 @@
       case 'toggle-streak': S.settings.showStreak = S.settings.showStreak === false; save(); render(true); break;
       case 'toggle-shuffle': S.settings.shuffle = !S.settings.shuffle; save(); render(true); break;
       case 'streak-info':
-        var curStreak = MobileStudy.calculateStreak(getStudyTimestamps(), Date.now());
-        toast(curStreak > 0 ? (curStreak + ' day streak! Keep studying daily to maintain momentum.') : 'Study cards today to start your streak!');
+        go({ name: 'streak', returnTo: 'home' });
+        break;
+      case 'results-continue':
+        if (V.isFirstSessionToday && S.settings.showStreak !== false) {
+          go({ name: 'streak', returnTo: 'home' });
+        } else {
+          go({ name: 'home' });
+        }
+        break;
+      case 'close-streak':
+        go({ name: V.returnTo || 'home' });
+        break;
+      case 'onboarding-next':
+        if (V.step < 7) {
+          V.step++;
+          render();
+        } else {
+          finishOnboarding(true, true);
+        }
+        break;
+      case 'onboarding-back':
+        if (V.step > 0) {
+          V.step--;
+          render();
+        }
+        break;
+      case 'onboarding-pick':
+        var pickKey = t.dataset.key;
+        var pickVal = t.dataset.val;
+        if (pickKey === 'dailyMinutes') pickVal = parseInt(pickVal, 10);
+        if (!V.answers) V.answers = Object.assign({}, MobileStudy.defaultOnboarding(false));
+        V.answers[pickKey] = pickVal;
+        render(true);
+        break;
+      case 'onboarding-skip':
+        finishOnboarding(false, false);
+        break;
+      case 'commit-hold':
+      case 'commit-finish':
+        triggerHaptic('correct');
+        finishOnboarding(true, true);
+        break;
+      case 'retake-onboarding':
+        V = { name: 'onboarding', step: 2, answers: Object.assign({}, S.onboarding || MobileStudy.defaultOnboarding(true)) };
+        render();
         break;
       case 'close': closeModal(); break;
       case 'askok': var fn = pendingAsk; closeModal(); if (fn) fn(); break;
@@ -1520,6 +1920,45 @@
     }
     V.editing = null; save(); render(true); toast('Card saved');
   }
+  function finishOnboarding(committed, saveAnswers) {
+    var ans = (saveAnswers && V.answers) ? V.answers : (S.onboarding || MobileStudy.defaultOnboarding(true));
+    S.onboarding = {
+      completed: true,
+      goal: ans.goal || 'habit',
+      dailyMinutes: ans.dailyMinutes || 10,
+      startingTopic: ans.startingTopic || 'soteriology',
+      preferredTime: ans.preferredTime || 'anytime',
+      committed: !!committed
+    };
+    save();
+    go({ name: 'home' });
+    toast(committed ? 'Commitment made! Your study plan is active.' : 'Welcome to CCI Discipleship!');
+  }
+
+  var holdTimer = null;
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('pointerdown', function (e) {
+      var btn = e.target && e.target.closest && e.target.closest('.commit-hold-btn');
+      if (!btn) return;
+      btn.classList.add('holding');
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(function () {
+        btn.classList.remove('holding');
+        triggerHaptic('correct');
+        finishOnboarding(true, true);
+      }, 1100);
+    });
+    function cancelCommitHold() {
+      if (holdTimer) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+        var btn = document.querySelector('.commit-hold-btn.holding');
+        if (btn) btn.classList.remove('holding');
+      }
+    }
+    document.addEventListener('pointerup', cancelCommitHold);
+    document.addEventListener('pointercancel', cancelCommitHold);
+  }
   document.addEventListener('change', function (e) {
     var t = e.target;
     if (t.dataset.sel) { t.checked ? SEL.add(t.dataset.sel) : SEL.delete(t.dataset.sel); document.getElementById('bar').innerHTML = bar(); render(true); }
@@ -1586,6 +2025,7 @@
       var text = results[1];
       STARTER_DECKS = P.parseDecks(text).decks;
       var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION;
+      var isFirstRun = !S.seeded && (!S.onboarding || !S.onboarding.completed);
       seed();
       if (reconcileStarters && syncStarterDecks()) save();
       return applyDataMigrations().then(function () {
@@ -1594,6 +2034,9 @@
           S.pausedSession = restoredSession ? MobileStudy.snapshot(restoredSession) : null;
         }
         applyTheme();
+        if (isFirstRun) {
+          V = { name: 'onboarding', step: 0, answers: MobileStudy.defaultOnboarding(false) };
+        }
         render();
         registerServiceWorker();
         registerNativeNavigation();

@@ -142,7 +142,8 @@
     var cards = [];
 
     // 1. Due / Daily Review Card
-    var dueLimit = 10;
+    var dailyMinutes = Number.isInteger(options.dailyMinutes) && options.dailyMinutes > 0 ? options.dailyMinutes : 10;
+    var dueLimit = Number.isInteger(options.dueLimit) && options.dueLimit > 0 ? options.dueLimit : dailyMinutes;
     var countDue = dueItems.length;
     if (countDue > 0) {
       var countToReview = Math.min(countDue, dueLimit);
@@ -215,14 +216,39 @@
       });
     }
 
-    // 3. New lesson Card
+    // 3. New lesson Card (prioritizing startingTopic if unmastered)
     var nextDeck = null;
-    for (var i = 0; i < decks.length; i++) {
-      var d = decks[i];
-      var unmasteredInDeck = (d.cards || []).filter(function (c) { return !isMastered({ deckId: d.id, card: c }); });
-      if (unmasteredInDeck.length > 0) {
-        nextDeck = d;
-        break;
+    if (options.startingTopic) {
+      var topicSlug = String(options.startingTopic).toLowerCase();
+      var topicKeywords = {
+        soteriology: ['soteriology', 'salvation', 'section 1', 'section 2'],
+        christology: ['christology', 'predestination', 'trinity', 'section 3', 'section 4'],
+        conduct: ['conduct', 'prayer', 'section 5', 'section 6'],
+        bible: ['bible', 'evangelism', 'apologetics', 'authority', 'church history', 'section 7', 'section 8', 'section 12']
+      }[topicSlug] || [topicSlug];
+
+      for (var t = 0; t < decks.length; t++) {
+        var cand = decks[t];
+        var titleLow = (cand.title || '').toLowerCase();
+        var matches = topicKeywords.some(function (kw) { return titleLow.indexOf(kw) >= 0; });
+        if (matches) {
+          var unmasteredInTopic = (cand.cards || []).filter(function (c) { return !isMastered({ deckId: cand.id, card: c }); });
+          if (unmasteredInTopic.length > 0) {
+            nextDeck = cand;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!nextDeck) {
+      for (var i = 0; i < decks.length; i++) {
+        var d = decks[i];
+        var unmasteredInDeck = (d.cards || []).filter(function (c) { return !isMastered({ deckId: d.id, card: c }); });
+        if (unmasteredInDeck.length > 0) {
+          nextDeck = d;
+          break;
+        }
       }
     }
 
@@ -402,7 +428,47 @@
     };
   }
 
+  function defaultOnboarding(hasActivity) {
+    return {
+      completed: !!hasActivity,
+      goal: 'habit',
+      dailyMinutes: 10,
+      startingTopic: 'soteriology',
+      preferredTime: 'anytime',
+      committed: false
+    };
+  }
+
+  function normalizeOnboarding(raw, hasActivity) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return defaultOnboarding(hasActivity);
+    }
+    var validGoals = ['habit', 'exam', 'theology', 'review'];
+    var validTopics = ['soteriology', 'christology', 'conduct', 'bible'];
+    var validTimes = ['morning', 'midday', 'evening', 'anytime'];
+    return {
+      completed: typeof raw.completed === 'boolean' ? raw.completed : !!hasActivity,
+      goal: typeof raw.goal === 'string' && validGoals.indexOf(raw.goal) >= 0 ? raw.goal : 'habit',
+      dailyMinutes: Number.isInteger(raw.dailyMinutes) && raw.dailyMinutes > 0 ? raw.dailyMinutes : 10,
+      startingTopic: typeof raw.startingTopic === 'string' && validTopics.indexOf(raw.startingTopic) >= 0 ? raw.startingTopic : 'soteriology',
+      preferredTime: typeof raw.preferredTime === 'string' && validTimes.indexOf(raw.preferredTime) >= 0 ? raw.preferredTime : 'anytime',
+      committed: !!raw.committed
+    };
+  }
+
+  function normalizeStreak(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return { lastStreakDate: null };
+    }
+    return {
+      lastStreakDate: typeof raw.lastStreakDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.lastStreakDate) ? raw.lastStreakDate : null
+    };
+  }
+
   return Object.freeze({
+    defaultOnboarding: defaultOnboarding,
+    normalizeOnboarding: normalizeOnboarding,
+    normalizeStreak: normalizeStreak,
     formatCompletionFeedback: formatCompletionFeedback,
     parseChapterTitle: parseChapterTitle,
     getChapterSteps: getChapterSteps,

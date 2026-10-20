@@ -133,3 +133,29 @@ test('writes the new state to the legacy fallback if IndexedDB save fails', asyn
   assert.equal(result.ok, true);
   assert.equal(localStorage.getItem('flashdecks.v1'), '{"saved":true}');
 });
+
+test('storage preserves onboarding and streak data', async () => {
+  const idb = fakeIndexedDB();
+  const storage = createStorage({ indexedDB: idb.indexedDB, localStorage: mockLocalStorage() });
+  const state = {
+    decks: [],
+    progress: {},
+    settings: { theme: 'dark', showStreak: true },
+    onboarding: { completed: true, goal: 'exam', dailyMinutes: 15, startingTopic: 'christology', preferredTime: 'morning', committed: true },
+    streak: { lastStreakDate: '2026-10-20' },
+    dataVersion: 9
+  };
+  const raw = JSON.stringify(state);
+  const saveResult = await storage.save(raw);
+  assert.equal(saveResult.ok, true);
+
+  const loadResult = await storage.load();
+  const parsed = JSON.parse(loadResult.raw);
+  assert.equal(parsed.onboarding.completed, true);
+  assert.equal(parsed.onboarding.goal, 'exam');
+  assert.equal(parsed.onboarding.dailyMinutes, 15);
+  assert.equal(parsed.onboarding.startingTopic, 'christology');
+  assert.equal(parsed.onboarding.committed, true);
+  assert.equal(parsed.streak.lastStreakDate, '2026-10-20');
+  assert.equal(parsed.dataVersion, 9);
+});

@@ -203,3 +203,68 @@ test('formatCompletionFeedback generates positive coaching titles and stats', ()
   assert.equal(flash.title, 'Session Complete!');
   assert.equal(flash.cardsMastered, 3);
 });
+
+test('defaultOnboarding and normalizeOnboarding handle new users and legacy backups with defaults', () => {
+  const fresh = MobileStudy.defaultOnboarding(false);
+  assert.equal(fresh.completed, false);
+  assert.equal(fresh.dailyMinutes, 10);
+  assert.equal(fresh.goal, 'habit');
+
+  const legacyActive = MobileStudy.normalizeOnboarding(null, true);
+  assert.equal(legacyActive.completed, true);
+  assert.equal(legacyActive.dailyMinutes, 10);
+  assert.equal(legacyActive.startingTopic, 'soteriology');
+
+  const custom = MobileStudy.normalizeOnboarding({
+    completed: true,
+    goal: 'theology',
+    dailyMinutes: 20,
+    startingTopic: 'conduct',
+    preferredTime: 'evening',
+    committed: true
+  }, false);
+  assert.equal(custom.goal, 'theology');
+  assert.equal(custom.dailyMinutes, 20);
+  assert.equal(custom.startingTopic, 'conduct');
+  assert.equal(custom.preferredTime, 'evening');
+  assert.equal(custom.committed, true);
+
+  const fallback = MobileStudy.normalizeOnboarding({ goal: 'invalid-choice', dailyMinutes: -5 }, true);
+  assert.equal(fallback.goal, 'habit');
+  assert.equal(fallback.dailyMinutes, 10);
+});
+
+test('normalizeStreak sanitizes stored dates', () => {
+  assert.deepEqual(MobileStudy.normalizeStreak({ lastStreakDate: '2026-10-20' }), { lastStreakDate: '2026-10-20' });
+  assert.deepEqual(MobileStudy.normalizeStreak({ lastStreakDate: 'invalid-date' }), { lastStreakDate: null });
+  assert.deepEqual(MobileStudy.normalizeStreak(null), { lastStreakDate: null });
+});
+
+test('selectPlanCards adapts to dailyMinutes and startingTopic from onboarding', () => {
+  const due = Array.from({ length: 25 }, (_, i) => item('d1', `c${i}`));
+  const decks = [
+    { id: 'd1', title: 'Discipleship Experience (Section 1) Soteriology', cards: [{ id: 'c1' }] },
+    { id: 'd2', title: 'Discipleship Experience (Section 5) Christian Conduct', cards: [{ id: 'cc1' }] }
+  ];
+
+  // 5-minute plan
+  const plan5 = MobileStudy.selectPlanCards({
+    dueItems: due,
+    decks,
+    isMastered: () => false,
+    dailyMinutes: 5
+  });
+  assert.equal(plan5[0].title, 'Review 5 due cards');
+
+  // 20-minute plan prioritizing Christian Conduct
+  const plan20 = MobileStudy.selectPlanCards({
+    dueItems: due,
+    decks,
+    isMastered: () => false,
+    dailyMinutes: 20,
+    startingTopic: 'conduct'
+  });
+  assert.equal(plan20[0].title, 'Review 20 due cards');
+  assert.equal(plan20[2].deckId, 'd2');
+  assert.match(plan20[2].oneLine, /Christian Conduct/);
+});
