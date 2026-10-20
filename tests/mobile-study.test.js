@@ -113,3 +113,74 @@ test('calculateStreak accurately computes consecutive study days', () => {
   assert.equal(MobileStudy.calculateStreak([], now), 0);
 });
 
+
+test('parseChapterTitle extracts section number, section label, and clean topic', () => {
+  const parsed1 = MobileStudy.parseChapterTitle('Discipleship Experience (Section 1) Soteriology');
+  assert.equal(parsed1.sectionNum, 1);
+  assert.equal(parsed1.sectionLabel, 'Section 1');
+  assert.equal(parsed1.topic, 'Soteriology');
+
+  const parsed12 = MobileStudy.parseChapterTitle('(Section 12) Church History');
+  assert.equal(parsed12.sectionNum, 12);
+  assert.equal(parsed12.sectionLabel, 'Section 12');
+  assert.equal(parsed12.topic, 'Church History');
+
+  const custom = MobileStudy.parseChapterTitle('My Custom Topic');
+  assert.equal(custom.sectionNum, null);
+  assert.equal(custom.sectionLabel, 'Lesson');
+  assert.equal(custom.topic, 'My Custom Topic');
+});
+
+test('getChapterSteps returns four study steps with soft unlock states', () => {
+  const deck = {
+    id: 'd1',
+    title: 'Discipleship Experience (Section 1) Soteriology',
+    cards: [
+      { id: 'c1', question: 'Q1' },
+      { id: 'c2', question: 'Q2' },
+      { id: 'c3', question: 'Q3' }
+    ]
+  };
+
+  // Case A: Fresh deck (not studied yet)
+  const freshSteps = MobileStudy.getChapterSteps(deck, { cards: {} });
+  assert.equal(freshSteps.length, 4);
+  assert.equal(freshSteps[0].id, 'flash');
+  assert.equal(freshSteps[0].state, 'unlocked');
+  assert.equal(freshSteps[1].id, 'quiz');
+  assert.equal(freshSteps[1].state, 'recommended-next');
+  assert.equal(freshSteps[2].id, 'weak');
+  assert.equal(freshSteps[2].state, 'unlocked');
+  assert.equal(freshSteps[3].id, 'exam');
+  assert.equal(freshSteps[3].state, 'unlocked');
+
+  // Case B: In-progress deck with quiz completed and a weak spot
+  const inProgProgress = {
+    best: { score: 2, total: 3, pct: 67 },
+    cards: {
+      c1: { box: 2, attempts: 2, misses: 0 },
+      c2: { box: 1, attempts: 2, misses: 1 },
+      c3: { box: 0, attempts: 0, misses: 0 }
+    }
+  };
+  const inProgSteps = MobileStudy.getChapterSteps(deck, inProgProgress);
+  assert.equal(inProgSteps[0].state, 'in-progress');
+  assert.equal(inProgSteps[1].state, 'complete');
+  assert.equal(inProgSteps[2].state, 'in-progress');
+  assert.match(inProgSteps[2].meta, /1 card to strengthen/);
+
+  // Case C: Fully mastered deck
+  const masteredProgress = {
+    best: { score: 3, total: 3, pct: 100 },
+    cards: {
+      c1: { box: 2, attempts: 2, misses: 0 },
+      c2: { box: 2, attempts: 2, misses: 0 },
+      c3: { box: 2, attempts: 2, misses: 0 }
+    }
+  };
+  const masteredSteps = MobileStudy.getChapterSteps(deck, masteredProgress);
+  assert.equal(masteredSteps[0].state, 'complete');
+  assert.equal(masteredSteps[1].state, 'complete');
+  assert.equal(masteredSteps[2].state, 'complete');
+  assert.equal(masteredSteps[3].state, 'complete');
+});

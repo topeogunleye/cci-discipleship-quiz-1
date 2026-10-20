@@ -420,7 +420,7 @@
     return '<span class="deck-topic">' + esc(title) + '</span>';
   }
 
-  var MAIN_TABS = ['home', 'journey', 'practice', 'progress', 'settings'];
+  var MAIN_TABS = ['home', 'journey', 'chapter', 'practice', 'progress', 'settings'];
 
   function getStudyTimestamps() {
     var timestamps = [];
@@ -597,59 +597,175 @@
     return topBar + backupReminder + heroCard + (S.decks.length ? planSection + milestoneCard : '');
   };
 
+  
+  function chapterSvgIllustration(seed) {
+    var s = (seed || 1) % 4;
+    if (s === 1) {
+      // Sunrise & rolling hills
+      return '<svg viewBox="0 0 120 70" class="chapter-ill" aria-hidden="true"><circle cx="60" cy="24" r="16" fill="rgba(255,255,255,0.2)"/><path d="M-10 70 Q30 35 70 70 Z" fill="rgba(255,255,255,0.15)"/><path d="M40 70 Q85 30 130 70 Z" fill="rgba(255,255,255,0.25)"/></svg>';
+    } else if (s === 2) {
+      // Mountain peaks
+      return '<svg viewBox="0 0 120 70" class="chapter-ill" aria-hidden="true"><polygon points="20,70 55,25 90,70" fill="rgba(255,255,255,0.18)"/><polygon points="60,70 85,35 110,70" fill="rgba(255,255,255,0.12)"/><polygon points="-5,70 25,40 55,70" fill="rgba(255,255,255,0.12)"/></svg>';
+    } else if (s === 3) {
+      // Pathway
+      return '<svg viewBox="0 0 120 70" class="chapter-ill" aria-hidden="true"><circle cx="95" cy="20" r="10" fill="rgba(255,255,255,0.2)"/><path d="M10 70 Q45 50 60 25 Q75 50 110 70 Z" fill="rgba(255,255,255,0.18)"/><path d="M48 70 Q55 45 60 25 Q65 45 72 70 Z" fill="rgba(255,255,255,0.22)"/></svg>';
+    } else {
+      // Serene horizon & waves/hills
+      return '<svg viewBox="0 0 120 70" class="chapter-ill" aria-hidden="true"><circle cx="25" cy="22" r="12" fill="rgba(255,255,255,0.15)"/><path d="M0 55 Q35 40 70 55 T140 55 L140 70 L0 70 Z" fill="rgba(255,255,255,0.18)"/><path d="M0 62 Q35 50 70 62 T140 62 L140 70 L0 70 Z" fill="rgba(255,255,255,0.22)"/></svg>';
+    }
+  }
+
+  function getStepIconSvg(icon) {
+    switch (icon) {
+      case 'flash':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="13" y2="12"/></svg>';
+      case 'quiz':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+      case 'target':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>';
+      case 'trophy':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3M18 9h3a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-3M4 3h16v8a8 8 0 0 1-16 0V3zM12 17v4M8 21h8"/></svg>';
+      default:
+        return '';
+    }
+  }
+
   views.journey = function () {
     var totalCards = S.decks.reduce(function (n, d) { return n + d.cards.length; }, 0);
     var now = Date.now();
-    var rows = S.decks.map(function (d) {
-      var p = prog(d.id), mastered = d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length;
-      var pct = d.cards.length ? Math.round(100 * mastered / d.cards.length) : 0;
-      var deckDue = d.cards.filter(function (c) { return StudyLogic.isDueToday(p.cards[c.id], now); }).length;
-      var weakCards = d.cards.filter(function (c) { var r = p.cards[c.id]; return r && typeof r === 'object' && r.attempts > 0 && r.misses > 0; }).length;
+    var rows = S.decks.map(function (d, index) {
+      var p = prog(d.id);
+      var mastered = d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length;
+      var total = d.cards.length;
+      var pct = total ? Math.round(100 * mastered / total) : 0;
+      var parsed = MobileStudy.parseChapterTitle(d.title);
+      var secNum = parsed.sectionNum || (index + 1);
+      var gradClass = 'deck-grad-' + (((secNum - 1) % 12) + 1);
       var hidden = homeFilter && d.title.toLowerCase().indexOf(homeFilter.toLowerCase()) < 0;
-      var statusBadge = pct === 100
-        ? '<span class="badge-status badge-mastered">Mastered</span>'
-        : (pct > 0 ? '<span class="badge-status badge-progress">' + pct + '% mastered</span>' : '<span class="badge-status badge-new">Not started</span>');
-      var metaParts = [plural(d.cards.length, 'card')];
-      if (p.best) metaParts.push('Best ' + p.best.pct + '%');
-      if (deckDue) metaParts.push('<span class="meta-due">' + deckDue + ' due</span>');
-      if (weakCards) metaParts.push('<span class="meta-weak">' + weakCards + ' weak</span>');
-      return '<article class="deck" data-deck-name="' + esc(d.title.toLowerCase()) + '"' + (hidden ? ' hidden' : '') + '>' +
-        '<div class="deck-header">' +
-          '<label class="chk"><input type="checkbox" data-sel="' + d.id + '"' + (SEL.has(d.id) ? ' checked' : '') + ' aria-label="Select ' + esc(d.title) + '"></label>' +
-          '<div class="dinfo"><h2>' + formatDeckHeading(d.title) + '</h2>' +
-            '<p class="meta">' + metaParts.join(' · ') + '</p>' +
+
+      var bestBadge = p.best ? '<span class="chapter-best-badge">Best ' + p.best.pct + '%</span>' : '';
+
+      return '<article class="chapter-card ' + gradClass + '" data-deck-name="' + esc(d.title.toLowerCase()) + '"' + (hidden ? ' hidden' : '') + '>' +
+        '<div class="chapter-card-top">' +
+          '<div class="chapter-badges">' +
+            '<span class="chapter-sec-pill">' + esc(parsed.sectionLabel) + '</span>' +
+            bestBadge +
           '</div>' +
-          statusBadge +
+          '<div class="chapter-card-actions">' +
+            '<button class="chapter-icon-btn chapter-info-btn" data-act="chapter-info" data-id="' + d.id + '" aria-label="Deck info for ' + esc(d.title) + '" title="View deck details">' +
+              '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' +
+            '</button>' +
+            '<button class="chapter-icon-btn" data-act="chapter-menu" data-id="' + d.id + '" aria-label="Options for ' + esc(d.title) + '">' +
+              '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>' +
+            '</button>' +
+          '</div>' +
         '</div>' +
-        '<div class="deck-progress" role="progressbar" aria-label="' + esc(d.title) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
-        '<div class="acts">' +
-          '<button class="btn sm primary" data-act="setup" data-mode="flash" data-id="' + d.id + '">Study Flashcards</button>' +
-          '<button class="btn sm" data-act="setup" data-mode="quiz" data-id="' + d.id + '">Quiz</button>' +
-          '<button class="btn sm ghost deck-edit-btn" data-act="edit" data-id="' + d.id + '" aria-label="Edit ' + esc(d.title) + '">Edit</button>' +
-        '</div></article>';
+        '<button class="chapter-card-main-hit" data-act="open-chapter" data-id="' + d.id + '" aria-label="Open chapter ' + esc(parsed.topic) + '">' +
+          '<h2 class="chapter-title">' + esc(parsed.topic) + '</h2>' +
+          '<p class="chapter-sub">CCI Discipleship Experience</p>' +
+          '<div class="chapter-card-bottom">' +
+            '<div class="chapter-progress-info">' +
+              '<span class="chapter-count">' + mastered + ' / ' + total + ' mastered</span>' +
+              '<span class="chapter-pct">' + pct + '%</span>' +
+            '</div>' +
+            '<div class="deck-progress chapter-progress-bar" role="progressbar" aria-label="' + esc(d.title) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
+          '</div>' +
+        '</button>' +
+        chapterSvgIllustration(secNum) +
+      '</article>';
     }).join('');
+
     var empty = '<div class="empty"><h2>Welcome to CCI Study Decks</h2><p>Begin your discipleship journey. Add a deck from a text file or paste its content to start studying.</p><button class="btn primary sm" data-act="import" style="margin-top:14px">Add your first deck</button></div>';
+
     return '<header class="view-header">' +
       '<div class="row spread">' +
-        '<div><h1>Journey</h1><p class="view-sub">12 Discipleship Chapters · ' + plural(S.decks.length, 'deck') + ' · ' + plural(totalCards, 'card') + '</p></div>' +
+        '<div><h1>Journey</h1><p class="view-sub">12 Discipleship Chapters · ' + plural(S.decks.length, 'chapter') + ' · ' + plural(totalCards, 'card') + '</p></div>' +
         '<button class="btn sm" data-act="import">Add deck</button>' +
       '</div>' +
     '</header>' +
     (S.decks.length ? '<div class="decks-section-bar">' +
-      '<div class="row spread-mid">' +
-        '<h2 class="decks-heading">Lesson Decks</h2>' +
-        '<div class="row sel-all"><label><input type="checkbox" data-selall' + (SEL.size === S.decks.length ? ' checked' : '') + '> Select all</label><span class="meta">' + plural(S.decks.length, 'deck') + ' · ' + plural(totalCards, 'card') + '</span></div>' +
-      '</div>' +
       '<div class="home-tools">' +
-        '<label class="sr-only" for="deck-search">Search decks</label>' +
-        '<input id="deck-search" type="search" placeholder="Search lessons by topic or section…" value="' + esc(homeFilter) + '" autocomplete="off">' +
-        '<span class="meta" id="deck-result-count">' + S.decks.length + ' ' + (S.decks.length === 1 ? 'deck' : 'decks') + '</span>' +
+        '<label class="sr-only" for="deck-search">Search chapters</label>' +
+        '<input id="deck-search" type="search" placeholder="Search chapters by section or topic…" value="' + esc(homeFilter) + '" autocomplete="off">' +
+        '<span class="meta" id="deck-result-count">' + S.decks.length + ' ' + (S.decks.length === 1 ? 'chapter' : 'chapters') + '</span>' +
       '</div>' +
-      '<p class="search-empty" id="search-empty">No decks match that search. Try searching by section or topic.</p>' +
+      '<p class="search-empty" id="search-empty">No chapters match that search. Try searching by section or topic.</p>' +
     '</div>' : '') +
-    (rows ? '<div class="deck-grid">' + rows + '</div>' : empty) +
-    '<div id="bar" class="bar">' + bar() + '</div>';
+    (rows ? '<div class="chapter-grid">' + rows + '</div>' : empty);
   };
+
+  views.chapter = function () {
+    var d = deck(V.id);
+    if (!d) return '<div class="empty"><h2>Chapter not found</h2><button class="btn primary sm" data-act="nav-tab" data-tab="journey">Back to Journey</button></div>';
+    var p = prog(d.id);
+    var mastered = d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length;
+    var total = d.cards.length;
+    var pct = total ? Math.round(100 * mastered / total) : 0;
+    var parsed = MobileStudy.parseChapterTitle(d.title);
+    var secNum = parsed.sectionNum || 1;
+    var gradClass = 'deck-grad-' + (((secNum - 1) % 12) + 1);
+
+    var steps = MobileStudy.getChapterSteps(d, p, {
+      isMastered: function (c) { return isMastered(d.id, c.id); }
+    });
+
+    var timelineHtml = steps.map(function (s, idx) {
+      var stateClass = 'step-' + s.state;
+      var stateBadge = s.state === 'complete'
+        ? '<span class="step-badge complete">Complete ✓</span>'
+        : (s.state === 'in-progress' ? '<span class="step-badge in-progress">In progress</span>' : '<span class="step-badge unlocked">Unlocked</span>');
+
+      return '<div class="timeline-step ' + stateClass + '">' +
+        '<div class="timeline-node" aria-hidden="true">' +
+          '<div class="node-circle">' + (s.state === 'complete' ? '✓' : (idx + 1)) + '</div>' +
+          (idx < steps.length - 1 ? '<div class="node-line"></div>' : '') +
+        '</div>' +
+        '<div class="timeline-card">' +
+          '<div class="timeline-card-head">' +
+            '<div class="timeline-step-icon">' + getStepIconSvg(s.icon) + '</div>' +
+            '<div class="timeline-step-info">' +
+              '<h3 class="timeline-step-title">' + esc(s.title) + '</h3>' +
+              '<p class="timeline-step-meta">' + esc(s.meta) + '</p>' +
+            '</div>' +
+            stateBadge +
+          '</div>' +
+          '<p class="timeline-step-desc">' + esc(s.desc) + '</p>' +
+          '<div class="timeline-step-act">' +
+            '<button class="btn sm' + (s.state === 'complete' ? '' : ' primary') + '" data-act="' + s.action + '" data-mode="' + s.mode + '" data-id="' + d.id + '">Start ' + esc(s.title) + '</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    return '<header class="chapter-view-header ' + gradClass + '">' +
+      '<div class="chapter-view-top">' +
+        '<button class="btn sm ghost" data-act="nav-tab" data-tab="journey">‹ Journey</button>' +
+        '<div class="row">' +
+          '<button class="chapter-icon-btn chapter-info-btn" data-act="chapter-info" data-id="' + d.id + '" aria-label="Chapter info" title="Chapter details">' +
+            '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' +
+          '</button>' +
+          '<button class="chapter-icon-btn" data-act="chapter-menu" data-id="' + d.id + '" aria-label="Chapter menu">' +
+            '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="chapter-view-hero">' +
+        '<span class="chapter-sec-pill">' + esc(parsed.sectionLabel) + '</span>' +
+        '<h1 class="chapter-view-title">' + esc(parsed.topic) + '</h1>' +
+        '<p class="chapter-view-sub">' + plural(total, 'question') + ' · ' + mastered + ' mastered (' + pct + '%)</p>' +
+        '<div class="deck-progress chapter-progress-bar" role="progressbar" aria-label="' + esc(d.title) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
+      '</div>' +
+      chapterSvgIllustration(secNum) +
+    '</header>' +
+    '<section class="chapter-timeline-section" aria-label="Study Steps">' +
+      '<div class="timeline-intro">' +
+        '<h2>Study Timeline</h2>' +
+        '<p class="meta">Step through each mode or jump straight to any challenge anytime.</p>' +
+      '</div>' +
+      '<div class="chapter-timeline">' + timelineHtml + '</div>' +
+    '</section>';
+  };
+
 
   views.practice = function () {
     var now = Date.now();
@@ -1082,6 +1198,62 @@
     var a = t.dataset.act, d;
     switch (a) {
       case 'home': closeModal(); go({ name: 'home' }); break;
+      case 'open-chapter': go({ name: 'chapter', id: t.dataset.id }); break;
+      case 'chapter-info':
+        var infoDeck = deck(t.dataset.id);
+        if (infoDeck) {
+          var infoProg = prog(infoDeck.id);
+          var infoMastered = infoDeck.cards.filter(function (c) { return isMastered(infoDeck.id, c.id); }).length;
+          var infoDue = infoDeck.cards.filter(function (c) { return StudyLogic.isDueToday(infoProg.cards[c.id], Date.now()); }).length;
+          var infoWeak = infoDeck.cards.filter(function (c) { var r = infoProg.cards[c.id]; return r && typeof r === 'object' && r.attempts > 0 && r.misses > 0; }).length;
+          var infoParsed = MobileStudy.parseChapterTitle(infoDeck.title);
+          openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="chapter-info-title">' +
+            '<h2 id="chapter-info-title">' + esc(infoDeck.title) + '</h2>' +
+            '<p class="meta">' + infoParsed.sectionLabel + ' · ' + plural(infoDeck.cards.length, 'question') + '</p>' +
+            '<div class="statline" style="margin: 16px 0">' +
+              '<div class="stat"><b>' + infoMastered + ' / ' + infoDeck.cards.length + '</b><span>Mastered</span></div>' +
+              '<div class="stat"><b>' + (infoProg.best ? infoProg.best.pct + '%' : '—') + '</b><span>Best Quiz</span></div>' +
+              '<div class="stat"><b>' + infoDue + '</b><span>Due</span></div>' +
+              '<div class="stat"><b>' + infoWeak + '</b><span>Weak</span></div>' +
+            '</div>' +
+            '<div class="row end"><button class="btn primary" data-act="close">Done</button></div>' +
+          '</div>');
+        }
+        break;
+      case 'chapter-menu':
+        var menuDeck = deck(t.dataset.id);
+        if (menuDeck) {
+          openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="chapter-menu-title">' +
+            '<h2 id="chapter-menu-title">' + esc(menuDeck.title) + '</h2>' +
+            '<div class="chapter-menu-list">' +
+              '<button class="btn full" data-act="edit" data-id="' + menuDeck.id + '">Edit Deck Questions</button>' +
+              '<button class="btn full" data-act="export" data-id="' + menuDeck.id + '">Export Deck as .txt</button>' +
+              '<button class="btn full danger" data-act="ddel" data-id="' + menuDeck.id + '">Delete Deck</button>' +
+            '</div>' +
+            '<div class="row end" style="margin-top:14px"><button class="btn ghost" data-act="close">Cancel</button></div>' +
+          '</div>');
+        }
+        break;
+      case 'chapter-weak':
+        var cwDeck = deck(t.dataset.id);
+        if (cwDeck) {
+          var cwCards = StudyLogic.weakSpots(cwDeck.cards.map(function (c) { return { deckId: cwDeck.id, card: c, record: prog(cwDeck.id).cards[c.id] }; }), 10);
+          if (!cwCards.length) {
+            toast('No weak spots for this chapter yet. Practice questions first!');
+            return;
+          }
+          begin('quiz', shuffle(cwCards), { unk: false, limit: 0, shuf: true, saveBest: false }, [cwDeck.id]);
+        }
+        break;
+      case 'chapter-exam':
+        var ceDeck = deck(t.dataset.id);
+        if (ceDeck) {
+          var ceCards = ceDeck.cards.map(function (c) { return { deckId: ceDeck.id, card: c }; });
+          var ceCount = Math.min(20, ceCards.length);
+          begin('exam', StudyLogic.examQuestions(ceCards, ceCount), { unk: false, limit: ceCount, shuf: true, duration: 15 * 60 * 1000, saveBest: false }, [ceDeck.id]);
+        }
+        break;
+
       case 'nav-tab': closeModal(); if (t.dataset.tab) go({ name: t.dataset.tab }); break;
       case 'set-theme': if (t.dataset.theme) { S.settings.theme = t.dataset.theme; applyTheme(); save(); render(true); } break;
       case 'toggle-streak': S.settings.showStreak = S.settings.showStreak === false; save(); render(true); break;

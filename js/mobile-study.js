@@ -256,7 +256,100 @@
     return cards;
   }
 
+  
+  function parseChapterTitle(title) {
+    var raw = String(title || '').trim();
+    var match = /^(?:Discipleship Experience\s*)?\(Section\s*(\d+)\)\s*(.+)$/i.exec(raw);
+    if (match) {
+      return {
+        sectionNum: parseInt(match[1], 10),
+        sectionLabel: 'Section ' + match[1],
+        topic: match[2].trim()
+      };
+    }
+    return {
+      sectionNum: null,
+      sectionLabel: 'Lesson',
+      topic: raw
+    };
+  }
+
+  function getChapterSteps(deck, progress, options) {
+    options = options || {};
+    var cards = deck && Array.isArray(deck.cards) ? deck.cards : [];
+    var totalCards = cards.length;
+    var progCards = (progress && progress.cards) || {};
+    var isMasteredFn = typeof options.isMastered === 'function'
+      ? options.isMastered
+      : function (card) {
+        var r = progCards[card.id];
+        return r && typeof r === 'object' && r.box >= 2;
+      };
+
+    var masteredCount = 0;
+    var attemptsCount = 0;
+    var weakCount = 0;
+
+    cards.forEach(function (c) {
+      if (isMasteredFn(c)) masteredCount++;
+      var r = progCards[c.id];
+      if (r && typeof r === 'object') {
+        if (r.attempts > 0) attemptsCount++;
+        if (r.misses > 0) weakCount++;
+      }
+    });
+
+    var hasStudied = attemptsCount > 0 || masteredCount > 0;
+    var quizUnlocked = totalCards > 0 && hasStudied;
+    var examUnlocked = totalCards > 0 && (masteredCount >= Math.min(5, totalCards));
+
+    return [
+      {
+        id: 'flash',
+        mode: 'flash',
+        title: 'Study Flashcards',
+        desc: 'Review concepts and Scripture references at your own pace',
+        state: masteredCount === totalCards && totalCards > 0 ? 'complete' : (hasStudied ? 'in-progress' : 'unlocked'),
+        action: 'setup',
+        meta: totalCards > 0 ? (masteredCount + ' of ' + totalCards + ' mastered') : 'No cards',
+        icon: 'flash'
+      },
+      {
+        id: 'quiz',
+        mode: 'quiz',
+        title: 'Chapter Quiz',
+        desc: 'Test your retention with instant feedback and explanations',
+        state: progress && progress.best ? 'complete' : (quizUnlocked ? 'unlocked' : 'recommended-next'),
+        action: 'setup',
+        meta: progress && progress.best ? ('Best score: ' + progress.best.pct + '%') : (quizUnlocked ? 'Ready to test' : 'Study flashcards first (optional)'),
+        icon: 'quiz'
+      },
+      {
+        id: 'weak',
+        mode: 'weak',
+        title: 'Weak Spot Practice',
+        desc: 'Focus on questions you have previously missed',
+        state: weakCount === 0 ? (attemptsCount > 0 ? 'complete' : 'unlocked') : 'in-progress',
+        action: 'chapter-weak',
+        meta: weakCount > 0 ? (weakCount + ' ' + (weakCount === 1 ? 'card' : 'cards') + ' to strengthen') : (attemptsCount > 0 ? 'No weak spots!' : 'Available anytime'),
+        icon: 'target'
+      },
+      {
+        id: 'exam',
+        mode: 'exam',
+        title: 'Mastery Challenge',
+        desc: 'Comprehensive timed review for this chapter',
+        state: masteredCount === totalCards && totalCards > 0 ? 'complete' : (examUnlocked ? 'unlocked' : 'unlocked'),
+        action: 'chapter-exam',
+        meta: masteredCount >= totalCards && totalCards > 0 ? 'Chapter Mastered' : 'Open anytime',
+        icon: 'trophy'
+      }
+    ];
+  }
+
   return Object.freeze({
+    parseChapterTitle: parseChapterTitle,
+    getChapterSteps: getChapterSteps,
     selectDailyItems: selectDailyItems,
     selectPlanCards: selectPlanCards,
     calculateStreak: calculateStreak,
