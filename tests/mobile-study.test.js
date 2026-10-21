@@ -268,3 +268,66 @@ test('selectPlanCards adapts to dailyMinutes and startingTopic from onboarding',
   assert.equal(plan20[2].deckId, 'd2');
   assert.match(plan20[2].oneLine, /Christian Conduct/);
 });
+
+test('selectChallengeItems prioritizes due cards, then weak spots, then unmastered cards up to 10 items', () => {
+  const due = [item('d1', 'q1'), item('d1', 'q2'), item('d1', 'q3')];
+  // q3 is in both due and weak
+  const weak = [item('d1', 'q3'), item('d1', 'q4'), item('d1', 'q5'), item('d1', 'q6')];
+  const unmastered = [item('d1', 'q7'), item('d1', 'q8'), item('d1', 'q9'), item('d1', 'q10'), item('d1', 'q11')];
+  const mastered = [item('d1', 'q12'), item('d1', 'q13')];
+  const all = [...due, ...weak.slice(1), ...unmastered, ...mastered];
+
+  const selected = MobileStudy.selectChallengeItems(
+    due,
+    weak,
+    all,
+    candidate => candidate.card.id === 'q12' || candidate.card.id === 'q13',
+    10
+  );
+
+  assert.equal(selected.length, 10);
+  // Verify deduplication and order
+  assert.deepEqual(selected.map(s => s.card.id), [
+    'q1', 'q2', 'q3', // from due
+    'q4', 'q5', 'q6', // from weak (q3 skipped as already included)
+    'q7', 'q8', 'q9', 'q10' // from unmastered to reach limit 10
+  ]);
+});
+
+test('selectChallengeItems falls back to all cards when nothing is due or weak', () => {
+  const all = [item('d1', 'q1'), item('d1', 'q2'), item('d1', 'q3')];
+  const selected = MobileStudy.selectChallengeItems([], [], all, () => true, 10);
+  assert.equal(selected.length, 3);
+  assert.deepEqual(selected.map(s => s.card.id), ['q1', 'q2', 'q3']);
+});
+
+test('formatPickerDecks returns structured chapter metadata for lesson picker', () => {
+  const decks = [
+    {
+      id: 'd1',
+      title: 'Discipleship Experience (Section 1) Soteriology',
+      cards: [{ id: 'c1' }, { id: 'c2' }]
+    },
+    {
+      id: 'd2',
+      title: 'Discipleship Experience (Section 2) Soteriology II',
+      cards: [{ id: 'c3' }, { id: 'c4' }]
+    }
+  ];
+
+  const pickerDecks = MobileStudy.formatPickerDecks(decks, (deckId, cardId) => cardId === 'c1');
+  assert.equal(pickerDecks.length, 2);
+  assert.equal(pickerDecks[0].topic, 'Soteriology');
+  assert.equal(pickerDecks[0].sectionNum, 1);
+  assert.equal(pickerDecks[0].gradientClass, 'deck-grad-1');
+  assert.equal(pickerDecks[0].totalCards, 2);
+  assert.equal(pickerDecks[0].masteredCount, 1);
+  assert.equal(pickerDecks[0].pct, 50);
+
+  assert.equal(pickerDecks[1].topic, 'Soteriology II');
+  assert.equal(pickerDecks[1].sectionNum, 2);
+  assert.equal(pickerDecks[1].gradientClass, 'deck-grad-2');
+  assert.equal(pickerDecks[1].totalCards, 2);
+  assert.equal(pickerDecks[1].masteredCount, 0);
+  assert.equal(pickerDecks[1].pct, 0);
+});

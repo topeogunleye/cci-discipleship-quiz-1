@@ -4,7 +4,7 @@
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
   var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
   var STARTER_DECKS = [], DEVOTIONALS = [];
-  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
+  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
   var browserLocalStorage = null, browserIndexedDB = null;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
   if (!browserLocalStorage) { try { if (typeof localStorage !== 'undefined') browserLocalStorage = localStorage; } catch (e) {} }
@@ -1305,6 +1305,64 @@
     '</article>';
   };
 
+  views.picker = function () {
+    var mode = V.mode === 'quiz' ? 'quiz' : 'flash';
+    var isQuiz = mode === 'quiz';
+    var modeTitle = isQuiz ? 'Quiz: Choose Lesson' : 'Flashcards: Choose Lesson';
+    var formattedDecks = MobileStudy.formatPickerDecks(S.decks, function (deckId, cardId) {
+      return isMastered(deckId, cardId);
+    });
+
+    var totalCards = formattedDecks.reduce(function (sum, d) { return sum + d.totalCards; }, 0);
+    var totalMastered = formattedDecks.reduce(function (sum, d) { return sum + d.masteredCount; }, 0);
+    var overallPct = totalCards ? Math.round(100 * totalMastered / totalCards) : 0;
+
+    var tilesHtml = formattedDecks.map(function (d) {
+      return '<button class="picker-tile ' + d.gradientClass + '" data-act="setup" data-mode="' + mode + '" data-id="' + d.id + '" aria-label="' + esc(d.topic) + ', ' + d.totalCards + ' cards, ' + d.pct + '% mastered">' +
+        '<div class="picker-tile-top">' +
+          '<span class="picker-tile-badge">' + d.sectionNum + '/12</span>' +
+        '</div>' +
+        '<h3 class="picker-tile-title">' + esc(d.topic) + '</h3>' +
+        '<div class="picker-tile-bottom">' +
+          '<span class="picker-tile-count">' + d.totalCards + ' cards</span>' +
+          '<span class="picker-tile-pct">' + d.pct + '%</span>' +
+        '</div>' +
+        '<div class="picker-tile-bar" aria-hidden="true"><i style="width:' + d.pct + '%"></i></div>' +
+      '</button>';
+    }).join('');
+
+    var allTile = '<button class="picker-tile picker-tile-all hero-gradient-sunrise" data-act="setup" data-mode="' + mode + '" data-id="*" aria-label="All Lessons, ' + totalCards + ' cards, ' + overallPct + '% mastered">' +
+      '<div class="picker-tile-top">' +
+        '<span class="picker-tile-badge">All 12</span>' +
+      '</div>' +
+      '<h3 class="picker-tile-title">All Lessons</h3>' +
+      '<div class="picker-tile-bottom">' +
+        '<span class="picker-tile-count">' + totalCards + ' cards</span>' +
+        '<span class="picker-tile-pct">' + overallPct + '%</span>' +
+      '</div>' +
+      '<div class="picker-tile-bar" aria-hidden="true"><i style="width:' + overallPct + '%"></i></div>' +
+    '</button>';
+
+    return '<div class="picker-view-shell" role="region" aria-label="' + esc(modeTitle) + '">' +
+      '<header class="picker-header">' +
+        '<button class="picker-close-btn" data-act="close-picker" aria-label="Close lesson picker">' +
+          '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button>' +
+        '<div class="picker-title-wrap">' +
+          '<span class="eyebrow">' + (isQuiz ? 'QUIZ MODE' : 'FLASHCARDS MODE') + '</span>' +
+          '<h1>' + esc(modeTitle) + '</h1>' +
+        '</div>' +
+      '</header>' +
+      '<div class="picker-body">' +
+        '<p class="picker-subtitle">Select a chapter or practice all 12 lessons together.</p>' +
+        '<div class="picker-grid">' +
+          allTile +
+          tilesHtml +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  };
+
   function shareDevotional(dev) {
     var text = dev.title + ' — ' + dev.subtitle + '\n\n"' + (dev.scriptureText || dev.scripture) + '"\n\nRead more in the CCI Discipleship App.';
     if (window.CciNative && window.CciNative.isNative) {
@@ -1695,13 +1753,85 @@
   function progressBar(n, t) { var pct = t ? Math.max(0, Math.min(100, Math.round(100 * n / t))) : 0; return '<div class="pbar study-progress" role="progressbar" aria-label="Study session progress" aria-valuemin="0" aria-valuemax="' + t + '" aria-valuenow="' + n + '" aria-valuetext="' + n + ' of ' + t + '"><i style="width:' + pct + '%"></i></div>'; }
   function formatClock(milliseconds) { var seconds = Math.max(0, Math.ceil(milliseconds / 1000)); return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'); }
 
+  function openRocketMenu() {
+    rocketMenuOpen = true;
+    render(true);
+    var firstPill = app.querySelector('.rocket-pills button');
+    if (firstPill) firstPill.focus();
+  }
+
+  function closeRocketMenu() {
+    if (!rocketMenuOpen) return;
+    rocketMenuOpen = false;
+    render(true);
+    var fab = app.querySelector('#rocket-fab-btn');
+    if (fab) fab.focus();
+  }
+
+  function toggleRocketMenu() {
+    if (rocketMenuOpen) closeRocketMenu();
+    else openRocketMenu();
+  }
+
+  function renderRocketFab() {
+    var pillsHtml = '';
+    var backdropHtml = '';
+    if (rocketMenuOpen) {
+      backdropHtml = '<div class="rocket-backdrop" data-act="close-rocket" aria-hidden="true"></div>';
+      pillsHtml = '<div class="rocket-pills" role="menu" aria-label="Study menu">' +
+        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-flash">' +
+          '<span class="pill-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="14" rx="2"/><path d="M6 3h12a2 2 0 0 1 2 2v12"/></svg>' +
+          '</span>' +
+          '<span class="rocket-pill-text"><strong>Flashcards</strong></span>' +
+        '</button>' +
+        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-quiz">' +
+          '<span class="pill-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+          '</span>' +
+          '<span class="rocket-pill-text"><strong>Quiz</strong></span>' +
+        '</button>' +
+        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-challenge">' +
+          '<span class="pill-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>' +
+          '</span>' +
+          '<span class="rocket-pill-text"><strong>Start a Challenge</strong><small>About 5 minutes</small></span>' +
+        '</button>' +
+        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-exam">' +
+          '<span class="pill-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="10" y1="2" x2="14" y2="2"/></svg>' +
+          '</span>' +
+          '<span class="rocket-pill-text"><strong>Start Exam</strong></span>' +
+        '</button>' +
+      '</div>';
+    }
+
+    var iconSvg = rocketMenuOpen
+      ? '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'
+      : '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4.5c1.45-1.47 4.5-2 4.5-2"/><path d="M15 15v5s3.03-.55 4.5-2c1.47-1.45 2-4.5 2-4.5"/></svg>';
+
+    return backdropHtml +
+      '<div class="rocket-container' + (rocketMenuOpen ? ' is-open' : '') + '">' +
+        pillsHtml +
+        '<button id="rocket-fab-btn" class="rocket-fab-btn' + (rocketMenuOpen ? ' is-open' : '') + '" ' +
+          'data-act="toggle-rocket" ' +
+          'aria-label="' + (rocketMenuOpen ? 'Close study menu' : 'Study menu') + '" ' +
+          'aria-expanded="' + (rocketMenuOpen ? 'true' : 'false') + '" ' +
+          'aria-haspopup="menu">' +
+          iconSvg +
+        '</button>' +
+      '</div>';
+  }
+
   /* ---------- render ---------- */
   function render(keep) {
     var isMainTab = MAIN_TABS.indexOf(V.name) >= 0;
     var view = V.name === 'exam' ? views.quiz : views[V.name];
     if (typeof view !== 'function') view = views.home;
     var tabBarHtml = isMainTab ? renderTabBar(V.name) : '';
-    app.innerHTML = banner() + view() + tabBarHtml;
+    var showRocket = V.name === 'home' || V.name === 'journey' || V.name === 'practice';
+    var rocketHtml = showRocket ? renderRocketFab() : '';
+    app.innerHTML = banner() + view() + tabBarHtml + rocketHtml;
     if (!keep) window.scrollTo(0, 0);
     if (V.name === 'flash') {
       var f = app.querySelector('.flip');
@@ -1714,6 +1844,7 @@
 
   function go(v, replace) {
     if (V.name === 'exam' && v.name !== 'exam') stopExamTimer();
+    rocketMenuOpen = false;
     var prev = V;
     V = v;
     try {
@@ -1735,6 +1866,7 @@
         if (isStudySession(V.name)) {
           pauseStudySession();
         }
+        rocketMenuOpen = false;
         V = { name: e.state.name, id: e.state.id };
         render();
       }
@@ -1743,7 +1875,8 @@
 
   /* ---------- sessions ---------- */
   function setup(mode, id) {
-    var ids = id === '*' ? Array.from(SEL) : [id];
+    var ids = id === '*' ? (SEL.size ? Array.from(SEL) : S.decks.map(function (d) { return d.id; })) : [id];
+    if (!ids.length) ids = S.decks.map(function (d) { return d.id; });
     V.setup = { mode: mode, ids: ids };
     var q = mode === 'quiz';
     openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setup-title"><h2 id="setup-title">' + (q ? 'Start quiz' : 'Start flashcards') + '</h2>' +
@@ -1790,6 +1923,20 @@
     var cards = StudyLogic.weakSpots(allCardItems(), 10);
     if (!cards.length) { toast('Answer some questions first to build weak-spot stats.'); return; }
     begin('quiz', shuffle(cards), { unk: false, limit: 0, shuf: true, saveBest: false }, deckIdsFor(cards));
+  }
+  function startChallenge() {
+    var all = allCardItems();
+    var due = StudyLogic.dueItems(all, Date.now());
+    var weak = StudyLogic.weakSpots(all, 10);
+    var cards = MobileStudy.selectChallengeItems(
+      due,
+      weak,
+      all,
+      function (item) { return isMastered(item.deckId, item.card.id); },
+      10
+    );
+    if (!cards.length) { toast('No challenge questions available.'); return; }
+    begin('quiz', shuffle(cards), { unk: false, limit: 10, shuf: true, challenge: true, saveBest: false }, deckIdsFor(cards));
   }
   function begin(mode, cards, o, ids) {
     if (mode === 'quiz' || mode === 'exam') {
@@ -2077,7 +2224,14 @@
       case 'close': closeModal(); break;
       case 'askok': var fn = pendingAsk; closeModal(); if (fn) fn(); break;
       case 'theme': S.settings.theme = { auto: 'light', light: 'dark', dark: 'auto' }[S.settings.theme]; applyTheme(); save(); render(true); break;
-      case 'setup': if (t.dataset.id === '*' && !SEL.size) return; setup(t.dataset.mode, t.dataset.id); break;
+      case 'toggle-rocket': toggleRocketMenu(); break;
+      case 'close-rocket': closeRocketMenu(); break;
+      case 'rocket-flash': closeRocketMenu(); go({ name: 'picker', mode: 'flash', from: V.name }); break;
+      case 'rocket-quiz': closeRocketMenu(); go({ name: 'picker', mode: 'quiz', from: V.name }); break;
+      case 'rocket-challenge': closeRocketMenu(); startChallenge(); break;
+      case 'rocket-exam': closeRocketMenu(); setupExam(); break;
+      case 'close-picker': go({ name: V.from || 'home' }); break;
+      case 'setup': setup(t.dataset.mode, t.dataset.id); break;
       case 'due': startDue(); break;
       case 'daily-study': startDailyStudy(); break;
       case 'resume-study': resumeStudySession(); break;
@@ -2210,6 +2364,32 @@
     }
   });
   document.addEventListener('keydown', function (e) {
+    if (rocketMenuOpen) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeRocketMenu();
+        return;
+      }
+      if (e.key === 'Tab') {
+        var focusables = Array.from(app.querySelectorAll('.rocket-pills button, #rocket-fab-btn'));
+        if (focusables.length) {
+          var firstEl = focusables[0], lastEl = focusables[focusables.length - 1];
+          if (e.shiftKey && document.activeElement === firstEl) {
+            e.preventDefault();
+            lastEl.focus();
+          } else if (!e.shiftKey && document.activeElement === lastEl) {
+            e.preventDefault();
+            firstEl.focus();
+          }
+        }
+        return;
+      }
+    }
+    if (V.name === 'picker' && !modal.innerHTML && e.key === 'Escape') {
+      e.preventDefault();
+      go({ name: V.from || 'home' });
+      return;
+    }
     if (modal.innerHTML && e.key === 'Escape') { e.preventDefault(); return closeModal(); }
     if (modal.innerHTML && e.key === 'Tab') {
       var focusable = Array.from(modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
@@ -2241,6 +2421,8 @@
     if (!window.CciNative || !window.CciNative.isNative) return;
     window.CciNative.onBackButton(function () {
       if (modal.innerHTML) { closeModal(); return; }
+      if (rocketMenuOpen) { closeRocketMenu(); return; }
+      if (V.name === 'picker') { go({ name: V.from || 'home' }); return; }
       if (isStudySession(V.name)) { pauseStudySession(); return; }
       if (V.name === 'devotional') { go({ name: 'home' }); return; }
       if (V.name !== 'home') { go({ name: 'home' }); return; }

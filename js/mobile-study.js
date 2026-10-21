@@ -16,6 +16,45 @@
     return source.slice(0, limit);
   }
 
+  function selectChallengeItems(dueItems, weakItems, allItems, isMastered, limit) {
+    var target = Number.isInteger(limit) && limit > 0 ? limit : 10;
+    var seen = new Set();
+    var selected = [];
+
+    function add(item) {
+      if (!item || !item.card || !item.card.id) return;
+      var key = (item.deckId || '') + ':' + item.card.id;
+      if (seen.has(key)) return;
+      seen.add(key);
+      selected.push(item);
+    }
+
+    // 1. Due cards first
+    (dueItems || []).forEach(function (item) {
+      if (selected.length < target) add(item);
+    });
+
+    // 2. Weak spots
+    (weakItems || []).forEach(function (item) {
+      if (selected.length < target) add(item);
+    });
+
+    // 3. Unmastered cards
+    (allItems || []).forEach(function (item) {
+      if (selected.length < target) {
+        var mastered = typeof isMastered === 'function' ? isMastered(item) : false;
+        if (!mastered) add(item);
+      }
+    });
+
+    // 4. Any remaining cards if needed
+    (allItems || []).forEach(function (item) {
+      if (selected.length < target) add(item);
+    });
+
+    return selected.slice(0, target);
+  }
+
   function snapshot(session) {
     if (!session || MODES.indexOf(session.name) < 0 || !Array.isArray(session.cards)) return null;
     return {
@@ -501,6 +540,31 @@
     };
   }
 
+  function formatPickerDecks(decks, isMastered) {
+    if (!Array.isArray(decks)) return [];
+    return decks.map(function (d, index) {
+      var cards = Array.isArray(d.cards) ? d.cards : [];
+      var total = cards.length;
+      var mastered = cards.filter(function (c) {
+        return typeof isMastered === 'function' ? isMastered(d.id, c.id) : false;
+      }).length;
+      var pct = total ? Math.round(100 * mastered / total) : 0;
+      var parsed = parseChapterTitle(d.title);
+      var secNum = parsed.sectionNum || (index + 1);
+      var gradClass = 'deck-grad-' + (((secNum - 1) % 12) + 1);
+      return {
+        id: d.id,
+        title: d.title,
+        topic: parsed.topic,
+        sectionNum: secNum,
+        totalCards: total,
+        masteredCount: mastered,
+        pct: pct,
+        gradientClass: gradClass
+      };
+    });
+  }
+
   return Object.freeze({
     defaultOnboarding: defaultOnboarding,
     normalizeOnboarding: normalizeOnboarding,
@@ -509,6 +573,8 @@
     parseChapterTitle: parseChapterTitle,
     getChapterSteps: getChapterSteps,
     selectDailyItems: selectDailyItems,
+    selectChallengeItems: selectChallengeItems,
+    formatPickerDecks: formatPickerDecks,
     selectPlanCards: selectPlanCards,
     filterDevotionals: filterDevotionals,
     getTodayDevotional: getTodayDevotional,

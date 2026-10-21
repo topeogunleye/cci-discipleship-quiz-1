@@ -4571,7 +4571,392 @@ button.opt.wrong .opt-badge {
   padding-top: var(--space-md);
 }
 
+/* ============================================================
+   Rocket Study Menu & Lesson Picker (Prompt 2B v2)
+============================================================ */
+
+.rocket-container {
+  position: fixed;
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+@media (min-width: 641px) {
+  .rocket-container {
+    right: 28px;
+    bottom: 28px;
+  }
+}
+
+.rocket-container > * {
+  pointer-events: auto;
+}
+
+.rocket-fab-btn {
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  border-radius: 999px;
+  background: var(--primary, #B5173A);
+  color: #FFFFFF;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 18px rgba(181, 23, 58, 0.42), 0 2px 6px rgba(0, 0, 0, 0.16);
+  cursor: pointer;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.18s ease, box-shadow 0.18s ease;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rocket-fab-btn:hover {
+  transform: scale(1.06);
+  background: #C91D44;
+  box-shadow: 0 6px 22px rgba(181, 23, 58, 0.5), 0 3px 8px rgba(0, 0, 0, 0.2);
+}
+
+.rocket-fab-btn:active {
+  transform: scale(0.94);
+}
+
+.rocket-fab-btn.is-open {
+  background: var(--text, #16152B);
+  color: #FFFFFF;
+  transform: rotate(90deg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+
+.rocket-fab-btn:focus-visible,
+.rocket-pill-btn:focus-visible,
+.picker-close-btn:focus-visible,
+.picker-tile:focus-visible {
+  outline: 3px solid var(--primary, #B5173A);
+  outline-offset: 3px;
+}
+
+.rocket-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 16, 58, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 115;
+  cursor: pointer;
+  animation: rocketFadeIn 0.2s ease forwards;
+}
+
+@keyframes rocketFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.rocket-pills {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 14px;
+  animation: rocketPillsFanOut 0.24s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+}
+
+@keyframes rocketPillsFanOut {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.rocket-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface, #FFFFFF);
+  color: var(--text, #16152B);
+  border: 1px solid var(--line, #E5E7EB);
+  border-radius: 999px;
+  padding: 10px 18px 10px 14px;
+  min-height: 48px;
+  box-shadow: 0 4px 16px rgba(18, 16, 58, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-sm, 14px);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: transform 0.18s ease, background-color 0.15s ease, box-shadow 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rocket-pill-btn:hover {
+  background: var(--surface-raised, #F8F9FE);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(18, 16, 58, 0.18);
+}
+
+.rocket-pill-btn:active {
+  transform: translateY(1px);
+}
+
+.rocket-pill-btn .pill-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(181, 23, 58, 0.12);
+  color: var(--primary, #B5173A);
+  flex-shrink: 0;
+}
+
+:root[data-theme="dark"] .rocket-pill-btn {
+  background: var(--surface, #1D1A55);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-theme="dark"] .rocket-pill-btn:hover {
+  background: var(--surface-raised, #25226B);
+}
+
+:root[data-theme="dark"] .rocket-pill-btn .pill-icon {
+  background: rgba(255, 255, 255, 0.14);
+  color: #FFFFFF;
+}
+
+:root[data-theme="dark"] .rocket-fab-btn.is-open {
+  background: #FFFFFF;
+  color: #16152B;
+}
+
+:root[data-theme="dark"] .rocket-pill-text strong {
+  color: #FFFFFF;
+}
+
+:root[data-theme="dark"] .rocket-pill-text small {
+  color: var(--text-sub, #A8A6D8);
+}
+
+.rocket-pill-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.rocket-pill-text strong {
+  font-size: var(--text-sm, 14px);
+  color: var(--text, #16152B);
+  line-height: 1.25;
+}
+
+.rocket-pill-text small {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-sub, #6B7280);
+  line-height: 1.2;
+}
+
+/* Lesson Picker View */
+.picker-view-shell {
+  min-height: 100vh;
+  padding: calc(var(--space-md) + env(safe-area-inset-top, 0px)) var(--space-md) calc(var(--space-2xl) + env(safe-area-inset-bottom, 0px));
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.picker-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.picker-close-btn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.picker-close-btn:hover {
+  background: var(--surface-raised);
+  transform: scale(1.05);
+}
+
+.picker-close-btn:active {
+  transform: scale(0.95);
+}
+
+.picker-title-wrap {
+  flex: 1;
+}
+
+.picker-title-wrap .eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--primary);
+  text-transform: uppercase;
+}
+
+.picker-title-wrap h1 {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text);
+  margin: 2px 0 0;
+  line-height: 1.2;
+}
+
+.picker-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-sub);
+  margin-bottom: var(--space-md);
+}
+
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 380px) {
+  .picker-grid {
+    gap: 8px;
+  }
+  .picker-tile {
+    padding: 12px;
+    min-height: 110px;
+    border-radius: 16px;
+  }
+  .picker-tile-title {
+    font-size: 13px;
+  }
+}
+
+.picker-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: left;
+  border-radius: 20px;
+  padding: 16px;
+  min-height: 130px;
+  border: none;
+  cursor: pointer;
+  color: #FFFFFF;
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s cubic-bezier(0.34, 1.2, 0.64, 1), box-shadow 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.picker-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.picker-tile:active {
+  transform: translateY(1px);
+}
+
+.picker-tile-top {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+}
+
+.picker-tile-badge {
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.24);
+  color: #FFFFFF;
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+}
+
+.picker-tile-title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: #FFFFFF;
+  line-height: 1.28;
+  margin: 0 0 auto;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.picker-tile-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.95;
+}
+
+.picker-tile-count {
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.picker-tile-pct {
+  font-weight: 700;
+}
+
+.picker-tile-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.26);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.picker-tile-bar i {
+  display: block;
+  height: 100%;
+  background: #FFFFFF;
+  border-radius: 999px;
+}
+
+.picker-tile-all {
+  grid-column: 1 / -1;
+  min-height: 100px;
+  background: var(--grad-hero-sunrise);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .rocket-fab-btn,
+  .rocket-fab-btn.is-open,
+  .rocket-backdrop,
+  .rocket-pills,
+  .rocket-pill-btn,
+  .picker-close-btn,
+  .picker-tile,
   .devotion-card,
   .devotion-dismiss-btn,
   .devotional-more-btn,
@@ -5064,6 +5449,45 @@ button.opt.wrong .opt-badge {
     return source.slice(0, limit);
   }
 
+  function selectChallengeItems(dueItems, weakItems, allItems, isMastered, limit) {
+    var target = Number.isInteger(limit) && limit > 0 ? limit : 10;
+    var seen = new Set();
+    var selected = [];
+
+    function add(item) {
+      if (!item || !item.card || !item.card.id) return;
+      var key = (item.deckId || '') + ':' + item.card.id;
+      if (seen.has(key)) return;
+      seen.add(key);
+      selected.push(item);
+    }
+
+    // 1. Due cards first
+    (dueItems || []).forEach(function (item) {
+      if (selected.length < target) add(item);
+    });
+
+    // 2. Weak spots
+    (weakItems || []).forEach(function (item) {
+      if (selected.length < target) add(item);
+    });
+
+    // 3. Unmastered cards
+    (allItems || []).forEach(function (item) {
+      if (selected.length < target) {
+        var mastered = typeof isMastered === 'function' ? isMastered(item) : false;
+        if (!mastered) add(item);
+      }
+    });
+
+    // 4. Any remaining cards if needed
+    (allItems || []).forEach(function (item) {
+      if (selected.length < target) add(item);
+    });
+
+    return selected.slice(0, target);
+  }
+
   function snapshot(session) {
     if (!session || MODES.indexOf(session.name) < 0 || !Array.isArray(session.cards)) return null;
     return {
@@ -5549,6 +5973,31 @@ button.opt.wrong .opt-badge {
     };
   }
 
+  function formatPickerDecks(decks, isMastered) {
+    if (!Array.isArray(decks)) return [];
+    return decks.map(function (d, index) {
+      var cards = Array.isArray(d.cards) ? d.cards : [];
+      var total = cards.length;
+      var mastered = cards.filter(function (c) {
+        return typeof isMastered === 'function' ? isMastered(d.id, c.id) : false;
+      }).length;
+      var pct = total ? Math.round(100 * mastered / total) : 0;
+      var parsed = parseChapterTitle(d.title);
+      var secNum = parsed.sectionNum || (index + 1);
+      var gradClass = 'deck-grad-' + (((secNum - 1) % 12) + 1);
+      return {
+        id: d.id,
+        title: d.title,
+        topic: parsed.topic,
+        sectionNum: secNum,
+        totalCards: total,
+        masteredCount: mastered,
+        pct: pct,
+        gradientClass: gradClass
+      };
+    });
+  }
+
   return Object.freeze({
     defaultOnboarding: defaultOnboarding,
     normalizeOnboarding: normalizeOnboarding,
@@ -5557,6 +6006,8 @@ button.opt.wrong .opt-badge {
     parseChapterTitle: parseChapterTitle,
     getChapterSteps: getChapterSteps,
     selectDailyItems: selectDailyItems,
+    selectChallengeItems: selectChallengeItems,
+    formatPickerDecks: formatPickerDecks,
     selectPlanCards: selectPlanCards,
     filterDevotionals: filterDevotionals,
     getTodayDevotional: getTodayDevotional,
@@ -5574,7 +6025,7 @@ button.opt.wrong .opt-badge {
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
   var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
   var STARTER_DECKS = [], DEVOTIONALS = [];
-  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
+  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
   var browserLocalStorage = null, browserIndexedDB = null;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
   if (!browserLocalStorage) { try { if (typeof localStorage !== 'undefined') browserLocalStorage = localStorage; } catch (e) {} }
@@ -6875,6 +7326,64 @@ button.opt.wrong .opt-badge {
     '</article>';
   };
 
+  views.picker = function () {
+    var mode = V.mode === 'quiz' ? 'quiz' : 'flash';
+    var isQuiz = mode === 'quiz';
+    var modeTitle = isQuiz ? 'Quiz: Choose Lesson' : 'Flashcards: Choose Lesson';
+    var formattedDecks = MobileStudy.formatPickerDecks(S.decks, function (deckId, cardId) {
+      return isMastered(deckId, cardId);
+    });
+
+    var totalCards = formattedDecks.reduce(function (sum, d) { return sum + d.totalCards; }, 0);
+    var totalMastered = formattedDecks.reduce(function (sum, d) { return sum + d.masteredCount; }, 0);
+    var overallPct = totalCards ? Math.round(100 * totalMastered / totalCards) : 0;
+
+    var tilesHtml = formattedDecks.map(function (d) {
+      return '<button class="picker-tile ' + d.gradientClass + '" data-act="setup" data-mode="' + mode + '" data-id="' + d.id + '" aria-label="' + esc(d.topic) + ', ' + d.totalCards + ' cards, ' + d.pct + '% mastered">' +
+        '<div class="picker-tile-top">' +
+          '<span class="picker-tile-badge">' + d.sectionNum + '/12</span>' +
+        '</div>' +
+        '<h3 class="picker-tile-title">' + esc(d.topic) + '</h3>' +
+        '<div class="picker-tile-bottom">' +
+          '<span class="picker-tile-count">' + d.totalCards + ' cards</span>' +
+          '<span class="picker-tile-pct">' + d.pct + '%</span>' +
+        '</div>' +
+        '<div class="picker-tile-bar" aria-hidden="true"><i style="width:' + d.pct + '%"></i></div>' +
+      '</button>';
+    }).join('');
+
+    var allTile = '<button class="picker-tile picker-tile-all hero-gradient-sunrise" data-act="setup" data-mode="' + mode + '" data-id="*" aria-label="All Lessons, ' + totalCards + ' cards, ' + overallPct + '% mastered">' +
+      '<div class="picker-tile-top">' +
+        '<span class="picker-tile-badge">All 12</span>' +
+      '</div>' +
+      '<h3 class="picker-tile-title">All Lessons</h3>' +
+      '<div class="picker-tile-bottom">' +
+        '<span class="picker-tile-count">' + totalCards + ' cards</span>' +
+        '<span class="picker-tile-pct">' + overallPct + '%</span>' +
+      '</div>' +
+      '<div class="picker-tile-bar" aria-hidden="true"><i style="width:' + overallPct + '%"></i></div>' +
+    '</button>';
+
+    return '<div class="picker-view-shell" role="region" aria-label="' + esc(modeTitle) + '">' +
+      '<header class="picker-header">' +
+        '<button class="picker-close-btn" data-act="close-picker" aria-label="Close lesson picker">' +
+          '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button>' +
+        '<div class="picker-title-wrap">' +
+          '<span class="eyebrow">' + (isQuiz ? 'QUIZ MODE' : 'FLASHCARDS MODE') + '</span>' +
+          '<h1>' + esc(modeTitle) + '</h1>' +
+        '</div>' +
+      '</header>' +
+      '<div class="picker-body">' +
+        '<p class="picker-subtitle">Select a chapter or practice all 12 lessons together.</p>' +
+        '<div class="picker-grid">' +
+          allTile +
+          tilesHtml +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  };
+
   function shareDevotional(dev) {
     var text = dev.title + ' — ' + dev.subtitle + '\n\n"' + (dev.scriptureText || dev.scripture) + '"\n\nRead more in the CCI Discipleship App.';
     if (window.CciNative && window.CciNative.isNative) {
@@ -7265,13 +7774,85 @@ button.opt.wrong .opt-badge {
   function progressBar(n, t) { var pct = t ? Math.max(0, Math.min(100, Math.round(100 * n / t))) : 0; return '<div class="pbar study-progress" role="progressbar" aria-label="Study session progress" aria-valuemin="0" aria-valuemax="' + t + '" aria-valuenow="' + n + '" aria-valuetext="' + n + ' of ' + t + '"><i style="width:' + pct + '%"></i></div>'; }
   function formatClock(milliseconds) { var seconds = Math.max(0, Math.ceil(milliseconds / 1000)); return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'); }
 
+  function openRocketMenu() {
+    rocketMenuOpen = true;
+    render(true);
+    var firstPill = app.querySelector('.rocket-pills button');
+    if (firstPill) firstPill.focus();
+  }
+
+  function closeRocketMenu() {
+    if (!rocketMenuOpen) return;
+    rocketMenuOpen = false;
+    render(true);
+    var fab = app.querySelector('#rocket-fab-btn');
+    if (fab) fab.focus();
+  }
+
+  function toggleRocketMenu() {
+    if (rocketMenuOpen) closeRocketMenu();
+    else openRocketMenu();
+  }
+
+  function renderRocketFab() {
+    var pillsHtml = '';
+    var backdropHtml = '';
+    if (rocketMenuOpen) {
+      backdropHtml = '<div class="rocket-backdrop" data-act="close-rocket" aria-hidden="true"></div>';
+      pillsHtml = '<div class="rocket-pills" role="menu" aria-label="Study menu">' +
+        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-flash">' +
+          '<span class="pill-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="14" rx="2"/><path d="M6 3h12a2 2 0 0 1 2 2v12"/></svg>' +
+          '</span>' +
+          '<span class="rocket-pill-text"><strong>Flashcards</strong></span>' +
+        '</button>' +
+        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-quiz">' +
+          '<span class="pill-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+          '</span>' +
+          '<span class="rocket-pill-text"><strong>Quiz</strong></span>' +
+        '</button>' +
+        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-challenge">' +
+          '<span class="pill-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>' +
+          '</span>' +
+          '<span class="rocket-pill-text"><strong>Start a Challenge</strong><small>About 5 minutes</small></span>' +
+        '</button>' +
+        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-exam">' +
+          '<span class="pill-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="10" y1="2" x2="14" y2="2"/></svg>' +
+          '</span>' +
+          '<span class="rocket-pill-text"><strong>Start Exam</strong></span>' +
+        '</button>' +
+      '</div>';
+    }
+
+    var iconSvg = rocketMenuOpen
+      ? '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'
+      : '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4.5c1.45-1.47 4.5-2 4.5-2"/><path d="M15 15v5s3.03-.55 4.5-2c1.47-1.45 2-4.5 2-4.5"/></svg>';
+
+    return backdropHtml +
+      '<div class="rocket-container' + (rocketMenuOpen ? ' is-open' : '') + '">' +
+        pillsHtml +
+        '<button id="rocket-fab-btn" class="rocket-fab-btn' + (rocketMenuOpen ? ' is-open' : '') + '" ' +
+          'data-act="toggle-rocket" ' +
+          'aria-label="' + (rocketMenuOpen ? 'Close study menu' : 'Study menu') + '" ' +
+          'aria-expanded="' + (rocketMenuOpen ? 'true' : 'false') + '" ' +
+          'aria-haspopup="menu">' +
+          iconSvg +
+        '</button>' +
+      '</div>';
+  }
+
   /* ---------- render ---------- */
   function render(keep) {
     var isMainTab = MAIN_TABS.indexOf(V.name) >= 0;
     var view = V.name === 'exam' ? views.quiz : views[V.name];
     if (typeof view !== 'function') view = views.home;
     var tabBarHtml = isMainTab ? renderTabBar(V.name) : '';
-    app.innerHTML = banner() + view() + tabBarHtml;
+    var showRocket = V.name === 'home' || V.name === 'journey' || V.name === 'practice';
+    var rocketHtml = showRocket ? renderRocketFab() : '';
+    app.innerHTML = banner() + view() + tabBarHtml + rocketHtml;
     if (!keep) window.scrollTo(0, 0);
     if (V.name === 'flash') {
       var f = app.querySelector('.flip');
@@ -7284,6 +7865,7 @@ button.opt.wrong .opt-badge {
 
   function go(v, replace) {
     if (V.name === 'exam' && v.name !== 'exam') stopExamTimer();
+    rocketMenuOpen = false;
     var prev = V;
     V = v;
     try {
@@ -7305,6 +7887,7 @@ button.opt.wrong .opt-badge {
         if (isStudySession(V.name)) {
           pauseStudySession();
         }
+        rocketMenuOpen = false;
         V = { name: e.state.name, id: e.state.id };
         render();
       }
@@ -7313,7 +7896,8 @@ button.opt.wrong .opt-badge {
 
   /* ---------- sessions ---------- */
   function setup(mode, id) {
-    var ids = id === '*' ? Array.from(SEL) : [id];
+    var ids = id === '*' ? (SEL.size ? Array.from(SEL) : S.decks.map(function (d) { return d.id; })) : [id];
+    if (!ids.length) ids = S.decks.map(function (d) { return d.id; });
     V.setup = { mode: mode, ids: ids };
     var q = mode === 'quiz';
     openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setup-title"><h2 id="setup-title">' + (q ? 'Start quiz' : 'Start flashcards') + '</h2>' +
@@ -7360,6 +7944,20 @@ button.opt.wrong .opt-badge {
     var cards = StudyLogic.weakSpots(allCardItems(), 10);
     if (!cards.length) { toast('Answer some questions first to build weak-spot stats.'); return; }
     begin('quiz', shuffle(cards), { unk: false, limit: 0, shuf: true, saveBest: false }, deckIdsFor(cards));
+  }
+  function startChallenge() {
+    var all = allCardItems();
+    var due = StudyLogic.dueItems(all, Date.now());
+    var weak = StudyLogic.weakSpots(all, 10);
+    var cards = MobileStudy.selectChallengeItems(
+      due,
+      weak,
+      all,
+      function (item) { return isMastered(item.deckId, item.card.id); },
+      10
+    );
+    if (!cards.length) { toast('No challenge questions available.'); return; }
+    begin('quiz', shuffle(cards), { unk: false, limit: 10, shuf: true, challenge: true, saveBest: false }, deckIdsFor(cards));
   }
   function begin(mode, cards, o, ids) {
     if (mode === 'quiz' || mode === 'exam') {
@@ -7647,7 +8245,14 @@ button.opt.wrong .opt-badge {
       case 'close': closeModal(); break;
       case 'askok': var fn = pendingAsk; closeModal(); if (fn) fn(); break;
       case 'theme': S.settings.theme = { auto: 'light', light: 'dark', dark: 'auto' }[S.settings.theme]; applyTheme(); save(); render(true); break;
-      case 'setup': if (t.dataset.id === '*' && !SEL.size) return; setup(t.dataset.mode, t.dataset.id); break;
+      case 'toggle-rocket': toggleRocketMenu(); break;
+      case 'close-rocket': closeRocketMenu(); break;
+      case 'rocket-flash': closeRocketMenu(); go({ name: 'picker', mode: 'flash', from: V.name }); break;
+      case 'rocket-quiz': closeRocketMenu(); go({ name: 'picker', mode: 'quiz', from: V.name }); break;
+      case 'rocket-challenge': closeRocketMenu(); startChallenge(); break;
+      case 'rocket-exam': closeRocketMenu(); setupExam(); break;
+      case 'close-picker': go({ name: V.from || 'home' }); break;
+      case 'setup': setup(t.dataset.mode, t.dataset.id); break;
       case 'due': startDue(); break;
       case 'daily-study': startDailyStudy(); break;
       case 'resume-study': resumeStudySession(); break;
@@ -7780,6 +8385,32 @@ button.opt.wrong .opt-badge {
     }
   });
   document.addEventListener('keydown', function (e) {
+    if (rocketMenuOpen) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeRocketMenu();
+        return;
+      }
+      if (e.key === 'Tab') {
+        var focusables = Array.from(app.querySelectorAll('.rocket-pills button, #rocket-fab-btn'));
+        if (focusables.length) {
+          var firstEl = focusables[0], lastEl = focusables[focusables.length - 1];
+          if (e.shiftKey && document.activeElement === firstEl) {
+            e.preventDefault();
+            lastEl.focus();
+          } else if (!e.shiftKey && document.activeElement === lastEl) {
+            e.preventDefault();
+            firstEl.focus();
+          }
+        }
+        return;
+      }
+    }
+    if (V.name === 'picker' && !modal.innerHTML && e.key === 'Escape') {
+      e.preventDefault();
+      go({ name: V.from || 'home' });
+      return;
+    }
     if (modal.innerHTML && e.key === 'Escape') { e.preventDefault(); return closeModal(); }
     if (modal.innerHTML && e.key === 'Tab') {
       var focusable = Array.from(modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
@@ -7811,6 +8442,8 @@ button.opt.wrong .opt-badge {
     if (!window.CciNative || !window.CciNative.isNative) return;
     window.CciNative.onBackButton(function () {
       if (modal.innerHTML) { closeModal(); return; }
+      if (rocketMenuOpen) { closeRocketMenu(); return; }
+      if (V.name === 'picker') { go({ name: V.from || 'home' }); return; }
       if (isStudySession(V.name)) { pauseStudySession(); return; }
       if (V.name === 'devotional') { go({ name: 'home' }); return; }
       if (V.name !== 'home') { go({ name: 'home' }); return; }
