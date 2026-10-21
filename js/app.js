@@ -362,11 +362,18 @@
   function openModal(html) {
     returnFocus = document.activeElement;
     modal.innerHTML = html;
+    var rocketEl = document.querySelector('.rocket-container');
+    if (rocketEl) rocketEl.style.display = 'none';
     var first = modal.querySelector('button, input, select, textarea');
     if (first) first.focus();
   }
   function ask(msg, label, fn) { pendingAsk = fn; openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><h2 id="dialog-title" class="dialog-title">Please confirm</h2><p>' + esc(msg) + '</p><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn danger" data-act="askok">' + esc(label) + '</button></div></div>'); }
-  function closeModal() { modal.innerHTML = ''; pendingAsk = null; if (returnFocus && document.contains(returnFocus)) returnFocus.focus(); returnFocus = null; }
+  function closeModal() {
+    modal.innerHTML = ''; pendingAsk = null;
+    var rocketEl = document.querySelector('.rocket-container');
+    if (rocketEl) rocketEl.style.display = '';
+    if (returnFocus && document.contains(returnFocus)) returnFocus.focus(); returnFocus = null;
+  }
   function download(filename, text) {
     var viaBlob = function () {
       try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); }

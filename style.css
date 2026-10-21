@@ -1047,7 +1047,7 @@ a:hover { color: var(--link-hover); }
   position: fixed;
   inset: 0;
   background: rgba(18, 16, 58, 0.55);
-  z-index: 20;
+  z-index: 200;
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
 }
@@ -1056,13 +1056,13 @@ a:hover { color: var(--link-hover); }
   position: fixed;
   left: var(--space-md);
   right: var(--space-md);
-  bottom: calc(var(--space-md) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   max-width: 480px;
   margin: 0 auto;
   background: var(--surface);
   border-radius: var(--radius-card);
   padding: var(--space-xl);
-  z-index: 21;
+  z-index: 201;
   box-shadow: var(--shadow-lg);
 }
 
