@@ -1639,6 +1639,7 @@ a:hover { color: var(--link-hover); }
 .session-status {
   justify-self: end;
   min-width: 56px;
+  min-height: 48px;
   padding: 8px 11px;
   border: 1px solid var(--line);
   border-radius: var(--radius-full);
@@ -2663,6 +2664,7 @@ a:hover { color: var(--link-hover); }
   border-radius: var(--radius-md);
   cursor: pointer;
   min-width: 56px;
+  min-height: 48px;
   transition: color var(--duration-fast) ease, transform var(--duration-fast) ease;
   -webkit-tap-highlight-color: transparent;
 }
@@ -3148,8 +3150,10 @@ a:hover { color: var(--link-hover); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
   border-radius: var(--radius-full);
   background: var(--surface);
   border: 1px solid var(--line);
@@ -3683,8 +3687,8 @@ button.opt.wrong .opt-badge {
   padding: var(--space-xs) var(--space-sm);
   cursor: pointer;
   border-radius: var(--radius-pill);
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 48px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4163,4 +4167,20 @@ button.opt.wrong .opt-badge {
   font-size: 0.75rem;
   color: var(--text-sub);
   text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coaching-bottom-sheet,
+  .commit-hold-btn,
+  .ring-fill,
+  .onboarding-progress-fill,
+  .streak-hero-card,
+  .plan-card,
+  .chapter-item,
+  .onboarding-choice-card,
+  .completion-hero-card {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -31,7 +31,7 @@ npx cap open android
 npx cap open ios
 ```
 
-Android builds require Android Studio and its Android SDK. iOS builds and simulator testing require macOS and Xcode. Native exports use the platform share sheet, while study data and bundled lesson decks remain on the device. The mobile app does not require an account or network connection for core study features. Store signing and submission are separate release steps.
+Android builds require Android Studio and its Android SDK (or JDK 17+ and command-line build tools). iOS builds and simulator testing require macOS and Xcode. Native exports use the platform share sheet, while study data and bundled lesson decks remain on the device. The mobile app does not require an account or network connection for core study features. In environments without local native toolchains (e.g. standard developer workstations without Android Studio or macOS), `npm run sync` synchronizes the verified web bundle and plugins into `android/` and `ios/`, and the GitHub Actions CI workflow compiles the native artifacts. Store signing and submission are separate release steps.
 
 ### Cloud builds
 
@@ -57,15 +57,20 @@ node --test
 
 ## Study tools
 
+- **Mobile Coaching Navigation:** persistent 5-tab navigation shell (`Home`, `Journey`, `Practice`, `Progress`, `Settings`) optimized for one-handed mobile and touch use.
+- **Today’s Plan:** personalized coaching plan on Home with minute estimates, prioritizing cards due for spaced repetition, weak spots, and next lessons based on the learner's daily study commitment.
+- **Chapter Journey & Timeline:** visual progress across all 12 curriculum chapters, each with an interactive 4-step study timeline (`Flashcards` → `Quiz` → `Weak spots` → `Chapter exam`).
+- **One-Question Study Flow:** single-question focus with large tap targets, thin progress tracking, first-use tooltip, coaching bottom sheet feedback with tappable Bible References, and encouraging completion summaries.
+- **First-Run Onboarding & Commitment:** skippable 4-question routine builder with a personalized study plan summary and interactive "tap-and-hold to commit" screen.
+- **Gentle Streaks:** optional daily streak tracker with a supportive "Daily Grace" celebration screen after the first session of the day; no guilt messaging and no required reminders.
 - **Flashcards:** reveal answers, mark cards as known or still learning, and move with the keyboard or touch gestures.
 - **Quizzes:** choose a deck or a selection of decks, set a question limit, skip mastered cards, and retake or review missed questions. Choices are shuffled on each attempt.
 - **Spaced repetition:** study due cards from all decks with Leitner intervals of 1, 3, 7, and 14 days.
-- **Today’s Study:** start a short, optional session from due cards, or cards not yet mastered when nothing is due; paused sessions can be resumed later.
 - **Weak spots:** quiz the questions with the highest recorded miss rates across decks.
 - **Exam mode:** take a timed, mixed-deck exam and review answers after submission or time expiry.
 - **Progress:** see deck-level mastery, saved quiz bests, and collection totals.
 - **Deck search and editing:** find a deck quickly; rename a deck and add, edit, delete, search, or export its cards.
-- **Themes:** cycle through automatic, light, and dark appearance.
+- **Themes:** cycle through automatic, light, and dark appearance (deep indigo `#12103A`).
 
 ## Import and backup
 
