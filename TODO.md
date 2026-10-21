@@ -7,7 +7,7 @@
 
 ## Guided daily study
 - [x] Provide a guided “Today’s Study” entry point that prioritizes cards already due for spaced repetition and, when no cards are due, offers a short study session using existing cards the learner has not mastered.
-- [x] Keep this routine optional and modest; do not add generated devotional or doctrinal teaching, mandatory streaks, social features, or required reminders.
+- [x] Keep this routine optional and modest; mandatory streaks, social features, or required reminders remain disallowed. Per the project owner's decision (Prompt 2C), devotional articles are allowed when written strictly from the existing lessons and verified Bible References, gated by `status: "draft" | "reviewed"` with draft filtering and requiring leader review before release.
 - [x] Keep direct access to all existing study modes and tools, and make it possible to pause and return without losing saved progress.
 
 ## Offline use, local data, and native behavior
@@ -33,3 +33,4 @@
 - [x] **Prompt 4 — One-Question-Per-Screen Study Flow:** Large question cards (`--text-xl`), big touch-target answer options (`A`–`D`), thin `6px` progress bar, safe exit `X` button with confirmation, coaching bottom sheet feedback with tappable Bible References, first-use tooltip, and "Well done!" encouraging completion screen.
 - [x] **Prompt 5 — Onboarding & Optional Streaks:** First-run skippable onboarding (Splash → Welcome → 4 goal/time/topic questions → Study plan summary → Tap-and-hold to commit). Daily plan length adapted to user's time commitment. Gentle streak celebration screen after first session of the day with no guilt messaging and optional toggle in Settings. `DATA_VERSION` bumped to 9 with migration and legacy backup compatibility.
 - [x] **Prompt 6 — QA, Accessibility & Native Sync:** WCAG AA contrast audit across light/dark modes and all 12 deck gradients, 48dp minimum touch targets, keyboard navigation and visible focus rings, ARIA roles and labels, 200% text scaling resilience, prefers-reduced-motion media query coverage, offline service worker cache `v15`, and Capacitor native sync for iOS & Android. All 57 tests passing.
+- [x] **Prompt 2C — Hide Section Labels & Devotional Feed:** Remove "Section N" labels in favor of clean topic titles, introduce bundled devotional articles (`content/devotionals.json`) gated by leader review, swipeable daily devotional home feed card, article reader view with expandable body, reflection, today's step integration with Plan, and `DATA_VERSION` 10 migration.

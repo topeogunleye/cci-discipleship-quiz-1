@@ -1,9 +1,9 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 9;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 10;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
-  var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false, showStreak: true }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, seeded: false, dataVersion: 0, pausedSession: null };
-  var STARTER_DECKS = [];
+  var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
+  var STARTER_DECKS = [], DEVOTIONALS = [];
   var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
   var browserLocalStorage = null, browserIndexedDB = null;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
@@ -68,6 +68,27 @@
     }).then(function (texts) { return texts.join('\n\n'); }).catch(function () { return fallback; });
   }
 
+  function inlineDevotionalsData() {
+    var el = document.getElementById('devotionals-fallback');
+    if (!el) return [];
+    try {
+      var data = JSON.parse(el.textContent || '[]');
+      return Array.isArray(data) ? data : [];
+    } catch (e) { return []; }
+  }
+  function loadDevotionals() {
+    var el = document.getElementById('devotionals-fallback');
+    if (!el) return Promise.resolve([]);
+    var fallback = inlineDevotionalsData();
+    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(fallback);
+    return window.fetch('content/devotionals.json').then(function (response) {
+      if (!response.ok) throw new Error('Could not load devotionals');
+      return response.json();
+    }).then(function (data) {
+      return Array.isArray(data) && data.length ? data : fallback;
+    }).catch(function () { return fallback; });
+  }
+
   /* ---------- storage ---------- */
   function loadSavedState(raw) {
     try {
@@ -93,13 +114,20 @@
         var best = old.best && Number.isFinite(+old.best.pct) && +old.best.pct >= 0 && +old.best.pct <= 100 ? old.best : null;
         S.progress[d.id] = { best: best, cards: cards };
       });
-      S.settings = Object.assign({ theme: 'auto', shuffle: false, showStreak: true }, o.settings && typeof o.settings === 'object' ? o.settings : {});
+      S.settings = Object.assign({ theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false }, o.settings && typeof o.settings === 'object' ? o.settings : {});
       if (['auto', 'light', 'dark'].indexOf(S.settings.theme) < 0) S.settings.theme = 'auto';
       S.settings.shuffle = !!S.settings.shuffle;
       S.settings.showStreak = S.settings.showStreak !== false;
+      S.settings.showDraftDevotionals = !!S.settings.showDraftDevotionals;
       var hasPriorData = !!o.seeded || (Array.isArray(o.decks) && o.decks.length > 0);
       S.onboarding = MobileStudy.normalizeOnboarding(o.onboarding, hasPriorData);
       S.streak = MobileStudy.normalizeStreak(o.streak);
+      S.devotions = (o.devotions && typeof o.devotions === 'object' && !Array.isArray(o.devotions)) ? {
+        read: (o.devotions.read && typeof o.devotions.read === 'object' && !Array.isArray(o.devotions.read)) ? o.devotions.read : {},
+        saved: (o.devotions.saved && typeof o.devotions.saved === 'object' && !Array.isArray(o.devotions.saved)) ? o.devotions.saved : {},
+        carouselHiddenOn: typeof o.devotions.carouselHiddenOn === 'string' ? o.devotions.carouselHiddenOn : null
+      } : { read: {}, saved: {}, carouselHiddenOn: null };
+      S.completedToday = (o.completedToday && typeof o.completedToday === 'object' && !Array.isArray(o.completedToday)) ? o.completedToday : {};
       S.seeded = !!o.seeded;
       S.dataVersion = Number.isInteger(o.dataVersion) && o.dataVersion >= 0 ? o.dataVersion : 0;
       S.backupReminder = o.backupReminder;
@@ -303,6 +331,17 @@
       var hasActivity = (S.decks && S.decks.length > 0) || Object.keys(S.progress || {}).length > 0;
       S.onboarding = MobileStudy.normalizeOnboarding(S.onboarding, hasActivity);
       S.streak = MobileStudy.normalizeStreak(S.streak);
+    } },
+    { version: 10, run: function () {
+      if (!S.devotions || typeof S.devotions !== 'object' || Array.isArray(S.devotions)) {
+        S.devotions = { read: {}, saved: {}, carouselHiddenOn: null };
+      } else {
+        if (!S.devotions.read || typeof S.devotions.read !== 'object') S.devotions.read = {};
+        if (!S.devotions.saved || typeof S.devotions.saved !== 'object') S.devotions.saved = {};
+        if (typeof S.devotions.carouselHiddenOn !== 'string') S.devotions.carouselHiddenOn = null;
+      }
+      if (!S.completedToday || typeof S.completedToday !== 'object') S.completedToday = {};
+      if (S.settings.showDraftDevotionals === undefined) S.settings.showDraftDevotionals = false;
     } }
   ];
   function applyDataMigrations() {
@@ -348,7 +387,7 @@
   }
   function exportDeck(d) { download(slug(d.title) + '.txt', P.serializeDeck(d)); }
   function exportBackup() {
-    var payload = { format: 'cci-discipleship-quiz-backup', version: 1, exportedAt: new Date().toISOString(), data: { decks: S.decks, progress: S.progress, settings: S.settings, seeded: S.seeded, dataVersion: S.dataVersion, backupReminder: S.backupReminder, onboarding: S.onboarding, streak: S.streak } };
+    var payload = { format: 'cci-discipleship-quiz-backup', version: 1, exportedAt: new Date().toISOString(), data: { decks: S.decks, progress: S.progress, settings: S.settings, seeded: S.seeded, dataVersion: S.dataVersion, backupReminder: S.backupReminder, onboarding: S.onboarding, streak: S.streak, devotions: S.devotions } };
     download('cci-study-backup-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(payload, null, 2));
   }
   function resetBackupReminder() {
@@ -382,9 +421,15 @@
       var pct = old.best && Number(old.best.pct);
       progress[d.id] = { cards: cards, best: Number.isFinite(pct) && pct >= 0 && pct <= 100 ? { pct: pct } : null };
     });
-    var settings = Object.assign({ theme: 'auto', shuffle: false }, raw.data.settings && typeof raw.data.settings === 'object' ? raw.data.settings : {});
+    var settings = Object.assign({ theme: 'auto', shuffle: false, showDraftDevotionals: false }, raw.data.settings && typeof raw.data.settings === 'object' ? raw.data.settings : {});
     if (['auto', 'light', 'dark'].indexOf(settings.theme) < 0) settings.theme = 'auto'; settings.shuffle = !!settings.shuffle;
-    return { decks: decks, progress: progress, settings: settings, seeded: !!raw.data.seeded, dataVersion: dataVersion, backupReminder: StudyLogic.normalizeBackupReminder(raw.data.backupReminder), onboarding: MobileStudy.normalizeOnboarding(raw.data.onboarding, true), streak: MobileStudy.normalizeStreak(raw.data.streak) };
+    settings.showDraftDevotionals = !!settings.showDraftDevotionals;
+    var devotions = (raw.data.devotions && typeof raw.data.devotions === 'object' && !Array.isArray(raw.data.devotions)) ? {
+      read: (raw.data.devotions.read && typeof raw.data.devotions.read === 'object') ? raw.data.devotions.read : {},
+      saved: (raw.data.devotions.saved && typeof raw.data.devotions.saved === 'object') ? raw.data.devotions.saved : {},
+      carouselHiddenOn: typeof raw.data.devotions.carouselHiddenOn === 'string' ? raw.data.devotions.carouselHiddenOn : null
+    } : { read: {}, saved: {}, carouselHiddenOn: null };
+    return { decks: decks, progress: progress, settings: settings, seeded: !!raw.data.seeded, dataVersion: dataVersion, backupReminder: StudyLogic.normalizeBackupReminder(raw.data.backupReminder), onboarding: MobileStudy.normalizeOnboarding(raw.data.onboarding, true), streak: MobileStudy.normalizeStreak(raw.data.streak), devotions: devotions };
   }
 
   /* ---------- views ---------- */
@@ -561,6 +606,50 @@
       heroCard = '<div class="empty"><h2>Welcome to CCI Study Decks</h2><p>Begin your discipleship journey. Add a deck from a text file or paste its content to start studying.</p><button class="btn primary sm" data-act="import" style="margin-top:14px">Add your first deck</button></div>';
     }
 
+    // Daily Devotionals swipeable row (between hero and plan)
+    var activeDevotionals = MobileStudy.filterDevotionals(DEVOTIONALS, S.settings.showDraftDevotionals);
+    var todayDevotion = MobileStudy.getTodayDevotional(activeDevotionals, now);
+    var isDevotionHiddenToday = !!(S.devotions && S.devotions.carouselHiddenOn === todayString(now));
+
+    var devotionSection = '';
+    if (activeDevotionals.length > 0 && !isDevotionHiddenToday) {
+      var todayIdx = todayDevotion ? activeDevotionals.indexOf(todayDevotion) : 0;
+      var orderedDevotionals = todayIdx > 0
+        ? activeDevotionals.slice(todayIdx).concat(activeDevotionals.slice(0, todayIdx))
+        : activeDevotionals;
+
+      devotionSection = '<section class="devotion-feed-section" aria-label="Daily Devotionals">' +
+        '<div class="section-head">' +
+          '<div>' +
+            '<h2 class="section-title">Daily Devotionals</h2>' +
+            '<span class="section-sub">Spiritual food rooted in Scripture</span>' +
+          '</div>' +
+          '<button class="devotion-dismiss-btn" data-act="dismiss-devotions" aria-label="Hide devotionals until tomorrow" title="Hide until tomorrow">✕</button>' +
+        '</div>' +
+        '<div class="devotion-carousel" role="region" aria-label="Devotional articles carousel">' +
+          orderedDevotionals.map(function (dev, i) {
+            var isToday = dev.id === (todayDevotion && todayDevotion.id);
+            var isRead = !!(S.devotions && S.devotions.read && S.devotions.read[dev.id]);
+            var gradClass = dev.gradient || 'deck-grad-1';
+            return '<article class="devotion-card ' + gradClass + '" role="group" aria-label="' + (i + 1) + ' of ' + orderedDevotionals.length + ': ' + esc(dev.title) + '">' +
+              '<div class="devotion-card-top">' +
+                '<span class="devotion-badge' + (isToday ? ' is-today' : '') + '">' + (isToday ? "Today's Devotion" : esc(dev.scripture)) + '</span>' +
+                (isRead ? '<span class="devotion-read-badge" aria-label="Read">✓ Read</span>' : '<span class="devotion-time">' + dev.readMinutes + ' min</span>') +
+              '</div>' +
+              '<button class="devotion-card-hit" data-act="open-devotional" data-id="' + dev.id + '" aria-label="Read ' + esc(dev.title) + '">' +
+                '<h3 class="devotion-card-title">' + esc(dev.title) + '</h3>' +
+                '<p class="devotion-card-sub">' + esc(dev.subtitle) + '</p>' +
+              '</button>' +
+              '<div class="devotion-card-footer">' +
+                '<span class="devotion-scripture-pill">' + esc(dev.scripture) + '</span>' +
+                '<button class="devotion-card-action-btn" data-act="open-devotional" data-id="' + dev.id + '">Read →</button>' +
+              '</div>' +
+            '</article>';
+          }).join('') +
+        '</div>' +
+      '</section>';
+    }
+
     // Your Plan for Today: short cards with icon, one-line title, minute estimate and state
     var planCards = MobileStudy.selectPlanCards({
       dueItems: StudyLogic.dueItems(all, now),
@@ -570,7 +659,9 @@
       decks: S.decks,
       completedToday: S.completedToday || {},
       dailyMinutes: (S.onboarding && S.onboarding.dailyMinutes) || 10,
-      startingTopic: (S.onboarding && S.onboarding.startingTopic) || 'soteriology'
+      startingTopic: (S.onboarding && S.onboarding.startingTopic) || 'soteriology',
+      todayDevotion: todayDevotion,
+      isDevotionRead: function (devId) { return !!(S.devotions && S.devotions.read && S.devotions.read[devId]); }
     });
 
     var planSection = '<section class="plan-section" aria-labelledby="plan-section-title">' +
@@ -580,7 +671,7 @@
       '</div>' +
       '<div class="plan-card-list">' +
         planCards.map(function (c) {
-          return '<button class="plan-card state-' + c.state + '" data-act="' + c.action + '"' + (c.mode ? ' data-mode="' + c.mode + '"' : '') + (c.deckId ? ' data-id="' + c.deckId + '"' : '') + ' aria-label="' + esc(c.oneLine) + '">' +
+          return '<button class="plan-card state-' + c.state + '" data-act="' + c.action + '"' + (c.mode ? ' data-mode="' + c.mode + '"' : '') + (c.deckId ? ' data-id="' + c.deckId + '"' : '') + (c.devotionalId ? ' data-id="' + c.devotionalId + '"' : '') + ' aria-label="' + esc(c.oneLine) + '">' +
             '<div class="plan-card-icon" aria-hidden="true">' + planIconSvg(c.icon) + '</div>' +
             '<div class="plan-card-body">' +
               '<div class="plan-card-title">' + esc(c.title) + '</div>' +
@@ -604,7 +695,7 @@
       '<button class="btn sm ghost" data-act="nav-tab" data-tab="progress">View Details →</button>' +
     '</section>' : '';
 
-    return topBar + backupReminder + heroCard + (S.decks.length ? planSection + milestoneCard : '');
+    return topBar + backupReminder + heroCard + devotionSection + (S.decks.length ? planSection + milestoneCard : '');
   };
 
   
@@ -651,21 +742,25 @@
       var parsed = MobileStudy.parseChapterTitle(d.title);
       var secNum = parsed.sectionNum || (index + 1);
       var gradClass = 'deck-grad-' + (((secNum - 1) % 12) + 1);
-      var hidden = homeFilter && d.title.toLowerCase().indexOf(homeFilter.toLowerCase()) < 0;
+      var hidden = homeFilter && (
+        parsed.topic.toLowerCase().indexOf(homeFilter.toLowerCase()) < 0 &&
+        d.title.toLowerCase().indexOf(homeFilter.toLowerCase()) < 0 &&
+        ('section ' + secNum).indexOf(homeFilter.toLowerCase()) < 0
+      );
 
       var bestBadge = p.best ? '<span class="chapter-best-badge">Best ' + p.best.pct + '%</span>' : '';
 
-      return '<article class="chapter-card ' + gradClass + '" data-deck-name="' + esc(d.title.toLowerCase()) + '"' + (hidden ? ' hidden' : '') + '>' +
+      return '<article class="chapter-card ' + gradClass + '" data-deck-name="' + esc(parsed.topic.toLowerCase()) + '" data-id="' + d.id + '"' + (hidden ? ' hidden' : '') + '>' +
         '<div class="chapter-card-top">' +
           '<div class="chapter-badges">' +
-            '<span class="chapter-sec-pill">' + esc(parsed.sectionLabel) + '</span>' +
+            '<span class="chapter-sec-pill">' + secNum + '/12</span>' +
             bestBadge +
           '</div>' +
           '<div class="chapter-card-actions">' +
-            '<button class="chapter-icon-btn chapter-info-btn" data-act="chapter-info" data-id="' + d.id + '" aria-label="Deck info for ' + esc(d.title) + '" title="View deck details">' +
+            '<button class="chapter-icon-btn chapter-info-btn" data-act="chapter-info" data-id="' + d.id + '" aria-label="Deck info for ' + esc(parsed.topic) + '" title="View deck details">' +
               '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' +
             '</button>' +
-            '<button class="chapter-icon-btn" data-act="chapter-menu" data-id="' + d.id + '" aria-label="Options for ' + esc(d.title) + '">' +
+            '<button class="chapter-icon-btn" data-act="chapter-menu" data-id="' + d.id + '" aria-label="Options for ' + esc(parsed.topic) + '">' +
               '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>' +
             '</button>' +
           '</div>' +
@@ -678,7 +773,7 @@
               '<span class="chapter-count">' + mastered + ' / ' + total + ' mastered</span>' +
               '<span class="chapter-pct">' + pct + '%</span>' +
             '</div>' +
-            '<div class="deck-progress chapter-progress-bar" role="progressbar" aria-label="' + esc(d.title) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
+            '<div class="deck-progress chapter-progress-bar" role="progressbar" aria-label="' + esc(parsed.topic) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
           '</div>' +
         '</button>' +
         chapterSvgIllustration(secNum) +
@@ -760,10 +855,10 @@
         '</div>' +
       '</div>' +
       '<div class="chapter-view-hero">' +
-        '<span class="chapter-sec-pill">' + esc(parsed.sectionLabel) + '</span>' +
+        '<span class="chapter-sec-pill">' + secNum + '/12</span>' +
         '<h1 class="chapter-view-title">' + esc(parsed.topic) + '</h1>' +
         '<p class="chapter-view-sub">' + plural(total, 'question') + ' · ' + mastered + ' mastered (' + pct + '%)</p>' +
-        '<div class="deck-progress chapter-progress-bar" role="progressbar" aria-label="' + esc(d.title) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="deck-progress chapter-progress-bar" role="progressbar" aria-label="' + esc(parsed.topic) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
       '</div>' +
       chapterSvgIllustration(secNum) +
     '</header>' +
@@ -838,12 +933,13 @@
       var mastered = d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length;
       var pct = d.cards.length ? Math.round(100 * mastered / d.cards.length) : 0;
       var bestText = p.best ? 'Best ' + p.best.pct + '%' : 'Not taken';
+      var parsed = MobileStudy.parseChapterTitle(d.title);
       return '<li class="progress-deck-item">' +
         '<div class="progress-deck-head">' +
-          '<strong>' + esc(d.title) + '</strong>' +
+          '<strong>' + esc(parsed.topic) + '</strong>' +
           '<span class="meta">' + pct + '% · ' + bestText + '</span>' +
         '</div>' +
-        '<div class="deck-progress" role="progressbar" aria-label="' + esc(d.title) + '" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="deck-progress" role="progressbar" aria-label="' + esc(parsed.topic) + '" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
       '</li>';
     }).join('');
 
@@ -899,6 +995,13 @@
       '</div>' +
     '</div>' +
     '<div class="settings-group">' +
+      '<h2 class="settings-group-title">Content</h2>' +
+      '<div class="settings-row">' +
+        '<div><strong>Show Draft Devotionals</strong><p class="meta">Preview devotional articles before leader review</p></div>' +
+        '<button class="btn sm' + (S.settings.showDraftDevotionals ? ' primary' : '') + '" data-act="toggle-draft-devotionals">' + (S.settings.showDraftDevotionals ? 'Enabled' : 'Off') + '</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="settings-group">' +
       '<h2 class="settings-group-title">Data &amp; Backup</h2>' +
       '<div class="settings-row">' +
         '<div><strong>Export JSON Backup</strong><p class="meta">Save all decks, history, and settings</p></div>' +
@@ -941,7 +1044,7 @@
           '<span class="inner">' +
             '<span class="face front" aria-hidden="' + V.flipped + '">' +
               '<span class="card-face-top">' +
-                '<span class="tag">' + esc(d ? d.title : '') + '</span>' +
+                '<span class="tag">' + esc(d ? (MobileStudy.parseChapterTitle(d.title).topic || d.title) : '') + '</span>' +
                 '<span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span>' +
               '</span>' +
               '<span class="q">' + esc(c.question) + '</span>' +
@@ -1147,6 +1250,77 @@
       '</div>' +
     '</section>';
   };
+
+  views.devotional = function () {
+    var dev = DEVOTIONALS.filter(function (d) { return d.id === V.id; })[0];
+    if (!dev) return '<div class="empty"><h2>Devotional not found</h2><button class="btn primary sm" data-act="close-devotional">Back to Home</button></div>';
+    var isRead = !!(S.devotions && S.devotions.read && S.devotions.read[dev.id]);
+    var isSaved = !!(S.devotions && S.devotions.saved && S.devotions.saved[dev.id]);
+    var expanded = !!V.expanded;
+    var gradClass = dev.gradient || 'deck-grad-1';
+    var bodyParagraphs = dev.body || [];
+    var visibleParagraphs = expanded ? bodyParagraphs : bodyParagraphs.slice(0, 1);
+
+    var shareIcon = '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
+    var bookmarkIcon = isSaved
+      ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>'
+      : '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+
+    return '<article class="devotional-view-shell" aria-labelledby="devotional-title">' +
+      '<header class="devotional-header ' + gradClass + '">' +
+        '<div class="devotional-nav-row">' +
+          '<button class="devotional-back-btn" data-act="close-devotional" aria-label="Go back to Home">‹ Home</button>' +
+          '<div class="devotional-actions">' +
+            '<button class="devotional-icon-btn' + (isSaved ? ' active' : '') + '" data-act="devotion-toggle-save" data-id="' + dev.id + '" aria-label="' + (isSaved ? 'Remove from saved' : 'Save article') + '" title="Save">' + bookmarkIcon + '</button>' +
+            '<button class="devotional-icon-btn" data-act="devotion-share" data-id="' + dev.id + '" aria-label="Share devotional" title="Share">' + shareIcon + '</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="devotional-hero-content">' +
+          '<span class="devotional-pill">' + esc(dev.scripture) + ' · ' + dev.readMinutes + ' min read</span>' +
+          '<h1 id="devotional-title" class="devotional-title">' + esc(dev.title) + '</h1>' +
+          '<p class="devotional-sub">' + esc(dev.subtitle) + '</p>' +
+        '</div>' +
+        chapterSvgIllustration(1) +
+      '</header>' +
+      '<div class="devotional-content-body">' +
+        (dev.scriptureText ? '<blockquote class="devotional-scripture-quote"><strong>' + esc(dev.scripture) + '</strong><p>' + esc(dev.scriptureText) + '</p></blockquote>' : '') +
+        '<div class="devotional-paragraphs">' +
+          visibleParagraphs.map(function (p) { return '<p class="devotional-p">' + esc(p) + '</p>'; }).join('') +
+        '</div>' +
+        (bodyParagraphs.length > 1 ? '<button class="devotional-more-btn" data-act="toggle-devotion-expand" aria-expanded="' + (expanded ? 'true' : 'false') + '">' + (expanded ? 'Show less ↑' : 'Read more ↓') + '</button>' : '') +
+        '<div class="devotional-callout reflection-box">' +
+          '<div class="callout-head"><span class="callout-icon" aria-hidden="true">💭</span><h2 class="callout-title">Reflection</h2></div>' +
+          '<p class="callout-text">' + esc(dev.reflection) + '</p>' +
+        '</div>' +
+        '<div class="devotional-callout step-box">' +
+          '<div class="callout-head"><span class="callout-icon" aria-hidden="true">👣</span><h2 class="callout-title">Today’s Step</h2></div>' +
+          '<p class="callout-text">' + esc(dev.step) + '</p>' +
+        '</div>' +
+        '<div class="devotional-footer-bar">' +
+          (isRead
+            ? '<button class="btn primary full btn-continue" data-act="devotion-study-lesson" data-id="' + dev.lessonId + '">Study this lesson →</button>'
+            : '<button class="btn primary full btn-continue" data-act="devotion-mark-read" data-id="' + dev.id + '">Mark as read ✓</button>') +
+        '</div>' +
+      '</div>' +
+    '</article>';
+  };
+
+  function shareDevotional(dev) {
+    var text = dev.title + ' — ' + dev.subtitle + '\n\n"' + (dev.scriptureText || dev.scripture) + '"\n\nRead more in the CCI Discipleship App.';
+    if (window.CciNative && window.CciNative.isNative) {
+      window.CciNative.shareFile(slug(dev.title) + '.txt', text).catch(function () { toast('Could not share.'); });
+      return;
+    }
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({ title: dev.title, text: text }).catch(function () {});
+      return;
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast('Copied article summary to clipboard.'); }).catch(function () { toast('Sharing not available.'); });
+      return;
+    }
+    toast('Sharing not available on this device.');
+  }
 
   views.streak = function () {
     var now = Date.now();
@@ -1483,7 +1657,7 @@
     } else if (IMP.parsed) {
       var ok = IMP.decks.filter(function (d) { return d.questions.length; }), total = ok.reduce(function (n, d) { return n + d.questions.length; }, 0);
       out = '<section class="preview"><h2>' + (ok.length ? plural(ok.length, 'deck') + ', ' + plural(total, 'question') + ' found' : 'No readable questions found') + '</h2>' +
-        ok.map(function (d) { return '<p class="prow"><span>' + esc(d.title) + '</span><b>' + d.questions.length + '</b></p>'; }).join('') +
+        ok.map(function (d) { return '<p class="prow"><span>' + esc(MobileStudy.parseChapterTitle(d.title).topic || d.title) + '</span><b>' + d.questions.length + '</b></p>'; }).join('') +
         (IMP.errors.length ? '<div class="note warn"><b>' + plural(IMP.errors.length, 'problem') + ' (those questions are skipped)</b><ul>' + IMP.errors.map(function (e) { return '<li>' + esc(e.message) + '</li>'; }).join('') + '</ul></div>' : '') +
         (IMP.warnings.length ? '<div class="note"><ul>' + IMP.warnings.map(function (e) { return '<li>' + esc(e.message) + '</li>'; }).join('') + '</ul></div>' : '') +
         (ok.length ? '<button class="btn primary full" data-act="isave">Save ' + plural(ok.length, 'deck') + (IMP.errors.length ? ' without the skipped questions' : '') + '</button>' : '') + '</section>';
@@ -1754,8 +1928,8 @@
           var infoWeak = infoDeck.cards.filter(function (c) { var r = infoProg.cards[c.id]; return r && typeof r === 'object' && r.attempts > 0 && r.misses > 0; }).length;
           var infoParsed = MobileStudy.parseChapterTitle(infoDeck.title);
           openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="chapter-info-title">' +
-            '<h2 id="chapter-info-title">' + esc(infoDeck.title) + '</h2>' +
-            '<p class="meta">' + infoParsed.sectionLabel + ' · ' + plural(infoDeck.cards.length, 'question') + '</p>' +
+            '<h2 id="chapter-info-title">' + esc(infoParsed.topic) + '</h2>' +
+            '<p class="meta">' + infoParsed.sectionNum + '/12 · ' + plural(infoDeck.cards.length, 'question') + '</p>' +
             '<div class="statline" style="margin: 16px 0">' +
               '<div class="stat"><b>' + infoMastered + ' / ' + infoDeck.cards.length + '</b><span>Mastered</span></div>' +
               '<div class="stat"><b>' + (infoProg.best ? infoProg.best.pct + '%' : '—') + '</b><span>Best Quiz</span></div>' +
@@ -1770,7 +1944,7 @@
         var menuDeck = deck(t.dataset.id);
         if (menuDeck) {
           openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="chapter-menu-title">' +
-            '<h2 id="chapter-menu-title">' + esc(menuDeck.title) + '</h2>' +
+            '<h2 id="chapter-menu-title">' + esc(MobileStudy.parseChapterTitle(menuDeck.title).topic) + '</h2>' +
             '<div class="chapter-menu-list">' +
               '<button class="btn full" data-act="edit" data-id="' + menuDeck.id + '">Edit Deck Questions</button>' +
               '<button class="btn full" data-act="export" data-id="' + menuDeck.id + '">Export Deck as .txt</button>' +
@@ -1804,6 +1978,55 @@
       case 'set-theme': if (t.dataset.theme) { S.settings.theme = t.dataset.theme; applyTheme(); save(); render(true); } break;
       case 'toggle-streak': S.settings.showStreak = S.settings.showStreak === false; save(); render(true); break;
       case 'toggle-shuffle': S.settings.shuffle = !S.settings.shuffle; save(); render(true); break;
+      case 'toggle-draft-devotionals':
+        S.settings.showDraftDevotionals = !S.settings.showDraftDevotionals;
+        save(); render(true);
+        toast(S.settings.showDraftDevotionals ? 'Draft devotionals enabled' : 'Draft devotionals hidden');
+        break;
+      case 'dismiss-devotions':
+        if (!S.devotions) S.devotions = { read: {}, saved: {}, carouselHiddenOn: null };
+        S.devotions.carouselHiddenOn = todayString();
+        save(); render(true);
+        toast('Devotionals hidden until tomorrow.');
+        break;
+      case 'open-devotional':
+        if (t.dataset.id) go({ name: 'devotional', id: t.dataset.id, expanded: false });
+        break;
+      case 'close-devotional':
+        go({ name: 'home' });
+        break;
+      case 'toggle-devotion-expand':
+        V.expanded = !V.expanded;
+        render(true);
+        break;
+      case 'devotion-toggle-save':
+        var saveId = t.dataset.id;
+        if (!S.devotions) S.devotions = { read: {}, saved: {}, carouselHiddenOn: null };
+        if (!S.devotions.saved) S.devotions.saved = {};
+        S.devotions.saved[saveId] = !S.devotions.saved[saveId];
+        save(); render(true);
+        toast(S.devotions.saved[saveId] ? 'Saved to bookmarks' : 'Removed from bookmarks');
+        break;
+      case 'devotion-share':
+        var shareId = t.dataset.id;
+        var toShare = DEVOTIONALS.filter(function (x) { return x.id === shareId; })[0];
+        if (toShare) shareDevotional(toShare);
+        break;
+      case 'devotion-mark-read':
+        var readId = t.dataset.id;
+        if (!S.devotions) S.devotions = { read: {}, saved: {}, carouselHiddenOn: null };
+        if (!S.devotions.read) S.devotions.read = {};
+        S.devotions.read[readId] = Date.now();
+        if (!S.completedToday) S.completedToday = {};
+        S.completedToday.devotion = true;
+        triggerHaptic('correct');
+        save(); render(true);
+        toast('Marked as read! Great step in your spiritual rhythm.');
+        break;
+      case 'devotion-study-lesson':
+        var lessonDeckId = t.dataset.id;
+        if (lessonDeckId) go({ name: 'chapter', id: lessonDeckId });
+        break;
       case 'streak-info':
         go({ name: 'streak', returnTo: 'home' });
         break;
@@ -1874,7 +2097,7 @@
       case 'exportall': download('all-decks.txt', P.serializeDecks(S.decks)); break;
       case 'edit': go({ name: 'edit', id: t.dataset.id, editing: null, filter: '' }); break;
       case 'export': exportDeck(deck(V.id)); break;
-      case 'ddel': d = deck(V.id); ask('Delete "' + d.title + '" and its progress? Export it first if you want to keep a copy.', 'Delete deck', function () { S.decks = S.decks.filter(function (x) { return x.id !== d.id; }); delete S.progress[d.id]; SEL.delete(d.id); save(); go({ name: 'home' }); }); break;
+      case 'ddel': d = deck(V.id); ask('Delete "' + (MobileStudy.parseChapterTitle(d.title).topic || d.title) + '" and its progress? Export it first if you want to keep a copy.', 'Delete deck', function () { S.decks = S.decks.filter(function (x) { return x.id !== d.id; }); delete S.progress[d.id]; SEL.delete(d.id); save(); go({ name: 'home' }); }); break;
       case 'cnew': V.editing = 'new'; render(true); break;
       case 'cedit': V.editing = +t.dataset.i; render(true); break;
       case 'ccancel': V.editing = null; render(true); break;
@@ -1973,9 +2196,16 @@
       app.querySelectorAll('.crow').forEach(function (r) { r.hidden = !!f && r.dataset.text.indexOf(f) < 0; });
     } else if (e.target.id === 'deck-search') {
       homeFilter = e.target.value.trim(); var q = homeFilter.toLowerCase(), visible = 0;
-      app.querySelectorAll('.deck[data-deck-name]').forEach(function (r) { r.hidden = !!q && r.dataset.deckName.indexOf(q) < 0; if (!r.hidden) visible++; });
+      app.querySelectorAll('.chapter-card[data-deck-name], .deck[data-deck-name]').forEach(function (r) {
+        var matchTopic = r.dataset.deckName && r.dataset.deckName.indexOf(q) >= 0;
+        var d = deck(r.dataset.id);
+        var matchTitle = d && d.title.toLowerCase().indexOf(q) >= 0;
+        var matchNum = d && ('section ' + (MobileStudy.parseChapterTitle(d.title).sectionNum || '')).indexOf(q) >= 0;
+        r.hidden = !!q && !matchTopic && !matchTitle && !matchNum;
+        if (!r.hidden) visible++;
+      });
       var count = document.getElementById('deck-result-count'), none = document.getElementById('search-empty');
-      if (count) count.textContent = visible + ' ' + (visible === 1 ? 'deck' : 'decks');
+      if (count) count.textContent = visible + ' ' + (visible === 1 ? 'chapter' : 'chapters');
       if (none) none.classList.toggle('on', visible === 0);
     }
   });
@@ -2012,6 +2242,7 @@
     window.CciNative.onBackButton(function () {
       if (modal.innerHTML) { closeModal(); return; }
       if (isStudySession(V.name)) { pauseStudySession(); return; }
+      if (V.name === 'devotional') { go({ name: 'home' }); return; }
       if (V.name !== 'home') { go({ name: 'home' }); return; }
       window.CciNative.exitApp().catch(function () {});
     }).catch(function () {});
@@ -2021,8 +2252,9 @@
   }
 
   function boot() {
-    return Promise.all([load(), loadStarterText()]).then(function (results) {
+    return Promise.all([load(), loadStarterText(), loadDevotionals()]).then(function (results) {
       var text = results[1];
+      DEVOTIONALS = results[2] || [];
       STARTER_DECKS = P.parseDecks(text).decks;
       var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION;
       var isFirstRun = !S.seeded && (!S.onboarding || !S.onboarding.completed);

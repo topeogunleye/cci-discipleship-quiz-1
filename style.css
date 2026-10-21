@@ -4169,7 +4169,401 @@ button.opt.wrong .opt-badge {
   text-align: center;
 }
 
+/* ==========================================================================
+   Prompt 2C — Devotionals Feed & Article Reader
+   ========================================================================== */
+
+.devotion-feed-section {
+  margin: var(--space-xl) 0 var(--space-lg);
+}
+
+.devotion-feed-section .section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-md);
+  padding: 0 4px;
+}
+
+.devotion-dismiss-btn {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text-sub);
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.devotion-dismiss-btn:hover,
+.devotion-dismiss-btn:focus-visible {
+  color: var(--text);
+  border-color: var(--text-sub);
+  background: var(--bg);
+}
+
+.devotion-carousel {
+  display: flex;
+  gap: var(--space-md);
+  overflow-x: auto;
+  padding: 4px 4px 16px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.devotion-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.devotion-card {
+  flex: 0 0 280px;
+  max-width: 85vw;
+  scroll-snap-align: start;
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+  color: #FFFFFF;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 200px;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.devotion-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-float);
+}
+
+.devotion-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.devotion-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+}
+
+.devotion-badge.is-today {
+  background: #FFE600;
+  color: #1A1A1A;
+}
+
+.devotion-time,
+.devotion-read-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.devotion-read-badge {
+  background: rgba(0, 0, 0, 0.25);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.devotion-card-hit {
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  flex-grow: 1;
+}
+
+.devotion-card-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  line-height: 1.25;
+  margin: var(--space-xs) 0 4px;
+  color: #FFFFFF;
+}
+
+.devotion-card-sub {
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.devotion-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.devotion-scripture-pill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.devotion-card-action-btn {
+  background: rgba(255, 255, 255, 0.25);
+  border: none;
+  color: #FFFFFF;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.devotion-card-action-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Devotional Reader View */
+.devotional-view-shell {
+  max-width: 680px;
+  margin: 0 auto;
+  padding-bottom: max(32px, env(safe-area-inset-bottom, 32px));
+}
+
+.devotional-header {
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+  color: #FFFFFF;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: var(--space-xl);
+}
+
+.devotional-header .chapter-ill {
+  position: absolute;
+  right: -10px;
+  bottom: 0;
+  width: 140px;
+  height: 80px;
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+.devotional-nav-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+  margin-bottom: var(--space-md);
+}
+
+.devotional-back-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #FFFFFF;
+  padding: 8px 16px;
+  min-height: 48px;
+  min-width: 48px;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.devotional-actions {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.devotional-icon-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #FFFFFF;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.devotional-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.devotional-icon-btn.active {
+  background: #FFE600;
+  color: #1A1A1A;
+}
+
+.devotional-hero-content {
+  position: relative;
+  z-index: 2;
+  margin-top: var(--space-md);
+}
+
+.devotional-pill {
+  display: inline-block;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+  letter-spacing: 0.03em;
+}
+
+.devotional-title {
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0 0 var(--space-xs);
+  color: #FFFFFF;
+}
+
+.devotional-sub {
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.devotional-content-body {
+  padding: 0 var(--space-xs);
+}
+
+.devotional-scripture-quote {
+  background: var(--surface);
+  border-left: 4px solid var(--primary);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  padding: var(--space-md) var(--space-lg);
+  margin: 0 0 var(--space-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.devotional-scripture-quote strong {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--primary);
+  margin-bottom: var(--space-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.devotional-scripture-quote p {
+  font-size: 1.05rem;
+  font-style: italic;
+  line-height: 1.55;
+  color: var(--text);
+  margin: 0;
+}
+
+.devotional-paragraphs {
+  margin: var(--space-lg) 0;
+}
+
+.devotional-p {
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 0 0 var(--space-md);
+  font-family: var(--font-stack);
+  font-weight: 400;
+}
+
+.devotional-more-btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--link);
+  padding: 10px 20px;
+  min-height: 48px;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 var(--space-lg);
+  transition: all 0.2s ease;
+}
+
+.devotional-more-btn:hover {
+  background: var(--surface);
+  border-color: var(--link);
+}
+
+.devotional-callout {
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.reflection-box {
+  border-left: 4px solid #7A3FD0;
+}
+
+.step-box {
+  border-left: 4px solid #FF8A3D;
+}
+
+.callout-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+
+.callout-icon {
+  font-size: 1.2rem;
+}
+
+.callout-title {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.callout-text {
+  font-size: var(--text-sm);
+  color: var(--text-sub);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.devotional-footer-bar {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-md);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .devotion-card,
+  .devotion-dismiss-btn,
+  .devotional-more-btn,
   .coaching-bottom-sheet,
   .commit-hold-btn,
   .ring-fill,

@@ -26,8 +26,9 @@ test('web app manifest declares standalone install metadata and valid icon asset
 test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
   const serviceWorker = read('service-worker.js');
   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v15'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v16'/);
   assert.match(serviceWorker, /decks\/manifest\.json/);
+  assert.match(serviceWorker, /content\/devotionals\.json/);
   assert.match(serviceWorker, /js\/native-bridge\.bundle\.js/);
   assert.match(serviceWorker, /js\/mobile-study\.js/);
   assert.match(serviceWorker, /cache\.addAll\(deckFiles\.map/);
@@ -49,7 +50,7 @@ test('activation deletes previous app caches and deck assets absent from the cur
     [url('settings.json'), {}]
   ]);
   const cacheStore = new Map([
-    ['cci-study-pwa-v15', activeEntries],
+    ['cci-study-pwa-v16', activeEntries],
     ['cci-study-pwa-v3', new Map()],
     ['unrelated-app-cache', new Map()]
   ]);
@@ -147,7 +148,7 @@ test('PWA source and offline build contain their required registration/assets', 
 
 test('standalone dist package includes all PWA runtime assets', () => {
   const dist = path.join(root, 'dist');
-  for (const file of ['index.html', 'manifest.webmanifest', 'service-worker.js', 'offline.html', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'decks/manifest.json']) {
+  for (const file of ['index.html', 'manifest.webmanifest', 'service-worker.js', 'offline.html', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'decks/manifest.json', 'content/devotionals.json']) {
     assert.ok(fs.existsSync(path.join(dist, file)), `Missing dist/${file}`);
   }
   const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');

@@ -279,7 +279,43 @@
       });
     }
 
+    // 4. Today's Devotion Card (when available)
+    if (options.todayDevotion) {
+      var devId = options.todayDevotion.id;
+      var isDevRead = !!(completedToday.devotion || (typeof options.isDevotionRead === 'function' && options.isDevotionRead(devId)));
+      cards.push({
+        id: 'devotion',
+        type: 'devotion',
+        title: "Read today's devotion",
+        oneLine: "Read today's devotion · 1 min",
+        minuteEstimate: 1,
+        state: isDevRead ? 'done' : 'ready',
+        action: 'open-devotional',
+        devotionalId: devId,
+        icon: 'spark'
+      });
+    }
+
     return cards;
+  }
+
+  function filterDevotionals(devotionals, showDrafts) {
+    if (!Array.isArray(devotionals)) return [];
+    return devotionals.filter(function (item) {
+      if (!item || typeof item !== 'object') return false;
+      if (typeof item.id !== 'string' || !item.id) return false;
+      if (typeof item.title !== 'string' || !item.title) return false;
+      if (showDrafts) return true;
+      return item.status === 'reviewed';
+    });
+  }
+
+  function getTodayDevotional(devotionals, timestampOrDate) {
+    if (!Array.isArray(devotionals) || devotionals.length === 0) return null;
+    var ts = Number.isFinite(timestampOrDate) ? timestampOrDate : (typeof Date !== 'undefined' && Date.now ? Date.now() : 0);
+    var days = Math.floor(ts / 86400000);
+    var index = Math.abs(days) % devotionals.length;
+    return devotionals[index] || devotionals[0] || null;
   }
 
   
@@ -474,6 +510,8 @@
     getChapterSteps: getChapterSteps,
     selectDailyItems: selectDailyItems,
     selectPlanCards: selectPlanCards,
+    filterDevotionals: filterDevotionals,
+    getTodayDevotional: getTodayDevotional,
     calculateStreak: calculateStreak,
     snapshot: snapshot,
     restore: restore
