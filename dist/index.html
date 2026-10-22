@@ -4608,8 +4608,9 @@ button.opt.wrong .opt-badge {
 
 @media (min-width: 641px) {
   .rocket-container {
-    right: 28px;
-    bottom: 28px;
+    display: flex !important;
+    right: 28px !important;
+    bottom: 28px !important;
   }
 }
 
@@ -5055,8 +5056,9 @@ button.opt.wrong .opt-badge {
   }
 
   .rocket-container {
-    right: 28px;
-    bottom: 28px;
+    display: flex !important;
+    right: 28px !important;
+    bottom: 28px !important;
   }
 
   .app-shell {
@@ -5149,8 +5151,9 @@ button.opt.wrong .opt-badge {
   }
 
   .rocket-container {
-    right: 32px;
-    bottom: 32px;
+    display: flex !important;
+    right: 32px !important;
+    bottom: 32px !important;
   }
 
   /* Full Desktop Sidebar (Images 1-7) */
@@ -5424,9 +5427,9 @@ button.opt.wrong .opt-badge {
   }
 
   .desktop-lessons-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 16px !important;
   }
 
   .desktop-lesson-card {
@@ -6576,8 +6579,8 @@ button.opt.wrong .opt-badge {
   }
 }
 
-/* Wide Desktop Breakpoint (>= 1280px) */
-@media (min-width: 1280px) {
+/* Wide Desktop Breakpoint (>= 1360px) */
+@media (min-width: 1360px) {
   #app {
     padding: var(--space-2xl) var(--space-2xl) var(--space-3xl);
   }
@@ -6591,17 +6594,17 @@ button.opt.wrong .opt-badge {
   }
 
   .home-columns-container {
-    grid-template-columns: minmax(0, 1fr) 340px;
-    gap: 32px;
+    grid-template-columns: minmax(0, 1fr) 340px !important;
+    gap: 32px !important;
   }
 
   .home-col-side {
-    width: 340px;
+    width: 340px !important;
   }
 
   .desktop-lessons-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 18px;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 18px !important;
   }
 }
 
