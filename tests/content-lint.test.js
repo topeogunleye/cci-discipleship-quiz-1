@@ -9,6 +9,7 @@ const root = path.join(__dirname, '..');
 const parser = require(path.join(root, 'js', 'parser.js'));
 const StudyLogic = require(path.join(root, 'js', 'study.js'));
 const StudyStorage = require(path.join(root, 'js', 'storage.js'));
+const MobileStudy = require(path.join(root, 'js', 'mobile-study.js'));
 const appSource = fs.readFileSync(path.join(root, 'js', 'app.js'), 'utf8');
 const deckFiles = JSON.parse(fs.readFileSync(path.join(root, 'decks', 'manifest.json'), 'utf8'));
 const starter = deckFiles.map(file => fs.readFileSync(path.join(root, 'decks', file), 'utf8')).join('\n\n');
@@ -264,7 +265,7 @@ test('stored progress survives starter duplicate removal and renumbering', async
     addEventListener: () => {},
     documentElement: { removeAttribute: () => {}, setAttribute: () => {} }
   };
-  const window = { DeckParser: parser, StudyLogic, StudyStorage, location: { protocol: 'file:' }, scrollTo: () => {} };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, location: { protocol: 'file:' }, scrollTo: () => {} };
   const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
   vm.runInNewContext(testAppSource, {
     window,
@@ -282,7 +283,7 @@ test('stored progress survives starter duplicate removal and renumbering', async
   const bible1 = migrated.decks.find(deck => deck.id === section7);
   const bible = migrated.decks.find(deck => deck.id === section8);
   const churchHistory = migrated.decks.find(deck => deck.id === section12);
-  assert.equal(migrated.dataVersion, 8);
+  assert.equal(migrated.dataVersion, 10);
   assert.ok(Number.isFinite(migrated.backupReminder.anchorAt));
   assert.equal(migrated.backupReminder.cardsStudied, 0);
   assert.ok(storageKeys.length > 0 && storageKeys.every(key => key === 'flashdecks.v1'));
@@ -329,7 +330,7 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
     };
     const registration = { waiting: null, installing: null, addEventListener: () => {} };
     const serviceWorker = { controller: null, register: file => { registrations.push(file); return Promise.resolve(registration); }, addEventListener: () => {} };
-    const window = { DeckParser: parser, StudyLogic, StudyStorage, navigator: { serviceWorker }, location: { protocol }, fetch, scrollTo: () => {} };
+    const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, navigator: { serviceWorker }, location: { protocol }, fetch, scrollTo: () => {} };
     const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
     vm.runInNewContext(testAppSource, {
       window,
@@ -382,7 +383,7 @@ test('saved starter decks refresh from source while custom cards and matching pr
     progress: { [deckId]: { best: { pct: 80 }, cards: { [`${deckId}.${first.id}`]: { box: 2 }, [`${deckId}.${second.id}`]: { box: 3 } } } },
     settings: { theme: 'auto', shuffle: false },
     seeded: true,
-    dataVersion: 8
+    dataVersion: 10
   });
   const result = await (async () => {
     let stored = raw;
@@ -393,7 +394,7 @@ test('saved starter decks refresh from source while custom cards and matching pr
       'starter-fallback': { textContent: JSON.stringify(starter) }
     };
     const document = { getElementById: id => elements[id], addEventListener: () => {}, documentElement: { removeAttribute: () => {}, setAttribute: () => {} } };
-    const window = { DeckParser: parser, StudyLogic, StudyStorage, location: { protocol: 'file:' }, scrollTo: () => {} };
+    const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, location: { protocol: 'file:' }, scrollTo: () => {} };
     const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
     vm.runInNewContext(testAppSource, { window, document, localStorage: { getItem: () => stored, setItem: (_, value) => { stored = value; } } });
     await window.testAppReady;
@@ -440,7 +441,7 @@ test('quiz and exam keyboard answers store stats and defer exam feedback until r
     addEventListener: (name, handler) => { listeners[name] = handler; },
     documentElement: { removeAttribute: () => {}, setAttribute: () => {} }
   };
-  const window = { DeckParser: parser, StudyLogic, StudyStorage, location: { protocol: 'file:' }, scrollTo: () => {} };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, location: { protocol: 'file:' }, scrollTo: () => {} };
   const testAppSource = appSource.replace(
     '  boot();',
     '  window.studyTestApi = { setSession: function (session) { V = session; }, pick: pick, begin: begin, finishExam: finishExam, flash: views.flash, quiz: views.quiz, flush: function () { return saveQueue; } };\n  window.testAppReady = boot();'
@@ -549,7 +550,7 @@ test('home shows the backup reminder and dismissing it resets stored thresholds'
     addEventListener: (name, handler) => { listeners[name] = handler; },
     documentElement: { removeAttribute: () => {}, setAttribute: () => {} }
   };
-  const window = { DeckParser: parser, StudyLogic, StudyStorage, location: { protocol: 'file:' }, scrollTo: () => {} };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, location: { protocol: 'file:' }, scrollTo: () => {} };
   const testAppSource = appSource.replace(
     '  boot();',
     '  window.reminderTestApi = { flush: function () { return saveQueue; } };\n  window.testAppReady = boot();'
@@ -581,7 +582,7 @@ test('storage failures appear as an accessible alert in the app', async () => {
     addEventListener: () => {},
     documentElement: { removeAttribute: () => {}, setAttribute: () => {} }
   };
-  const window = { DeckParser: parser, StudyLogic, StudyStorage, location: { protocol: 'file:' }, scrollTo: () => {} };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, location: { protocol: 'file:' }, scrollTo: () => {} };
   const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
   vm.runInNewContext(testAppSource, { window, document });
   await window.testAppReady;
@@ -606,7 +607,7 @@ test('a waiting service worker shows an update prompt and receives SKIP_WAITING'
     addEventListener: (name, handler) => { listeners[name] = handler; },
     documentElement: { removeAttribute: () => {}, setAttribute: () => {} }
   };
-  const window = { DeckParser: parser, StudyLogic, StudyStorage, navigator: { serviceWorker }, location: { protocol: 'https:', reload: () => {} }, scrollTo: () => {} };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, navigator: { serviceWorker }, location: { protocol: 'https:', reload: () => {} }, scrollTo: () => {} };
   const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
   vm.runInNewContext(testAppSource, {
     window,
@@ -637,7 +638,7 @@ test('legacy and current JSON backups preserve optional metadata', async () => {
     addEventListener: () => {},
     documentElement: { removeAttribute: () => {}, setAttribute: () => {} }
   };
-  const window = { DeckParser: parser, StudyLogic, StudyStorage, location: { protocol: 'file:' }, scrollTo: () => {} };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, location: { protocol: 'file:' }, scrollTo: () => {} };
   vm.runInNewContext(exposedAppSource, {
     window,
     document,
