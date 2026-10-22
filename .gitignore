@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+
+android/.gradle/
+android/**/build/
+
+# Xcode local builds and user-specific settings
+ios/DerivedData/
+ios/Pods/
+ios/**/*.xcuserstate
+ios/**/*.xcuserdatad/

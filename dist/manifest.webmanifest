@@ -1,13 +1,13 @@
 {
   "id": "./",
-  "name": "CCI Discipleship Study Decks",
-  "short_name": "CCI Study",
+  "name": "Disciple",
+  "short_name": "Disciple",
   "description": "Study CCI discipleship lessons with flashcards, quizzes, and spaced repetition.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#F6F3EE",
-  "theme_color": "#8B6E2F",
+  "background_color": "#F5F6FB",
+  "theme_color": "#B5173A",
   "icons": [
     {
       "src": "icons/icon-192.png",
@@ -19,7 +19,13 @@
       "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "icons/icon.svg",
