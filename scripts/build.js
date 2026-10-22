@@ -30,7 +30,7 @@ html = replaceOnce(html, '<script src="js/app.js"></script>', `<script>\n${read(
 
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(path.join(outputDir, 'index.html'), html);
-for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html']) {
+for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html', 'favicon.ico']) {
   fs.copyFileSync(path.join(root, file), path.join(outputDir, file));
 }
 for (const directory of ['decks', 'icons', 'content']) {

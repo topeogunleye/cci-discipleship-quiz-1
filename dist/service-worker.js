@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v16';
+const CACHE_NAME = CACHE_PREFIX + 'v17';
 const CORE_FILES = [
   './',
   'offline.html',
@@ -9,6 +9,7 @@ const CORE_FILES = [
   'icons/icon.svg',
   'icons/icon-192.png',
   'icons/icon-512.png',
+  'icons/apple-touch-icon.png',
   'style.css',
   'js/parser.js',
   'js/study.js',

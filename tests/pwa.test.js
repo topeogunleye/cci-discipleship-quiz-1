@@ -26,7 +26,7 @@ test('web app manifest declares standalone install metadata and valid icon asset
 test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
   const serviceWorker = read('service-worker.js');
   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v16'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v17'/);
   assert.match(serviceWorker, /decks\/manifest\.json/);
   assert.match(serviceWorker, /content\/devotionals\.json/);
   assert.match(serviceWorker, /js\/native-bridge\.bundle\.js/);
@@ -50,7 +50,7 @@ test('activation deletes previous app caches and deck assets absent from the cur
     [url('settings.json'), {}]
   ]);
   const cacheStore = new Map([
-    ['cci-study-pwa-v16', activeEntries],
+    ['cci-study-pwa-v17', activeEntries],
     ['cci-study-pwa-v3', new Map()],
     ['unrelated-app-cache', new Map()]
   ]);
