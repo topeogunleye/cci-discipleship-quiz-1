@@ -5042,7 +5042,8 @@ button.opt.wrong .opt-badge {
   }
 
   .rocket-container {
-    display: none !important;
+    right: 28px;
+    bottom: 28px;
   }
 
   .app-shell {
@@ -5131,16 +5132,21 @@ button.opt.wrong .opt-badge {
 @media (min-width: 1024px) {
   #app {
     max-width: 1440px;
-    padding: var(--space-2xl) var(--space-2xl) var(--space-3xl);
+    padding: 24px 24px 36px;
+  }
+
+  .rocket-container {
+    right: 32px;
+    bottom: 32px;
   }
 
   /* Full Desktop Sidebar (Images 1-7) */
   .app-shell {
-    gap: var(--space-2xl);
+    gap: 24px;
   }
 
   .app-sidebar {
-    width: 220px !important;
+    width: 200px !important;
     padding: var(--space-md) var(--space-sm) !important;
     background: transparent !important;
     box-shadow: none !important;
@@ -5262,13 +5268,20 @@ button.opt.wrong .opt-badge {
 
   .home-columns-container {
     display: grid;
-    grid-template-columns: 1fr 340px;
-    gap: 32px;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 24px;
     align-items: flex-start;
   }
 
   .home-col-main {
     min-width: 0;
+    width: 100%;
+  }
+
+  .home-col-side {
+    min-width: 0;
+    width: 300px;
+    flex-shrink: 0;
   }
 
   /* Hero Card Desktop */
@@ -5399,7 +5412,7 @@ button.opt.wrong .opt-badge {
 
   .desktop-lessons-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 16px;
   }
 
@@ -5414,6 +5427,8 @@ button.opt.wrong .opt-badge {
     flex-direction: column;
     justify-content: space-between;
     min-height: 125px;
+    min-width: 0;
+    overflow: hidden;
     box-shadow: var(--shadow);
     transition: transform var(--duration-fast), box-shadow var(--duration-fast);
   }
@@ -5435,6 +5450,8 @@ button.opt.wrong .opt-badge {
     font-weight: 700;
     line-height: 1.25;
     margin: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
 
   .lesson-sec-pill {
@@ -6543,6 +6560,35 @@ button.opt.wrong .opt-badge {
     padding: 12px 24px;
     background: var(--btn-secondary-bg);
     color: var(--btn-secondary-ink);
+  }
+}
+
+/* Wide Desktop Breakpoint (>= 1280px) */
+@media (min-width: 1280px) {
+  #app {
+    padding: var(--space-2xl) var(--space-2xl) var(--space-3xl);
+  }
+
+  .app-shell {
+    gap: var(--space-2xl);
+  }
+
+  .app-sidebar {
+    width: 220px !important;
+  }
+
+  .home-columns-container {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 32px;
+  }
+
+  .home-col-side {
+    width: 340px;
+  }
+
+  .desktop-lessons-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
   }
 }
 
