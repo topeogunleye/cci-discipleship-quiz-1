@@ -3198,6 +3198,24 @@ a:hover { color: var(--link-hover); }
   position: relative;
 }
 
+/* Coaching Study Topbar (Mobile Base) */
+.coaching-study-topbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.coaching-study-topbar .study-topbar-progress {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.coaching-study-topbar .study-topbar-progress .pbar {
+  margin: 0;
+}
+
 /* Question Panel */
 .coaching-question-panel {
   background: transparent;
@@ -6041,65 +6059,411 @@ button.opt.wrong .opt-badge {
   }
 
   /* Desktop Quiz / Study Split Layout (Images 8 & 9) */
-  .coaching-study-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-    max-width: 960px;
-    margin: 0 auto 32px;
+  .study-shell.coaching-study-flow {
+    width: 100% !important;
+    max-width: 1060px !important;
+    margin: 40px auto !important;
+    padding: 0 32px var(--space-2xl) !important;
+  }
+
+  .coaching-study-topbar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 24px !important;
+    max-width: 1040px !important;
+    margin: 0 auto 36px !important;
+  }
+
+  .coaching-study-topbar .coaching-study-title-mobile {
+    display: none !important;
+  }
+
+  .coaching-study-topbar .study-topbar-progress {
+    flex: 1 1 auto !important;
+    margin: 0 16px !important;
+  }
+
+  .coaching-study-topbar .study-topbar-progress .pbar {
+    margin: 0 !important;
+    height: 8px !important;
+    border-radius: 999px !important;
+    background: #E2E8F0 !important;
+  }
+
+  .coaching-study-topbar .study-topbar-progress .pbar i {
+    background: var(--primary, #B5173A) !important;
+    border-radius: 999px !important;
+  }
+
+  .coaching-study-topbar .study-close-btn {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    color: #1E293B !important;
+    cursor: pointer !important;
+    box-shadow: var(--shadow-sm) !important;
+    transition: transform 0.15s ease !important;
+  }
+
+  .coaching-study-topbar .study-close-btn:hover {
+    transform: scale(1.05);
+  }
+
+  .coaching-study-topbar .session-status {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: var(--muted) !important;
+    letter-spacing: 0.04em !important;
+    min-width: 44px !important;
+    text-align: right !important;
   }
 
   .coaching-question-panel {
-    max-width: 960px;
-    margin: 0 auto;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    max-width: 1040px !important;
+    margin: 0 auto !important;
+    width: 100% !important;
     transition: all var(--duration-normal) var(--ease-out);
   }
 
   .coaching-question-panel:not(.has-feedback) .coaching-question-col {
-    max-width: 680px;
-    margin: 0 auto;
+    max-width: 680px !important;
+    margin: 0 auto !important;
   }
 
   .coaching-question-panel.has-feedback {
     display: flex !important;
-    gap: 32px !important;
+    flex-direction: row !important;
     align-items: flex-start !important;
+    gap: 48px !important;
+    width: 100% !important;
   }
 
   .coaching-question-panel.has-feedback .coaching-question-col {
-    flex: 1 1 58%;
-    min-width: 0;
+    flex: 1 1 58% !important;
+    min-width: 0 !important;
   }
 
   .coaching-question-panel.has-feedback .coaching-bottom-sheet {
-    flex: 1 1 42% !important;
+    flex: 0 0 380px !important;
+    width: 380px !important;
+    max-width: 380px !important;
     position: static !important;
-    box-shadow: var(--shadow-card) !important;
-    border-radius: var(--radius-card) !important;
-    background: var(--surface) !important;
-    padding: 28px !important;
-    max-width: 440px !important;
-    animation: desktopFeedbackIn 0.35s var(--ease-out);
+    border-radius: 24px !important;
+    padding: 32px 28px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08) !important;
+    animation: desktopFeedbackIn 0.3s var(--ease-out) !important;
   }
 
   .coaching-question-panel.has-feedback .coaching-bottom-sheet .sheet-drag-handle {
-    display: none;
+    display: none !important;
   }
 
-  .feedback-desktop-headline {
-    display: block;
-    font-size: 1.3rem;
-    font-weight: 700;
-    margin-bottom: 12px;
+  .coaching-question-panel.has-feedback .feedback-desktop-headline {
+    display: block !important;
+    font-size: 1.35rem !important;
+    font-weight: 800 !important;
+    margin: 0 0 16px !important;
+    color: #16A34A !important;
   }
 
-  .feedback-desktop-headline.ok {
-    color: var(--ok);
+  .coaching-question-panel.has-feedback .feedback-desktop-headline.ok,
+  .coaching-question-panel.has-feedback .feedback-desktop-headline.bad {
+    color: #16A34A !important;
   }
 
-  .feedback-desktop-headline.bad {
-    color: var(--ok); /* "Nice try, here's why" is green in design references */
+  .coaching-question-panel.has-feedback .feedback-header {
+    display: none !important;
+  }
+
+  .coaching-question-panel.has-feedback .card-note {
+    font-size: 0.95rem !important;
+    line-height: 1.55 !important;
+    margin-bottom: 14px !important;
+    color: var(--ink) !important;
+  }
+
+  .coaching-question-panel.has-feedback .card-ref,
+  .coaching-question-panel.has-feedback .card-bible {
+    font-size: 0.85rem !important;
+    color: var(--muted) !important;
+    margin-bottom: 8px !important;
+  }
+
+  .coaching-question-panel.has-feedback .btn-continue {
+    background: var(--primary, #B5173A) !important;
+    color: #FFFFFF !important;
+    border-radius: 999px !important;
+    height: 50px !important;
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    width: 100% !important;
+    margin-top: 24px !important;
+    border: none !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 14px rgba(181, 23, 58, 0.35) !important;
+    transition: transform 0.15s ease, filter 0.15s ease !important;
+  }
+
+  .coaching-question-panel.has-feedback .btn-continue:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+  }
+
+  /* Question Column Typography & Options */
+  .coaching-question-col .question-meta-row {
+    display: none !important;
+  }
+
+  .coaching-question-col .coaching-question-text {
+    font-size: clamp(1.4rem, 2.3vw, 1.85rem) !important;
+    font-weight: 700 !important;
+    line-height: 1.35 !important;
+    margin-bottom: 32px !important;
+    color: var(--ink) !important;
+  }
+
+  .coaching-question-col .coaching-opts-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+  }
+
+  .coaching-question-col .opt {
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+    padding: 16px 22px !important;
+    border-radius: 18px !important;
+    min-height: 64px !important;
+    font-size: 1rem !important;
+    font-weight: 500 !important;
+    background: #FFFFFF !important;
+    border: 1.5px solid #CBD5E1 !important;
+    color: #1E293B !important;
+    text-align: left !important;
+    box-shadow: var(--shadow-sm) !important;
+    cursor: pointer !important;
+    transition: all 0.18s ease !important;
+  }
+
+  .coaching-question-col .opt:not([disabled]):hover {
+    transform: translateY(-1px);
+    border-color: #94A3B8 !important;
+  }
+
+  .coaching-question-col .opt .opt-badge {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    border-radius: 50% !important;
+    background: #3B2BB0 !important;
+    color: #FFFFFF !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+  }
+
+  .coaching-question-col .opt .opt-text {
+    flex: 1 1 auto !important;
+    line-height: 1.42 !important;
+  }
+
+  .coaching-question-col .opt.right {
+    background: #DCFCE7 !important;
+    border-color: #16A34A !important;
+    color: #14532D !important;
+  }
+
+  .coaching-question-col .opt.right .opt-badge {
+    background: #16A34A !important;
+    color: #FFFFFF !important;
+  }
+
+  .coaching-question-col .opt.right .opt-status-icon {
+    color: #16A34A !important;
+    font-size: 1.3rem !important;
+    font-weight: 800 !important;
+    margin-left: 8px !important;
+  }
+
+  .coaching-question-col .opt.wrong {
+    background: #FEE2E2 !important;
+    border-color: #DC2626 !important;
+    color: #7F1D1D !important;
+  }
+
+  .coaching-question-col .opt.wrong .opt-badge {
+    background: #DC2626 !important;
+    color: #FFFFFF !important;
+  }
+
+  .coaching-question-col .opt.wrong .opt-status-icon {
+    color: #DC2626 !important;
+    font-size: 1.3rem !important;
+    font-weight: 800 !important;
+    margin-left: 8px !important;
+  }
+
+  /* Completion / Results Screen on Desktop (Image 2 fix) */
+  .results-shell {
+    width: 100% !important;
+    max-width: 680px !important;
+    margin: 48px auto var(--space-2xl) !important;
+    padding: 0 24px !important;
+  }
+
+  .results-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    margin-bottom: 24px !important;
+  }
+
+  .results-header h1,
+  .results-header .meta {
+    display: none !important;
+  }
+
+  .results-header .study-close-btn {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: var(--surface) !important;
+    border: 1px solid var(--line) !important;
+    color: var(--ink) !important;
+    cursor: pointer !important;
+    box-shadow: var(--shadow-sm) !important;
+  }
+
+  .completion-hero-card {
+    border-radius: 24px !important;
+    padding: 48px 36px !important;
+    text-align: center !important;
+    box-shadow: var(--shadow-lg) !important;
+  }
+
+  .completion-actions-bar {
+    max-width: 440px !important;
+    margin: 32px auto 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    width: 100% !important;
+  }
+
+  .completion-actions-bar .btn {
+    border-radius: 999px !important;
+    height: 50px !important;
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+  }
+
+  .completion-actions-bar .btn.primary {
+    background: var(--primary, #B5173A) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    box-shadow: 0 4px 14px rgba(181, 23, 58, 0.35) !important;
+  }
+
+  .completion-actions-bar .btn:not(.primary):not(.ghost) {
+    background: var(--surface) !important;
+    border: 1.5px solid var(--line) !important;
+    color: var(--ink) !important;
+  }
+
+  .completion-actions-bar .btn.ghost {
+    background: transparent !important;
+    border: none !important;
+    color: var(--muted) !important;
+  }
+
+  /* Dark Theme overrides for Quiz and Results (Image 9) */
+  :root[data-theme="dark"] .coaching-study-topbar .study-close-btn,
+  :root[data-theme="dark"] .results-header .study-close-btn,
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .coaching-study-topbar .study-close-btn,
+    :root:not([data-theme="light"]) .results-header .study-close-btn {
+      background: #1D1A55 !important;
+      border-color: #2F2B75 !important;
+      color: #FFFFFF !important;
+    }
+    :root:not([data-theme="light"]) .coaching-study-topbar .study-topbar-progress .pbar {
+      background: #252163 !important;
+    }
+    :root:not([data-theme="light"]) .coaching-question-col .opt {
+      background: #1D1A55 !important;
+      border-color: #2F2B75 !important;
+      color: #FFFFFF !important;
+    }
+    :root:not([data-theme="light"]) .coaching-question-col .opt:not([disabled]):hover {
+      border-color: #4C45A8 !important;
+      background: #25216B !important;
+    }
+    :root:not([data-theme="light"]) .coaching-question-col .opt .opt-badge {
+      background: #2D2875 !important;
+      color: #FFFFFF !important;
+    }
+    :root:not([data-theme="light"]) .coaching-question-panel.has-feedback .coaching-bottom-sheet {
+      background: #1D1A55 !important;
+      border-color: #2F2B75 !important;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45) !important;
+    }
+    :root:not([data-theme="light"]) .coaching-question-panel.has-feedback .feedback-desktop-headline.ok,
+    :root:not([data-theme="light"]) .coaching-question-panel.has-feedback .feedback-desktop-headline.bad {
+      color: #4ADE80 !important;
+    }
+    :root:not([data-theme="light"]) .coaching-question-col .opt.right {
+      background: rgba(34, 197, 94, 0.16) !important;
+      border-color: #22C55E !important;
+      color: #FFFFFF !important;
+    }
+    :root:not([data-theme="light"]) .coaching-question-col .opt.right .opt-badge {
+      background: #22C55E !important;
+      color: #FFFFFF !important;
+    }
+    :root:not([data-theme="light"]) .coaching-question-col .opt.right .opt-status-icon {
+      color: #22C55E !important;
+    }
+    :root:not([data-theme="light"]) .coaching-question-col .opt.wrong {
+      background: rgba(225, 29, 72, 0.16) !important;
+      border-color: #E11D48 !important;
+      color: #FFFFFF !important;
+    }
+    :root:not([data-theme="light"]) .coaching-question-col .opt.wrong .opt-badge {
+      background: #E11D48 !important;
+      color: #FFFFFF !important;
+    }
+    :root:not([data-theme="light"]) .coaching-question-col .opt.wrong .opt-status-icon {
+      color: #FB7185 !important;
+    }
+    :root:not([data-theme="light"]) .completion-actions-bar .btn:not(.primary):not(.ghost) {
+      background: #1D1A55 !important;
+      border-color: #2F2B75 !important;
+      color: #FFFFFF !important;
+    }
   }
 
   /* Chapter Detail Modal on Desktop (Image 10) */

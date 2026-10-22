@@ -1338,8 +1338,19 @@
     var isLast = V.i === V.cards.length - 1;
 
     return '<section class="study-shell flash-session coaching-study-flow" aria-label="Flashcard study session">' +
-      sessionHead(displayTitle, (V.i + 1) + ' / ' + V.cards.length) +
-      progressBar(V.i + 1, V.cards.length) +
+      '<div class="coaching-study-topbar">' +
+        '<button class="study-close-btn" data-act="pause-session" aria-label="Close study session">' +
+          '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button>' +
+        '<div class="study-heading coaching-study-title-mobile">' +
+          '<span class="eyebrow">CCI · DISCIPLESHIP</span>' +
+          '<h1>' + esc(displayTitle) + '</h1>' +
+        '</div>' +
+        '<div class="study-topbar-progress">' +
+          progressBar(V.i + 1, V.cards.length) +
+        '</div>' +
+        '<div class="session-status">' + (V.i + 1) + ' / ' + V.cards.length + '</div>' +
+      '</div>' +
       '<div class="coaching-question-container">' +
         '<button class="flip' + (V.flipped ? ' on' : '') + '" data-act="flip" type="button" aria-pressed="' + V.flipped + '" aria-label="' + (V.flipped ? 'Show question' : 'Reveal answer') + '">' +
           '<span class="inner">' +
@@ -1447,8 +1458,19 @@
       : '<span class="score-inline">' + (V.i + 1) + '/' + V.cards.length + '</span>';
 
     return '<section class="study-shell ' + (isExam ? 'exam-session' : 'quiz-session') + ' coaching-study-flow" aria-label="' + (isExam ? 'Timed exam' : 'Quiz') + '">' +
-      sessionHead(sessionTitle, status, isExam) +
-      progressBar(V.i + (done ? 1 : 0), V.cards.length) +
+      '<div class="coaching-study-topbar">' +
+        '<button class="study-close-btn" data-act="pause-session" aria-label="Close study session">' +
+          '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button>' +
+        '<div class="study-heading coaching-study-title-mobile">' +
+          '<span class="eyebrow">CCI · DISCIPLESHIP</span>' +
+          '<h1>' + esc(sessionTitle) + '</h1>' +
+        '</div>' +
+        '<div class="study-topbar-progress">' +
+          progressBar(V.i + (done ? 1 : 0), V.cards.length) +
+        '</div>' +
+        '<div class="session-status' + (isExam ? ' is-timer' : '') + '">' + status + '</div>' +
+      '</div>' +
       '<article class="question-panel coaching-question-panel' + (done ? ' has-feedback' : '') + '">' +
         '<div class="coaching-question-col">' +
           '<div class="question-meta-row">' +
