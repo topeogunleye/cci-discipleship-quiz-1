@@ -9,7 +9,7 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 test('Capacitor targets both native platforms and the existing offline build', () => {
   const config = JSON.parse(read('capacitor.config.json'));
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(config.appName, 'CCI Discipleship Study');
+  assert.equal(config.appName, 'Disciple');
   assert.equal(config.webDir, 'dist');
   assert.match(config.appId, /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$/);
   for (const platform of ['@capacitor/android', '@capacitor/ios']) assert.ok(pkg.dependencies[platform]);

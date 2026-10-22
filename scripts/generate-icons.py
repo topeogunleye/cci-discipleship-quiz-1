@@ -220,7 +220,7 @@ def main():
     with open(os.path.join(icons_dir, 'icon-512.png'), 'rb') as f:
         png_b64 = base64.b64encode(f.read()).decode('ascii')
 
-    svg_content = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="CCI Discipleship Study">
+    svg_content = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Disciple">
   <image width="512" height="512" href="data:image/png;base64,{png_b64}"/>
 </svg>
 '''

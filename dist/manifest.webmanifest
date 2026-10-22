@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "CCI Discipleship Study Decks",
-  "short_name": "CCI Study",
+  "name": "Disciple",
+  "short_name": "Disciple",
   "description": "Study CCI discipleship lessons with flashcards, quizzes, and spaced repetition.",
   "start_url": "./",
   "scope": "./",
