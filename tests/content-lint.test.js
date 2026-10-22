@@ -283,7 +283,9 @@ test('stored progress survives starter duplicate removal and renumbering', async
   const bible1 = migrated.decks.find(deck => deck.id === section7);
   const bible = migrated.decks.find(deck => deck.id === section8);
   const churchHistory = migrated.decks.find(deck => deck.id === section12);
-  assert.equal(migrated.dataVersion, 9);
+  assert.equal(migrated.dataVersion, 10);
+  assert.equal(migrated.settings.showDraftDevotionals, false);
+  assert.deepEqual(migrated.devotions, { read: [], saved: [], carouselHiddenOn: null });
   assert.ok(Number.isFinite(migrated.backupReminder.anchorAt));
   assert.equal(migrated.backupReminder.cardsStudied, 0);
   assert.ok(storageKeys.length > 0 && storageKeys.every(key => key === 'flashdecks.v1'));
@@ -345,11 +347,12 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
   const httpResult = await boot('http:', url => {
     fetched.push(url);
     if (url === 'decks/manifest.json') return Promise.resolve({ ok: true, json: () => Promise.resolve(deckFiles) });
+    if (url === 'content/devotionals.json') return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     return Promise.resolve({ ok: true, text: () => Promise.resolve(fs.readFileSync(path.join(root, url), 'utf8')) });
   }, '');
   const httpState = httpResult.state;
   assert.deepEqual(httpResult.registrations, ['service-worker.js']);
-  assert.deepEqual(fetched, ['decks/manifest.json', ...deckFiles.map(file => `decks/${file}`)]);
+  assert.deepEqual(fetched, ['decks/manifest.json', 'content/devotionals.json', ...deckFiles.map(file => `decks/${file}`)]);
   const expectedDeckCount = parsed.decks.length;
   const expectedCardCount = parsed.decks.reduce((count, deck) => count + deck.questions.length, 0);
   assert.equal(httpState.decks.length, expectedDeckCount);
@@ -383,7 +386,7 @@ test('saved starter decks refresh from source while custom cards and matching pr
     progress: { [deckId]: { best: { pct: 80 }, cards: { [`${deckId}.${first.id}`]: { box: 2 }, [`${deckId}.${second.id}`]: { box: 3 } } } },
     settings: { theme: 'auto', shuffle: false },
     seeded: true,
-    dataVersion: 9
+    dataVersion: 10
   });
   const result = await (async () => {
     let stored = raw;

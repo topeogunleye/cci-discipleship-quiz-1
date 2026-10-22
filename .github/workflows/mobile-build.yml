@@ -2,7 +2,7 @@ name: Mobile CI
 
 on:
   push:
-    branches: [main, feature/mobile-app]
+    branches: [main, feature/mobile-app, feature/manusai-mobile]
   pull_request:
     branches: [main]
   workflow_dispatch:

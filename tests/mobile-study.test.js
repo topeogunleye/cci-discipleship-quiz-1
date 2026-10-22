@@ -20,6 +20,61 @@ test('daily study falls back to cards that are not mastered when nothing is due'
   assert.deepEqual(selected.map(candidate => candidate.card.id), ['q1', 'q3']);
 });
 
+test('challenge selection prioritizes due, then weak, then unmastered cards without duplicates', () => {
+  const due = [item('d1', 'q1'), item('d1', 'q2')];
+  const weak = [item('d1', 'q2'), item('d2', 'q3')];
+  const newCards = [item('d2', 'q3'), item('d3', 'q4'), item('d3', 'q5')];
+  const selected = MobileStudy.selectChallengeItems(due, weak, newCards, 4);
+  assert.deepEqual(selected.map(candidate => candidate.deckId + '|' + candidate.card.id), [
+    'd1|q1', 'd1|q2', 'd2|q3', 'd3|q4'
+  ]);
+});
+
+test('lesson picker state accepts only flashcard and quiz modes and closes cleanly', () => {
+  const open = MobileStudy.createLessonPickerState('quiz', ['d1', 'd2']);
+  assert.deepEqual(open, { open: true, mode: 'quiz', deckIds: ['d1', 'd2'], selectionMode: false, selectedIds: [] });
+  assert.equal(MobileStudy.createLessonPickerState('exam', ['d1']), null);
+  assert.deepEqual(MobileStudy.closeLessonPickerState(open), { open: false, mode: 'quiz', deckIds: ['d1', 'd2'], selectionMode: false, selectedIds: [] });
+  assert.equal(MobileStudy.closeLessonPickerState(null), null);
+});
+
+test('lesson picker multi-select toggles valid decks, supports select all, and clears when disabled', () => {
+  const open = MobileStudy.createLessonPickerState('flash', ['d1', 'd2', 'd3']);
+  const selecting = MobileStudy.setLessonPickerSelectionMode(open, true);
+  const first = MobileStudy.toggleLessonPickerDeck(selecting, 'd1', ['d1', 'd2', 'd3']);
+  const two = MobileStudy.toggleLessonPickerDeck(first, 'd2', ['d1', 'd2', 'd3']);
+  assert.deepEqual(two.selectedIds, ['d1', 'd2']);
+  assert.deepEqual(MobileStudy.toggleLessonPickerDeck(two, 'd1', ['d1', 'd2', 'd3']).selectedIds, ['d2']);
+  assert.deepEqual(MobileStudy.toggleLessonPickerDeck(two, 'invalid', ['d1', 'd2', 'd3']).selectedIds, ['d1', 'd2']);
+  assert.deepEqual(MobileStudy.toggleLessonPickerDeck(selecting, '*', ['d1', 'd2', 'd3', 'unknown']).selectedIds, ['d1', 'd2', 'd3']);
+  assert.deepEqual(MobileStudy.setLessonPickerSelectionMode(two, false).selectedIds, []);
+});
+
+test('devotional drafts are hidden by default and local-date selection is deterministic', () => {
+  const articles = [
+    { id: 'draft-a', title: 'Draft A', status: 'draft' },
+    { id: 'reviewed-b', title: 'Reviewed B', status: 'reviewed' },
+    { id: 'draft-c', title: 'Draft C', status: 'draft' }
+  ];
+  assert.deepEqual(MobileStudy.visibleDevotionalArticles(articles, false).map(article => article.id), ['reviewed-b']);
+  assert.deepEqual(MobileStudy.visibleDevotionalArticles(articles, true).map(article => article.id), ['draft-a', 'reviewed-b', 'draft-c']);
+  const first = MobileStudy.selectDailyDevotionals(articles, '2026-10-21', true);
+  const repeat = MobileStudy.selectDailyDevotionals(articles, '2026-10-21', true);
+  const nextDay = MobileStudy.selectDailyDevotionals(articles, '2026-10-22', true);
+  assert.equal(first.featured.id, repeat.featured.id);
+  assert.equal(first.ordered.length, 3);
+  assert.notEqual(first.featured.id, nextDay.featured.id);
+  assert.deepEqual(MobileStudy.selectDailyDevotionals(articles, '2026-10-21', false).ordered.map(article => article.id), ['reviewed-b']);
+});
+
+test('devotional state migration sanitizes read/saved IDs and hide-until dates', () => {
+  assert.deepEqual(MobileStudy.normalizeDevotionsState({
+    read: ['a', 'a', '../bad', 12], saved: ['b', 'c'], carouselHiddenOn: '2026-10-21', ignored: true
+  }), { read: ['a'], saved: ['b', 'c'], carouselHiddenOn: '2026-10-21' });
+  assert.deepEqual(MobileStudy.normalizeDevotionsState(undefined), { read: [], saved: [], carouselHiddenOn: null });
+  assert.equal(MobileStudy.normalizeDevotionsState({ carouselHiddenOn: 'tomorrow' }).carouselHiddenOn, null);
+});
+
 test('paused sessions round-trip against current deck data without changing question content', () => {
   const current = item('section-1', 'q1');
   const session = {

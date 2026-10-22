@@ -33,5 +33,10 @@ window.CciNative = {
       dialogTitle: 'Share ' + filename
     });
     return true;
+  },
+  async shareText(title, text) {
+    if (!isNative) return false;
+    await Share.share({ title, text, dialogTitle: 'Share ' + title });
+    return true;
   }
 };

@@ -16,6 +16,87 @@
     return source.slice(0, limit);
   }
 
+  function selectChallengeItems(dueItems, weakItems, unmasteredItems, limit) {
+    limit = Number.isInteger(limit) && limit > 0 ? limit : 10;
+    var selected = [], seen = new Set();
+    [dueItems, weakItems, unmasteredItems].forEach(function (group) {
+      (Array.isArray(group) ? group : []).forEach(function (item) {
+        if (selected.length >= limit || !item || !item.card || typeof item.deckId !== 'string') return;
+        var key = item.deckId + '|' + item.card.id;
+        if (seen.has(key)) return;
+        seen.add(key);
+        selected.push(item);
+      });
+    });
+    return selected;
+  }
+
+  function createLessonPickerState(mode, deckIds) {
+    if (mode !== 'flash' && mode !== 'quiz') return null;
+    return {
+      open: true,
+      mode: mode,
+      deckIds: Array.isArray(deckIds) ? deckIds.filter(function (id) { return typeof id === 'string'; }).slice() : [],
+      selectionMode: false,
+      selectedIds: []
+    };
+  }
+
+  function setLessonPickerSelectionMode(state, enabled) {
+    if (!state || !state.open) return state;
+    return Object.assign({}, state, { selectionMode: enabled === true, selectedIds: [] });
+  }
+
+  function toggleLessonPickerDeck(state, id, allIds) {
+    if (!state || !state.open || !state.selectionMode) return state;
+    var selected = Array.isArray(state.selectedIds) ? state.selectedIds.slice() : [];
+    if (id === '*') {
+      selected = Array.isArray(allIds) ? Array.from(new Set(allIds.filter(function (candidate) { return state.deckIds.indexOf(candidate) >= 0; }))) : [];
+    } else if (state.deckIds.indexOf(id) >= 0) {
+      selected = selected.indexOf(id) >= 0 ? selected.filter(function (candidate) { return candidate !== id; }) : selected.concat(id);
+    }
+    return Object.assign({}, state, { selectedIds: selected });
+  }
+
+  function closeLessonPickerState(state) {
+    return state && state.open ? Object.assign({}, state, { open: false, selectionMode: false, selectedIds: [] }) : null;
+  }
+
+  function visibleDevotionalArticles(articles, showDrafts) {
+    return (Array.isArray(articles) ? articles : []).filter(function (article) {
+      return article && typeof article.id === 'string' && typeof article.title === 'string' &&
+        (article.status === 'reviewed' || (showDrafts === true && article.status === 'draft'));
+    });
+  }
+
+  function selectDailyDevotionals(articles, localDate, showDrafts) {
+    var visible = visibleDevotionalArticles(articles, showDrafts);
+    if (!visible.length) return { featured: null, ordered: [] };
+    var day = /^\d{4}-\d{2}-\d{2}$/.test(String(localDate || '')) ? String(localDate).split('-').map(Number) : null;
+    var dayNumber = day ? Math.floor(Date.UTC(day[0], day[1] - 1, day[2]) / 86400000) : 0;
+    var index = ((dayNumber % visible.length) + visible.length) % visible.length;
+    var ordered = visible.slice(index).concat(visible.slice(0, index));
+    return { featured: ordered[0], ordered: ordered };
+  }
+
+  function normalizeDevotionsState(raw) {
+    raw = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    function ids(value) {
+      if (!Array.isArray(value)) return [];
+      var seen = new Set();
+      return value.filter(function (id) {
+        if (typeof id !== 'string' || !/^[a-zA-Z0-9._-]{1,120}$/.test(id) || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      }).slice(-500);
+    }
+    return {
+      read: ids(raw.read),
+      saved: ids(raw.saved),
+      carouselHiddenOn: typeof raw.carouselHiddenOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.carouselHiddenOn) ? raw.carouselHiddenOn : null
+    };
+  }
+
   function snapshot(session) {
     if (!session || MODES.indexOf(session.name) < 0 || !Array.isArray(session.cards)) return null;
     return {
@@ -473,6 +554,14 @@
     parseChapterTitle: parseChapterTitle,
     getChapterSteps: getChapterSteps,
     selectDailyItems: selectDailyItems,
+    selectChallengeItems: selectChallengeItems,
+    createLessonPickerState: createLessonPickerState,
+    setLessonPickerSelectionMode: setLessonPickerSelectionMode,
+    toggleLessonPickerDeck: toggleLessonPickerDeck,
+    closeLessonPickerState: closeLessonPickerState,
+    visibleDevotionalArticles: visibleDevotionalArticles,
+    selectDailyDevotionals: selectDailyDevotionals,
+    normalizeDevotionsState: normalizeDevotionsState,
     selectPlanCards: selectPlanCards,
     calculateStreak: calculateStreak,
     snapshot: snapshot,

@@ -35,7 +35,7 @@ Android builds require Android Studio and its Android SDK (or JDK 17+ and comman
 
 ### Cloud builds
 
-The [Mobile CI workflow](.github/workflows/mobile-build.yml) runs on pushes to `main` or `feature/mobile-app`, pull requests to `main`, and manual dispatch. Download its artifacts from the workflow run in GitHub Actions. It produces an Android **debug APK** and an **unsigned iOS Simulator app** zipped for download. The iOS artifact is for Simulator, not a physical iPhone; a device-installable IPA or App Store release needs Apple signing credentials and provisioning profiles.
+The [Mobile CI workflow](.github/workflows/mobile-build.yml) runs on pushes to `main`, `feature/mobile-app`, or `feature/manusai-mobile`, pull requests to `main`, and manual dispatch. Download its artifacts from the workflow run in GitHub Actions. It produces an Android **debug APK** and an **unsigned iOS Simulator app** zipped for download. The iOS artifact is for Simulator, not a physical iPhone; a device-installable IPA or App Store release needs Apple signing credentials and provisioning profiles.
 
 ### App icons and splash screens
 
@@ -63,6 +63,9 @@ node --test
 - **One-Question Study Flow:** single-question focus with large tap targets, thin progress tracking, first-use tooltip, coaching bottom sheet feedback with tappable Bible References, and encouraging completion summaries.
 - **First-Run Onboarding & Commitment:** skippable 4-question routine builder with a personalized study plan summary and interactive "tap-and-hold to commit" screen.
 - **Gentle Streaks:** optional daily streak tracker with a supportive "Daily Grace" celebration screen after the first session of the day; no guilt messaging and no required reminders.
+- **Rocket Study Menu:** quick Flashcards, Quiz, ten-question challenge, and exam launch from Home, Journey, or Practice. Pick one lesson, all lessons, or use the existing multi-deck setup through **Select several**.
+- **Daily Devotionals:** twelve offline starter readings grounded in the lesson decks and their Bible references. They remain drafts and are hidden by default; enable previews in **Settings → Content** for development, and have a leader review each article before changing its status to reviewed.
+- **Lesson titles:** learner-facing screens show topic names without curriculum section prefixes; the original deck IDs and order stay unchanged.
 - **Flashcards:** reveal answers, mark cards as known or still learning, and move with the keyboard or touch gestures.
 - **Quizzes:** choose a deck or a selection of decks, set a question limit, skip mastered cards, and retake or review missed questions. Choices are shuffled on each attempt.
 - **Spaced repetition:** study due cards from all decks with Leitner intervals of 1, 3, 7, and 14 days.
