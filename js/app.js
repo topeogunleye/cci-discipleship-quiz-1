@@ -2,7 +2,7 @@
   'use strict';
   var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 10;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
-  var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
+  var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null, desktopPractice: { mode: 'quiz', multi: false, selected: ['all'] } };
   var STARTER_DECKS = [], DEVOTIONALS = [];
   var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
   var browserLocalStorage = null, browserIndexedDB = null;
@@ -545,6 +545,51 @@
     '</nav>';
   }
 
+  function renderSidebar(currentTab) {
+    var tabs = [
+      { id: 'home', label: 'Home', icon: 'home' },
+      { id: 'journey', label: 'Journey', icon: 'journey' },
+      { id: 'practice', label: 'Practice', icon: 'practice' },
+      { id: 'progress', label: 'Progress', icon: 'progress' },
+      { id: 'settings', label: 'Settings', icon: 'settings' }
+    ];
+    var logoSvg = '<svg class="brand-logo-icon" viewBox="0 0 28 28" width="28" height="28" fill="none" aria-hidden="true">' +
+      '<defs>' +
+        '<linearGradient id="sidebar-logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">' +
+          '<stop offset="0%" stop-color="#3B2BB0"/>' +
+          '<stop offset="100%" stop-color="#7A3FD0"/>' +
+        '</linearGradient>' +
+      '</defs>' +
+      '<rect width="28" height="28" rx="8" fill="url(#sidebar-logo-grad)"/>' +
+      '<circle cx="20" cy="8" r="3.5" fill="#FFE68C"/>' +
+      '<path d="M4 22C9 17 15 16 24 20" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>' +
+    '</svg>';
+
+    return '<aside class="app-sidebar" aria-label="Main Navigation">' +
+      '<div class="sidebar-brand" data-act="nav-tab" data-tab="home" role="button" tabindex="0">' +
+        logoSvg +
+        '<span class="brand-title">Study</span>' +
+      '</div>' +
+      '<nav class="sidebar-nav" aria-label="Sidebar Navigation">' +
+        tabs.map(function (tab) {
+          var isActive = tab.id === currentTab;
+          return '<button class="sidebar-tab-btn' + (isActive ? ' active' : '') + '" data-act="nav-tab" data-tab="' + tab.id + '" aria-selected="' + (isActive ? 'true' : 'false') + '" aria-label="' + tab.label + '">' +
+            tabIconSvg(tab.icon) +
+            '<span class="sidebar-tab-label">' + tab.label + '</span>' +
+          '</button>';
+        }).join('') +
+      '</nav>' +
+    '</aside>';
+  }
+
+  function desktopHeroIllustration() {
+    return '<svg viewBox="0 0 240 140" class="desktop-hero-svg" aria-hidden="true">' +
+      '<circle cx="180" cy="45" r="26" fill="#FFE68C"/>' +
+      '<path d="M0 140 Q70 85 140 115 T260 95 L260 140 Z" fill="rgba(255, 255, 255, 0.16)"/>' +
+      '<path d="M-20 140 Q90 100 170 125 T280 110 L280 140 Z" fill="rgba(255, 255, 255, 0.22)"/>' +
+    '</svg>';
+  }
+
   views.home = function () {
     var totalCards = S.decks.reduce(function (n, d) { return n + d.cards.length; }, 0);
     var totalKnown = S.decks.reduce(function (n, d) { return n + d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length; }, 0);
@@ -702,7 +747,156 @@
       '<button class="btn sm ghost" data-act="nav-tab" data-tab="progress">View Details →</button>' +
     '</section>' : '';
 
-    return topBar + backupReminder + heroCard + devotionSection + (S.decks.length ? planSection + milestoneCard : '');
+    var mobileLayout = '<div class="home-mobile-layout">' +
+      topBar + backupReminder + heroCard + devotionSection + (S.decks.length ? planSection + milestoneCard : '') +
+    '</div>';
+
+    // Desktop Layout (Images 1 & 2)
+    var desktopTopBar = '<header class="home-desktop-header">' +
+      '<div class="desktop-header-left">' +
+        '<h1 class="desktop-view-title">Study</h1>' +
+      '</div>' +
+      '<div class="desktop-header-right">' +
+        '<button class="btn pill primary desktop-start-btn" data-act="daily-study">' +
+          '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a6.5 6.5 0 0 1 13 0"/></svg>' +
+          '<span>Start practising</span>' +
+        '</button>' +
+      '</div>' +
+    '</header>';
+
+    var desktopBackupBanner = StudyLogic.backupReminderDue(S.backupReminder, now)
+      ? '<aside class="desktop-backup-banner" role="status">' +
+          '<div class="backup-banner-left">' +
+            '<span>Last backup was ' + Math.max(1, Math.floor((now - (S.backupReminder ? S.backupReminder.lastBackupTime : 0)) / (24 * 3600 * 1000))) + ' days ago</span>' +
+          '</div>' +
+          '<div class="backup-banner-actions">' +
+            '<button class="btn link-btn" data-act="backup">Back up now</button>' +
+            '<button class="banner-close-btn" data-act="backup-dismiss" aria-label="Dismiss backup reminder">✕</button>' +
+          '</div>' +
+        '</aside>'
+      : '';
+
+    var heroStudyCardsCount = S.pausedSession ? Math.min((S.pausedSession.i || 0) + 1, (S.pausedSession.cards || []).length) : (dueCount || 9);
+    var heroTotalCount = S.pausedSession ? S.pausedSession.cards.length : 20;
+    var heroAction = S.pausedSession ? 'resume-study' : (dueCount > 0 ? 'daily-study' : ((totalKnown >= totalCards && totalCards > 0) ? 'exam' : 'daily-study'));
+
+    var desktopHeroCard = '<section class="desktop-hero-card grad-hero-indigo" aria-label="Today\'s study">' +
+      '<div class="desktop-hero-body">' +
+        '<span class="desktop-hero-kicker">Today\'s study</span>' +
+        '<h2 class="desktop-hero-heading">' + (S.pausedSession ? 'Continue · ' + heroStudyCardsCount + ' of ' + heroTotalCount + ' cards' : (dueCount > 0 ? 'Review · ' + dueCount + ' due cards' : 'Continue · 9 of 20 cards')) + '</h2>' +
+        '<button class="btn pill white desktop-continue-btn" data-act="' + heroAction + '">Continue</button>' +
+      '</div>' +
+      desktopHeroIllustration() +
+    '</section>';
+
+    var desktopStatsRow = '<div class="desktop-stats-row">' +
+      '<div class="desktop-stat-card">' +
+        '<span class="stat-number">' + masterPct + '%</span>' +
+        '<span class="stat-caption">Mastered</span>' +
+      '</div>' +
+      '<div class="desktop-stat-card">' +
+        '<span class="stat-number">' + dueCount + '</span>' +
+        '<span class="stat-caption">Due today</span>' +
+      '</div>' +
+      '<div class="desktop-stat-card">' +
+        '<span class="stat-number">' + totalCards.toLocaleString() + '</span>' +
+        '<span class="stat-caption">Cards</span>' +
+      '</div>' +
+    '</div>';
+
+    var desktopLessonsSection = '<section class="desktop-lessons-section">' +
+      '<div class="desktop-section-header">' +
+        '<h2>Lessons</h2>' +
+        '<button class="desktop-search-btn" data-act="nav-tab" data-tab="journey" aria-label="Search lessons" title="Search lessons">' +
+          '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+        '</button>' +
+      '</div>' +
+      '<div class="desktop-lessons-grid">' +
+        S.decks.map(function (d, index) {
+          var mastered = d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length;
+          var total = d.cards.length;
+          var pct = total ? Math.round(100 * mastered / total) : 0;
+          var parsed = MobileStudy.parseChapterTitle(d.title);
+          var secNum = parsed.sectionNum || (index + 1);
+          var gradClass = 'deck-grad-' + (((secNum - 1) % 12) + 1);
+          return '<button class="desktop-lesson-card ' + gradClass + '" data-act="chapter-info" data-id="' + d.id + '" aria-label="' + esc(parsed.topic) + ', ' + total + ' cards, ' + pct + '% mastered">' +
+            '<div class="lesson-card-top">' +
+              '<h3 class="lesson-topic-title">' + esc(parsed.topic) + '</h3>' +
+              '<span class="lesson-sec-pill">' + secNum + '/12</span>' +
+            '</div>' +
+            '<div class="lesson-card-bottom">' +
+              '<div class="lesson-stats-row">' +
+                '<span>' + total + ' cards</span>' +
+                '<span>' + pct + '%</span>' +
+              '</div>' +
+              '<div class="deck-progress lesson-progress-bar" role="progressbar" aria-label="' + esc(parsed.topic) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '">' +
+                '<i style="width:' + pct + '%"></i>' +
+              '</div>' +
+            '</div>' +
+          '</button>';
+        }).join('') +
+      '</div>' +
+    '</section>';
+
+    var desktopDevotionCard = todayDevotion ? ('<div class="desktop-devotion-card grad-hero-sunrise" role="region" aria-label="Today\'s Devotion">' +
+      '<span class="devotion-hero-meta">Today\'s devotion · ' + todayDevotion.readMinutes + ' min</span>' +
+      '<h3 class="devotion-hero-title">' + esc(todayDevotion.title) + '</h3>' +
+      '<p class="devotion-hero-scripture">' + esc(todayDevotion.scripture) + '</p>' +
+      '<button class="btn pill dark devotion-hero-read-btn" data-act="open-devotional" data-id="' + todayDevotion.id + '">Read now</button>' +
+    '</div>') : '';
+
+    var desktopPlanCard = '<div class="desktop-plan-box" role="region" aria-label="Your plan for today">' +
+      '<h3 class="plan-box-title">Your plan for today</h3>' +
+      '<div class="plan-box-list">' +
+        planCards.map(function (c, idx) {
+          var frac = (idx + 1) + '/' + planCards.length;
+          var isDone = c.state === 'done';
+          return '<button class="desktop-plan-row' + (isDone ? ' is-done' : '') + '" data-act="' + c.action + '"' + (c.mode ? ' data-mode="' + c.mode + '"' : '') + (c.deckId ? ' data-id="' + c.deckId + '"' : '') + (c.devotionalId ? ' data-id="' + c.devotionalId + '"' : '') + ' aria-label="' + esc(c.oneLine) + '">' +
+            '<div class="plan-row-icon" aria-hidden="true">' + (isDone ? '<span class="done-checkmark">✓</span>' : planIconSvg(c.icon)) + '</div>' +
+            '<div class="plan-row-content">' +
+              '<span class="plan-row-title">' + esc(c.title) + '</span>' +
+              '<span class="plan-row-sub">' + (c.minuteEstimate ? c.minuteEstimate + ' min' : (isDone ? 'Completed' : 'Small action')) + '</span>' +
+            '</div>' +
+            '<span class="plan-row-frac">' + frac + '</span>' +
+          '</button>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+
+    var desktopDevotionalsFeed = activeDevotionals.length ? ('<div class="desktop-devotionals-feed" role="region" aria-label="Daily devotionals feed">' +
+      '<h3 class="devotionals-feed-title">Daily devotionals</h3>' +
+      '<div class="devotionals-feed-list">' +
+        activeDevotionals.slice(0, 3).map(function (dev) {
+          var grad = dev.gradient || 'deck-grad-1';
+          return '<div class="desktop-devotional-tile ' + grad + '">' +
+            '<div class="tile-meta-block">' +
+              '<span class="tile-min">' + dev.readMinutes + ' min</span>' +
+              '<h4 class="tile-name">' + esc(dev.title) + '</h4>' +
+            '</div>' +
+            '<button class="btn sm pill white tile-read-btn" data-act="open-devotional" data-id="' + dev.id + '" aria-label="Read ' + esc(dev.title) + '">Read</button>' +
+          '</div>';
+        }).join('') +
+      '</div>' +
+    '</div>') : '';
+
+    var desktopLayout = '<div class="home-desktop-layout">' +
+      desktopTopBar +
+      desktopBackupBanner +
+      '<div class="home-columns-container">' +
+        '<div class="home-col-main">' +
+          desktopHeroCard +
+          desktopStatsRow +
+          desktopLessonsSection +
+        '</div>' +
+        '<div class="home-col-side">' +
+          desktopDevotionCard +
+          desktopPlanCard +
+          desktopDevotionalsFeed +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    return mobileLayout + desktopLayout;
   };
 
   
@@ -884,44 +1078,144 @@
     var all = allCardItems();
     var dueCount = StudyLogic.dueItems(all, now).length;
     var weakCount = StudyLogic.weakSpots(all, 10).length;
-    return '<header class="view-header">' +
-      '<h1>Practice</h1>' +
-      '<p class="view-sub">Master your questions through focused study modes</p>' +
-    '</header>' +
-    '<div class="practice-grid">' +
-      '<button class="practice-card" data-act="daily-study">' +
-        '<div class="practice-icon">' + planIconSvg('review') + '</div>' +
-        '<div class="practice-body">' +
-          '<div class="practice-title">Today’s Focus Study</div>' +
-          '<div class="practice-desc">Focused 10-card daily review prioritized by spaced repetition.</div>' +
-        '</div>' +
-        '<span class="practice-arrow" aria-hidden="true">→</span>' +
+    var totalCards = S.decks.reduce(function (n, d) { return n + d.cards.length; }, 0);
+
+    if (!S.desktopPractice || typeof S.desktopPractice !== 'object') {
+      S.desktopPractice = { mode: 'quiz', multi: false, selected: ['all'] };
+    }
+    var currentMode = S.desktopPractice.mode || 'quiz';
+    var isMulti = !!S.desktopPractice.multi;
+    var selectedIds = S.desktopPractice.selected || ['all'];
+
+    // Mobile layout
+    var mobileHtml = '<div class="practice-mobile-layout">' +
+      '<header class="view-header">' +
+        '<h1>Practice</h1>' +
+        '<p class="view-sub">Master your questions through focused study modes</p>' +
+      '</header>' +
+      '<div class="practice-grid">' +
+        '<button class="practice-card" data-act="daily-study">' +
+          '<div class="practice-icon">' + planIconSvg('review') + '</div>' +
+          '<div class="practice-body">' +
+            '<div class="practice-title">Today’s Focus Study</div>' +
+            '<div class="practice-desc">Focused 10-card daily review prioritized by spaced repetition.</div>' +
+          '</div>' +
+          '<span class="practice-arrow" aria-hidden="true">→</span>' +
+        '</button>' +
+        '<button class="practice-card" data-act="due">' +
+          '<div class="practice-icon">' + planIconSvg('review') + '</div>' +
+          '<div class="practice-body">' +
+            '<div class="practice-title">Due Cards Review ' + (dueCount ? '<span class="badge">' + dueCount + '</span>' : '') + '</div>' +
+            '<div class="practice-desc">' + (dueCount ? plural(dueCount, 'card') + ' scheduled for review today.' : 'All caught up! No cards currently due.') + '</div>' +
+          '</div>' +
+          '<span class="practice-arrow" aria-hidden="true">→</span>' +
+        '</button>' +
+        '<button class="practice-card" data-act="weak">' +
+          '<div class="practice-icon">' + planIconSvg('target') + '</div>' +
+          '<div class="practice-body">' +
+            '<div class="practice-title">Weak Spots</div>' +
+            '<div class="practice-desc">' + (weakCount ? 'Practice questions you have missed most frequently.' : 'Build stats by studying cards to surface weak spots.') + '</div>' +
+          '</div>' +
+          '<span class="practice-arrow" aria-hidden="true">→</span>' +
+        '</button>' +
+        '<button class="practice-card" data-act="exam">' +
+          '<div class="practice-icon">' + planIconSvg('trophy') + '</div>' +
+          '<div class="practice-body">' +
+            '<div class="practice-title">Comprehensive Timed Exam</div>' +
+            '<div class="practice-desc">Timed exam across all 12 decks with complete answer review upon submission.</div>' +
+          '</div>' +
+          '<span class="practice-arrow" aria-hidden="true">→</span>' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+
+    // Desktop layout (Images 3 & 4)
+    var modeIcons = {
+      challenge: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>',
+      exam: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/></svg>',
+      quiz: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
+      flash: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><rect x="7" y="8" width="10" height="8" rx="1.5"/></svg>'
+    };
+
+    var desktopModesHtml = '<div class="desktop-practice-modes-row">' +
+      '<button class="desktop-mode-pill-card' + (currentMode === 'challenge' ? ' is-active' : '') + '" data-act="desktop-practice-mode" data-mode="challenge">' +
+        '<span class="mode-icon-badge badge-orange">' + modeIcons.challenge + '</span>' +
+        '<div class="mode-info"><strong class="mode-title">Start a Challenge</strong><span class="mode-desc">About 5 minutes</span></div>' +
       '</button>' +
-      '<button class="practice-card" data-act="due">' +
-        '<div class="practice-icon">' + planIconSvg('review') + '</div>' +
-        '<div class="practice-body">' +
-          '<div class="practice-title">Due Cards Review ' + (dueCount ? '<span class="badge">' + dueCount + '</span>' : '') + '</div>' +
-          '<div class="practice-desc">' + (dueCount ? plural(dueCount, 'card') + ' scheduled for review today.' : 'All caught up! No cards currently due.') + '</div>' +
-        '</div>' +
-        '<span class="practice-arrow" aria-hidden="true">→</span>' +
+      '<button class="desktop-mode-pill-card' + (currentMode === 'exam' ? ' is-active' : '') + '" data-act="desktop-practice-mode" data-mode="exam">' +
+        '<span class="mode-icon-badge badge-indigo">' + modeIcons.exam + '</span>' +
+        '<div class="mode-info"><strong class="mode-title">Start Exam</strong><span class="mode-desc">Full run</span></div>' +
       '</button>' +
-      '<button class="practice-card" data-act="weak">' +
-        '<div class="practice-icon">' + planIconSvg('target') + '</div>' +
-        '<div class="practice-body">' +
-          '<div class="practice-title">Weak Spots</div>' +
-          '<div class="practice-desc">' + (weakCount ? 'Practice questions you have missed most frequently.' : 'Build stats by studying cards to surface weak spots.') + '</div>' +
-        '</div>' +
-        '<span class="practice-arrow" aria-hidden="true">→</span>' +
+      '<button class="desktop-mode-pill-card' + (currentMode === 'quiz' ? ' is-active' : '') + '" data-act="desktop-practice-mode" data-mode="quiz">' +
+        '<span class="mode-icon-badge badge-crimson">' + modeIcons.quiz + '</span>' +
+        '<div class="mode-info"><strong class="mode-title">Quiz</strong><span class="mode-desc">Multiple choice</span></div>' +
       '</button>' +
-      '<button class="practice-card" data-act="exam">' +
-        '<div class="practice-icon">' + planIconSvg('trophy') + '</div>' +
-        '<div class="practice-body">' +
-          '<div class="practice-title">Comprehensive Timed Exam</div>' +
-          '<div class="practice-desc">Timed exam across all 12 decks with complete answer review upon submission.</div>' +
-        '</div>' +
-        '<span class="practice-arrow" aria-hidden="true">→</span>' +
+      '<button class="desktop-mode-pill-card' + (currentMode === 'flash' ? ' is-active' : '') + '" data-act="desktop-practice-mode" data-mode="flash">' +
+        '<span class="mode-icon-badge badge-blue">' + modeIcons.flash + '</span>' +
+        '<div class="mode-info"><strong class="mode-title">Flashcards</strong><span class="mode-desc">Flip and recall</span></div>' +
       '</button>' +
     '</div>';
+
+    var isAllSelected = selectedIds.indexOf('all') >= 0;
+    var isMixedSelected = selectedIds.indexOf('mixed') >= 0;
+
+    var desktopCoverCardsHtml = '<div class="desktop-cover-grid">' +
+      '<button class="desktop-cover-tile tile-all' + (isAllSelected ? ' is-selected' : '') + '" data-act="desktop-practice-select" data-id="all">' +
+        (isAllSelected ? '<span class="tile-check-circle" aria-hidden="true">✓</span>' : '') +
+        '<h3 class="tile-heading">All lessons</h3>' +
+        '<span class="tile-subtext">' + totalCards.toLocaleString() + ' cards</span>' +
+      '</button>' +
+      '<button class="desktop-cover-tile tile-mixed grad-hero-sunrise' + (isMixedSelected ? ' is-selected' : '') + '" data-act="desktop-practice-select" data-id="mixed">' +
+        (isMixedSelected ? '<span class="tile-check-circle" aria-hidden="true">✓</span>' : '') +
+        '<h3 class="tile-heading">Mixed review</h3>' +
+        '<span class="tile-subtext">Due + weak spots</span>' +
+      '</button>' +
+      S.decks.map(function (d, index) {
+        var mastered = d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length;
+        var total = d.cards.length;
+        var pct = total ? Math.round(100 * mastered / total) : 0;
+        var parsed = MobileStudy.parseChapterTitle(d.title);
+        var secNum = parsed.sectionNum || (index + 1);
+        var gradClass = 'deck-grad-' + (((secNum - 1) % 12) + 1);
+        var isSelected = selectedIds.indexOf(d.id) >= 0;
+        return '<button class="desktop-cover-tile ' + gradClass + (isSelected ? ' is-selected' : '') + '" data-act="desktop-practice-select" data-id="' + d.id + '">' +
+          (isSelected ? '<span class="tile-check-circle" aria-hidden="true">✓</span>' : '') +
+          '<h3 class="tile-heading">Lesson ' + secNum + ' · ' + esc(parsed.topic) + '</h3>' +
+          '<span class="tile-subtext">' + total + ' cards · ' + pct + '%</span>' +
+        '</button>';
+      }).join('') +
+    '</div>';
+
+    var selectionCount = selectedIds.length;
+    var countLabel = isAllSelected ? 'All lessons selected' : (isMixedSelected ? 'Mixed review selected' : (selectionCount + (selectionCount === 1 ? ' selection ready' : ' selections ready')));
+    var btnModeLabel = currentMode === 'flash' ? 'flashcards' : (currentMode === 'challenge' ? 'challenge' : (currentMode === 'exam' ? 'exam' : 'quiz'));
+    var btnSetsLabel = (isAllSelected || isMixedSelected) ? ('Start ' + btnModeLabel) : ('Start ' + btnModeLabel + ' · ' + selectionCount + (selectionCount === 1 ? ' set' : ' sets'));
+
+    var desktopHtml = '<div class="practice-desktop-layout">' +
+      '<header class="practice-desktop-header">' +
+        '<h1>Practice</h1>' +
+        '<p class="practice-desktop-sub">Pick how you want to practise, then choose what to cover.</p>' +
+      '</header>' +
+      desktopModesHtml +
+      '<div class="desktop-cover-section">' +
+        '<div class="desktop-cover-head">' +
+          '<h2>What to cover</h2>' +
+          '<label class="desktop-toggle-control">' +
+            '<span class="toggle-label">Select several</span>' +
+            '<button class="toggle-pill-switch' + (isMulti ? ' is-on' : '') + '" data-act="desktop-practice-toggle-multi" role="switch" aria-checked="' + isMulti + '">' +
+              '<span class="switch-knob"></span>' +
+            '</button>' +
+          '</label>' +
+        '</div>' +
+        desktopCoverCardsHtml +
+      '</div>' +
+      '<div class="desktop-sticky-launch-bar">' +
+        '<span class="launch-status-text">' + countLabel + '</span>' +
+        '<button class="btn pill primary desktop-launch-button" data-act="desktop-practice-launch">' + btnSetsLabel + '</button>' +
+      '</div>' +
+    '</div>';
+
+    return mobileHtml + desktopHtml;
   };
 
   views.progress = function () {
@@ -1098,14 +1392,21 @@
 
     var opts = order.map(function (source, k) {
       var cls = 'opt';
+      var stateIcon = '';
       if (done && isExam && k === picked) cls += ' selected';
       else if (done && !isExam) {
-        if (LET[source] === c.answer) cls += ' right';
-        else if (k === picked) cls += ' wrong';
+        if (LET[source] === c.answer) {
+          cls += ' right';
+          stateIcon = '<span class="opt-status-icon right" aria-hidden="true">✓</span>';
+        } else if (k === picked) {
+          cls += ' wrong';
+          stateIcon = '<span class="opt-status-icon wrong" aria-hidden="true">✕</span>';
+        }
       }
       return '<button class="' + cls + '" data-act="pick" data-i="' + k + '" aria-label="' + LET[k] + '. ' + esc(c.options[source]) + '" aria-pressed="' + (done && k === picked) + '"' + (done ? ' disabled' : '') + '>' +
         '<span class="opt-badge" aria-hidden="true">' + LET[k] + '</span>' +
         '<span class="opt-text">' + esc(c.options[source]) + '</span>' +
+        stateIcon +
       '</button>';
     }).join('');
 
@@ -1124,6 +1425,7 @@
           '<div class="sheet-drag-handle" aria-hidden="true"></div>' +
           '<div class="sheet-content">' +
             '<div class="feedback-panel ' + (ok ? 'is-correct' : 'is-incorrect') + '">' +
+              '<h3 class="feedback-desktop-headline ' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'Spot on!' : 'Nice try, here\'s why') + '</h3>' +
               '<div class="feedback-header">' +
                 '<span class="feedback-mark-icon" aria-hidden="true">' + (ok ? '✓' : '✗') + '</span>' +
                 '<p class="fb ' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'Correct.' : 'Not quite.') + '</p>' +
@@ -1133,7 +1435,7 @@
               (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') +
               bibleNote(c) +
             '</div>' +
-            '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Next question') + '</button>' +
+            '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Continue') + '</button>' +
           '</div>' +
         '</div>';
       }
@@ -1142,18 +1444,20 @@
     var title = isExam ? 'Exam' : 'Quiz';
     var status = isExam
       ? '<span id="exam-clock" role="timer" aria-label="Time remaining ' + formatClock(V.remaining) + '">' + formatClock(V.remaining) + '</span>'
-      : '<span class="score-inline">' + V.score + '<span aria-hidden="true"> / </span><span class="sr-only">out of</span>' + V.answers.length + '</span>';
+      : '<span class="score-inline">' + (V.i + 1) + '/' + V.cards.length + '</span>';
 
     return '<section class="study-shell ' + (isExam ? 'exam-session' : 'quiz-session') + ' coaching-study-flow" aria-label="' + (isExam ? 'Timed exam' : 'Quiz') + '">' +
       sessionHead(sessionTitle, status, isExam) +
       progressBar(V.i + (done ? 1 : 0), V.cards.length) +
-      '<article class="question-panel coaching-question-panel">' +
-        '<div class="question-meta-row">' +
-          '<span class="count">Question ' + (V.i + 1) + ' of ' + V.cards.length + '</span>' +
-          (showTooltip ? '<div class="coaching-first-tooltip" role="tooltip"><span class="tooltip-dot" aria-hidden="true"></span>Tap an answer to check it</div>' : '') +
+      '<article class="question-panel coaching-question-panel' + (done ? ' has-feedback' : '') + '">' +
+        '<div class="coaching-question-col">' +
+          '<div class="question-meta-row">' +
+            '<span class="count">Question ' + (V.i + 1) + ' of ' + V.cards.length + '</span>' +
+            (showTooltip ? '<div class="coaching-first-tooltip" role="tooltip"><span class="tooltip-dot" aria-hidden="true"></span>Tap an answer to check it</div>' : '') +
+          '</div>' +
+          '<h2 class="qtext coaching-question-text" id="question-prompt" tabindex="-1">' + esc(c.question) + '</h2>' +
+          '<div class="opts coaching-opts-group" role="group" aria-labelledby="question-prompt">' + opts + '</div>' +
         '</div>' +
-        '<h2 class="qtext coaching-question-text" id="question-prompt" tabindex="-1">' + esc(c.question) + '</h2>' +
-        '<div class="opts coaching-opts-group" role="group" aria-labelledby="question-prompt">' + opts + '</div>' +
         (done ? fbSheet : '') +
       '</article>' +
       '<p class="study-shortcuts">Choose A–D or 1–4' + (done ? '' : ' · Enter a selection to continue') + '</p>' +
@@ -1273,7 +1577,26 @@
       ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>'
       : '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
 
+    var moreDevotionalsList = DEVOTIONALS
+      .filter(function (d) { return d.id !== dev.id && (S.settings.showDraftDevotionals || d.status === 'reviewed'); })
+      .slice(0, 3)
+      .map(function (other) {
+        var otherGrad = other.gradient || 'deck-grad-1';
+        return '<button class="devotional-side-tile ' + otherGrad + '" data-act="open-devotional" data-id="' + other.id + '" aria-label="Read ' + esc(other.title) + '">' +
+          '<span class="tile-meta">' + other.readMinutes + ' min · ' + esc(other.scripture) + '</span>' +
+          '<h4 class="tile-title">' + esc(other.title) + '</h4>' +
+        '</button>';
+      }).join('');
+
     return '<article class="devotional-view-shell" aria-labelledby="devotional-title">' +
+      '<div class="devotional-desktop-hero-banner ' + gradClass + '">' +
+        '<button class="devotional-back-circle-btn" data-act="close-devotional" aria-label="Go back to Home">‹</button>' +
+        '<svg viewBox="0 0 240 100" class="devotional-banner-svg" aria-hidden="true">' +
+          '<circle cx="190" cy="35" r="22" fill="#FFE68C"/>' +
+          '<path d="M0 100 Q60 55 130 75 T260 65 L260 100 Z" fill="rgba(255, 255, 255, 0.16)"/>' +
+          '<path d="M-20 100 Q80 65 160 85 T280 75 L280 100 Z" fill="rgba(255, 255, 255, 0.22)"/>' +
+        '</svg>' +
+      '</div>' +
       '<header class="devotional-header ' + gradClass + '">' +
         '<div class="devotional-nav-row">' +
           '<button class="devotional-back-btn" data-act="close-devotional" aria-label="Go back to Home">‹ Home</button>' +
@@ -1289,25 +1612,50 @@
         '</div>' +
         chapterSvgIllustration(1) +
       '</header>' +
-      '<div class="devotional-content-body">' +
-        (dev.scriptureText ? '<blockquote class="devotional-scripture-quote"><strong>' + esc(dev.scripture) + '</strong><p>' + esc(dev.scriptureText) + '</p></blockquote>' : '') +
-        '<div class="devotional-paragraphs">' +
-          visibleParagraphs.map(function (p) { return '<p class="devotional-p">' + esc(p) + '</p>'; }).join('') +
+      '<div class="devotional-desktop-split-container">' +
+        '<div class="devotional-content-body">' +
+          '<div class="devotional-desktop-title-block">' +
+            '<h1 class="devotional-desktop-heading">' + esc(dev.title) + '</h1>' +
+            '<p class="devotional-desktop-subheading">' + esc(dev.subtitle) + '</p>' +
+            '<span class="devotional-desktop-time">' + dev.readMinutes + ' min read</span>' +
+          '</div>' +
+          '<div class="devotional-reading-card">' +
+            (dev.scriptureText ? '<blockquote class="devotional-scripture-quote"><strong>' + esc(dev.scripture) + '</strong><p>' + esc(dev.scriptureText) + '</p></blockquote>' : '') +
+            '<div class="devotional-paragraphs">' +
+              visibleParagraphs.map(function (p) { return '<p class="devotional-p">' + esc(p) + '</p>'; }).join('') +
+            '</div>' +
+            (bodyParagraphs.length > 1 ? '<button class="devotional-more-btn" data-act="toggle-devotion-expand" aria-expanded="' + (expanded ? 'true' : 'false') + '">' + (expanded ? 'Less' : 'Read more') + '</button>' : '') +
+          '</div>' +
+          '<div class="devotional-callout reflection-box">' +
+            '<div class="callout-head"><span class="callout-icon" aria-hidden="true">💭</span><h2 class="callout-title">Reflection</h2></div>' +
+            '<p class="callout-text">' + esc(dev.reflection) + '</p>' +
+          '</div>' +
+          '<div class="devotional-callout step-box">' +
+            '<div class="callout-head"><span class="callout-icon" aria-hidden="true">👣</span><h2 class="callout-title">Today’s step</h2></div>' +
+            '<p class="callout-text">' + esc(dev.step) + '</p>' +
+            '<button class="btn primary sm step-action-btn' + (isRead ? ' is-done' : '') + '" data-act="devotion-mark-read" data-id="' + dev.id + '">' + (isRead ? 'Done! What’s next?' : 'Mark step done') + '</button>' +
+          '</div>' +
+          '<div class="devotional-footer-bar">' +
+            (isRead
+              ? '<button class="btn primary full btn-continue" data-act="devotion-study-lesson" data-id="' + dev.lessonId + '">Study this lesson →</button>'
+              : '<button class="btn primary full btn-continue" data-act="devotion-mark-read" data-id="' + dev.id + '">Mark as read ✓</button>') +
+          '</div>' +
         '</div>' +
-        (bodyParagraphs.length > 1 ? '<button class="devotional-more-btn" data-act="toggle-devotion-expand" aria-expanded="' + (expanded ? 'true' : 'false') + '">' + (expanded ? 'Show less ↑' : 'Read more ↓') + '</button>' : '') +
-        '<div class="devotional-callout reflection-box">' +
-          '<div class="callout-head"><span class="callout-icon" aria-hidden="true">💭</span><h2 class="callout-title">Reflection</h2></div>' +
-          '<p class="callout-text">' + esc(dev.reflection) + '</p>' +
-        '</div>' +
-        '<div class="devotional-callout step-box">' +
-          '<div class="callout-head"><span class="callout-icon" aria-hidden="true">👣</span><h2 class="callout-title">Today’s Step</h2></div>' +
-          '<p class="callout-text">' + esc(dev.step) + '</p>' +
-        '</div>' +
-        '<div class="devotional-footer-bar">' +
-          (isRead
-            ? '<button class="btn primary full btn-continue" data-act="devotion-study-lesson" data-id="' + dev.lessonId + '">Study this lesson →</button>'
-            : '<button class="btn primary full btn-continue" data-act="devotion-mark-read" data-id="' + dev.id + '">Mark as read ✓</button>') +
-        '</div>' +
+        '<aside class="devotional-desktop-side-rail" aria-label="Devotional Actions and Related Articles">' +
+          '<div class="devotional-side-actions">' +
+            '<div class="side-actions-row">' +
+              '<button class="btn pill secondary side-action-pill" data-act="devotion-share" data-id="' + dev.id + '">Share</button>' +
+              '<button class="btn pill secondary side-action-pill' + (isSaved ? ' active' : '') + '" data-act="devotion-toggle-save" data-id="' + dev.id + '">' + (isSaved ? 'Saved' : 'Save') + '</button>' +
+            '</div>' +
+            (isRead
+              ? '<button class="btn pill primary full side-mark-read-btn" data-act="devotion-study-lesson" data-id="' + dev.lessonId + '">Study this lesson</button>'
+              : '<button class="btn pill primary full side-mark-read-btn" data-act="devotion-mark-read" data-id="' + dev.id + '">Mark as read</button>') +
+          '</div>' +
+          (moreDevotionalsList ? ('<div class="devotional-more-section">' +
+            '<h3 class="more-devotionals-title">More devotionals</h3>' +
+            '<div class="more-devotionals-list">' + moreDevotionalsList + '</div>' +
+          '</div>') : '') +
+        '</aside>' +
       '</div>' +
     '</article>';
   };
@@ -1835,10 +2183,20 @@
     var isMainTab = MAIN_TABS.indexOf(V.name) >= 0;
     var view = V.name === 'exam' ? views.quiz : views[V.name];
     if (typeof view !== 'function') view = views.home;
+    var currentTabId = V.name === 'devotional' ? 'home' : (isMainTab ? V.name : 'home');
+    var sidebarHtml = (isMainTab || V.name === 'devotional') ? renderSidebar(currentTabId) : '';
     var tabBarHtml = isMainTab ? renderTabBar(V.name) : '';
     var showRocket = V.name === 'home' || V.name === 'journey' || V.name === 'practice';
     var rocketHtml = showRocket ? renderRocketFab() : '';
-    app.innerHTML = banner() + view() + tabBarHtml + rocketHtml;
+
+    if (isMainTab || V.name === 'devotional') {
+      app.innerHTML = '<div class="app-shell">' +
+        sidebarHtml +
+        '<div class="app-main">' + banner() + view() + tabBarHtml + rocketHtml + '</div>' +
+      '</div>';
+    } else {
+      app.innerHTML = '<div class="app-focus-shell">' + banner() + view() + '</div>';
+    }
     if (!keep) window.scrollTo(0, 0);
     if (V.name === 'flash') {
       var f = app.querySelector('.flip');
@@ -2081,17 +2439,92 @@
           var infoDue = infoDeck.cards.filter(function (c) { return StudyLogic.isDueToday(infoProg.cards[c.id], Date.now()); }).length;
           var infoWeak = infoDeck.cards.filter(function (c) { var r = infoProg.cards[c.id]; return r && typeof r === 'object' && r.attempts > 0 && r.misses > 0; }).length;
           var infoParsed = MobileStudy.parseChapterTitle(infoDeck.title);
-          openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="chapter-info-title">' +
-            '<h2 id="chapter-info-title">' + esc(infoParsed.topic) + '</h2>' +
-            '<p class="meta">' + infoParsed.sectionNum + '/12 · ' + plural(infoDeck.cards.length, 'question') + '</p>' +
-            '<div class="statline" style="margin: 16px 0">' +
-              '<div class="stat"><b>' + infoMastered + ' / ' + infoDeck.cards.length + '</b><span>Mastered</span></div>' +
-              '<div class="stat"><b>' + (infoProg.best ? infoProg.best.pct + '%' : '—') + '</b><span>Best Quiz</span></div>' +
-              '<div class="stat"><b>' + infoDue + '</b><span>Due</span></div>' +
-              '<div class="stat"><b>' + infoWeak + '</b><span>Weak</span></div>' +
+          var infoPct = infoDeck.cards.length ? Math.round(100 * infoMastered / infoDeck.cards.length) : 0;
+          var gradIdx = (((infoParsed.sectionNum - 1) % 12) + 1);
+          var infoGrad = 'deck-grad-' + gradIdx;
+
+          openModal('<div class="scrim" data-act="close"></div><div class="sheet chapter-desktop-modal-sheet" role="dialog" aria-modal="true" aria-labelledby="chapter-info-title">' +
+            '<div class="modal-deck-hero ' + infoGrad + '">' +
+              '<h2 id="chapter-info-title" class="modal-deck-title">' + esc(infoParsed.topic) + '</h2>' +
+              '<p class="meta modal-deck-sub">Lesson ' + infoParsed.sectionNum + ' · ' + infoParsed.sectionNum + '/12</p>' +
+              '<div class="deck-progress modal-deck-progress-bar" role="progressbar" aria-label="' + esc(infoParsed.topic) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + infoPct + '">' +
+                '<i style="width:' + infoPct + '%"></i>' +
+              '</div>' +
             '</div>' +
-            '<div class="row end"><button class="btn primary" data-act="close">Done</button></div>' +
+            '<div class="modal-deck-stats-row">' +
+              '<div class="modal-deck-stat"><b>' + infoDeck.cards.length + '</b><span>Cards</span></div>' +
+              '<div class="modal-deck-stat"><b>' + infoMastered + '</b><span>Mastered</span></div>' +
+              '<div class="modal-deck-stat"><b>' + infoWeak + '</b><span>Weak spots</span></div>' +
+            '</div>' +
+            '<div class="modal-deck-actions">' +
+              '<button class="btn primary pill modal-study-btn" data-act="open-chapter" data-id="' + infoDeck.id + '">Study this lesson</button>' +
+              '<button class="btn ghost pill modal-close-btn" data-act="close">Close</button>' +
+            '</div>' +
           '</div>');
+        }
+        break;
+      case 'desktop-practice-mode':
+        if (!S.desktopPractice) S.desktopPractice = { mode: 'quiz', multi: false, selected: ['all'] };
+        S.desktopPractice.mode = t.dataset.mode;
+        render(true);
+        break;
+      case 'desktop-practice-toggle-multi':
+        if (!S.desktopPractice) S.desktopPractice = { mode: 'quiz', multi: false, selected: ['all'] };
+        S.desktopPractice.multi = !S.desktopPractice.multi;
+        if (!S.desktopPractice.multi && S.desktopPractice.selected.length > 1) {
+          S.desktopPractice.selected = [S.desktopPractice.selected[0]];
+        }
+        render(true);
+        break;
+      case 'desktop-practice-select':
+        if (!S.desktopPractice) S.desktopPractice = { mode: 'quiz', multi: false, selected: ['all'] };
+        var selId = t.dataset.id;
+        if (S.desktopPractice.multi) {
+          if (selId === 'all' || selId === 'mixed') {
+            S.desktopPractice.selected = [selId];
+          } else {
+            var currentSel = S.desktopPractice.selected.filter(function (x) { return x !== 'all' && x !== 'mixed'; });
+            var idx = currentSel.indexOf(selId);
+            if (idx >= 0) {
+              currentSel.splice(idx, 1);
+              if (!currentSel.length) currentSel = ['all'];
+            } else {
+              currentSel.push(selId);
+            }
+            S.desktopPractice.selected = currentSel;
+          }
+        } else {
+          S.desktopPractice.selected = [selId];
+        }
+        render(true);
+        break;
+      case 'desktop-practice-launch':
+        var dpMode = (S.desktopPractice && S.desktopPractice.mode) || 'quiz';
+        var dpSelected = (S.desktopPractice && S.desktopPractice.selected) || ['all'];
+        if (dpMode === 'challenge' || dpSelected.indexOf('mixed') >= 0) {
+          startDailyStudy();
+        } else if (dpMode === 'exam') {
+          setupExam();
+        } else {
+          var targetDecks = [];
+          if (dpSelected.indexOf('all') >= 0) {
+            targetDecks = S.decks;
+          } else {
+            targetDecks = S.decks.filter(function (d) { return dpSelected.indexOf(d.id) >= 0; });
+          }
+          if (!targetDecks.length) targetDecks = S.decks;
+          var cardsToStudy = [];
+          targetDecks.forEach(function (d) {
+            d.cards.forEach(function (c) {
+              cardsToStudy.push({ deckId: d.id, card: c });
+            });
+          });
+          if (!cardsToStudy.length) {
+            toast('No cards found in selection.');
+            return;
+          }
+          var studyLimit = dpMode === 'quiz' ? Math.min(20, cardsToStudy.length) : cardsToStudy.length;
+          begin(dpMode, shuffle(cardsToStudy), { unk: false, limit: studyLimit, shuf: true }, targetDecks.map(function (d) { return d.id; }));
         }
         break;
       case 'chapter-menu':

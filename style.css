@@ -4963,3 +4963,1256 @@ button.opt.wrong .opt-badge {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* ============================================================
+   Desktop & Larger-Screen Responsive Layouts (Images 1-10)
+   ============================================================ */
+
+/* Base visibility defaults for mobile (< 768px) */
+.app-sidebar {
+  display: none !important;
+}
+
+.home-desktop-layout {
+  display: none !important;
+}
+
+.practice-desktop-layout {
+  display: none !important;
+}
+
+.devotional-desktop-hero-banner {
+  display: none !important;
+}
+
+.devotional-desktop-title-block {
+  display: none !important;
+}
+
+.devotional-desktop-side-rail {
+  display: none !important;
+}
+
+.feedback-desktop-headline {
+  display: none;
+}
+
+.opt-status-icon {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.opt-status-icon.right {
+  color: var(--ok);
+}
+
+.opt-status-icon.wrong {
+  color: var(--bad);
+}
+
+/* Tablet Breakpoint (768px - 1023px) */
+@media (min-width: 768px) {
+  #app {
+    max-width: 1200px;
+    padding: var(--space-xl) var(--space-lg);
+  }
+
+  .bottom-tab-bar {
+    display: none !important;
+  }
+
+  .rocket-container {
+    display: none !important;
+  }
+
+  .app-shell {
+    display: flex;
+    gap: var(--space-lg);
+    align-items: flex-start;
+  }
+
+  .app-sidebar {
+    display: flex !important;
+    flex-direction: column;
+    width: 68px;
+    flex-shrink: 0;
+    position: sticky;
+    top: var(--space-xl);
+    align-self: flex-start;
+    background: var(--surface);
+    border-radius: var(--radius-card);
+    padding: var(--space-md) var(--space-xs);
+    box-shadow: var(--shadow);
+    align-items: center;
+  }
+
+  .app-sidebar .sidebar-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 0 18px;
+    cursor: pointer;
+  }
+
+  .app-sidebar .sidebar-brand .brand-title {
+    display: none;
+  }
+
+  .app-sidebar .sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    align-items: center;
+  }
+
+  .app-sidebar .sidebar-tab-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-btn);
+    border: none;
+    background: transparent;
+    color: var(--ink-secondary);
+    cursor: pointer;
+    transition: background var(--duration-fast), color var(--duration-fast);
+  }
+
+  .app-sidebar .sidebar-tab-btn:hover {
+    background: var(--btn-secondary-bg);
+    color: var(--ink);
+  }
+
+  .app-sidebar .sidebar-tab-btn.active {
+    background: var(--surface-raised);
+    color: var(--accent);
+    box-shadow: var(--shadow);
+  }
+
+  .app-sidebar .sidebar-tab-label {
+    display: none;
+  }
+
+  .app-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chapter-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--space-lg) !important;
+  }
+}
+
+/* Desktop Breakpoint (>= 1024px) */
+@media (min-width: 1024px) {
+  #app {
+    max-width: 1440px;
+    padding: var(--space-2xl) var(--space-2xl) var(--space-3xl);
+  }
+
+  /* Full Desktop Sidebar (Images 1-7) */
+  .app-shell {
+    gap: var(--space-2xl);
+  }
+
+  .app-sidebar {
+    width: 220px !important;
+    padding: var(--space-md) var(--space-sm) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    align-items: stretch !important;
+  }
+
+  .app-sidebar .sidebar-brand {
+    justify-content: flex-start !important;
+    padding: 8px 12px 24px !important;
+    gap: 12px;
+  }
+
+  .app-sidebar .sidebar-brand .brand-title {
+    display: inline-block !important;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+
+  .app-sidebar .sidebar-nav {
+    align-items: stretch !important;
+    gap: 6px !important;
+  }
+
+  .app-sidebar .sidebar-tab-btn {
+    width: 100% !important;
+    height: auto !important;
+    padding: 12px 18px !important;
+    justify-content: flex-start !important;
+    gap: 14px;
+    font-size: 1rem;
+    font-weight: 500;
+    border-radius: 999px;
+  }
+
+  .app-sidebar .sidebar-tab-label {
+    display: inline-block !important;
+  }
+
+  .app-sidebar .sidebar-tab-btn.active {
+    background: var(--surface) !important;
+    color: var(--accent) !important;
+    font-weight: 700;
+    box-shadow: var(--shadow);
+  }
+
+  /* Home Screen Desktop Layout (Images 1 & 2) */
+  .home-mobile-layout {
+    display: none !important;
+  }
+
+  .home-desktop-layout {
+    display: block !important;
+  }
+
+  .home-desktop-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .home-desktop-header .desktop-view-title {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+  }
+
+  .desktop-start-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 26px;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .desktop-backup-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #FFF1E6;
+    color: #8A4B00;
+    border-radius: 14px;
+    padding: 14px 22px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin-bottom: 28px;
+  }
+
+  .desktop-backup-banner .backup-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .desktop-backup-banner .link-btn {
+    background: none;
+    border: none;
+    color: var(--link);
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.92rem;
+    padding: 0;
+  }
+
+  .desktop-backup-banner .banner-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    color: inherit;
+    opacity: 0.7;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .home-columns-container {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 32px;
+    align-items: flex-start;
+  }
+
+  .home-col-main {
+    min-width: 0;
+  }
+
+  /* Hero Card Desktop */
+  .desktop-hero-card {
+    border-radius: var(--radius-card);
+    padding: 32px 36px;
+    color: #FFFFFF;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+  }
+
+  .desktop-hero-card.grad-hero-indigo {
+    background: linear-gradient(135deg, #3B2BB0 0%, #7A3FD0 100%);
+  }
+
+  .desktop-hero-body {
+    position: relative;
+    z-index: 2;
+  }
+
+  .desktop-hero-kicker {
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.9;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .desktop-hero-heading {
+    font-size: 1.85rem;
+    font-weight: 700;
+    line-height: 1.25;
+    margin-bottom: 20px;
+  }
+
+  .desktop-continue-btn {
+    background: #FFFFFF !important;
+    color: #16152B !important;
+    padding: 10px 28px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  }
+
+  .desktop-hero-svg {
+    width: 210px;
+    height: 120px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 3 Stats Row */
+  .desktop-stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .desktop-stat-card {
+    background: var(--surface);
+    border-radius: 18px;
+    padding: 24px 18px;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+
+  .desktop-stat-card .stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    display: block;
+  }
+
+  .desktop-stat-card .stat-caption {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin-top: 4px;
+    display: block;
+  }
+
+  /* Desktop Lessons Section */
+  .desktop-lessons-section {
+    margin-top: 8px;
+  }
+
+  .desktop-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+
+  .desktop-section-header h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .desktop-search-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--muted);
+    transition: color var(--duration-fast), transform var(--duration-fast);
+  }
+
+  .desktop-search-btn:hover {
+    color: var(--accent);
+    transform: scale(1.05);
+  }
+
+  .desktop-lessons-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .desktop-lesson-card {
+    border-radius: 18px;
+    padding: 20px;
+    color: #FFFFFF;
+    text-align: left;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 125px;
+    box-shadow: var(--shadow);
+    transition: transform var(--duration-fast), box-shadow var(--duration-fast);
+  }
+
+  .desktop-lesson-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .lesson-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .lesson-topic-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 0;
+  }
+
+  .lesson-sec-pill {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .lesson-card-bottom {
+    margin-top: 18px;
+  }
+
+  .lesson-stats-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    font-weight: 600;
+    opacity: 0.95;
+    margin-bottom: 6px;
+  }
+
+  .lesson-progress-bar {
+    height: 5px;
+    background: rgba(255, 255, 255, 0.28);
+    border-radius: 999px;
+  }
+
+  .lesson-progress-bar i {
+    background: #FFFFFF;
+  }
+
+  /* Home Right Side Rail */
+  .home-col-side {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .desktop-devotion-card {
+    border-radius: var(--radius-card);
+    padding: 24px;
+    color: #FFFFFF;
+    box-shadow: var(--shadow);
+  }
+
+  .desktop-devotion-card.grad-hero-sunrise {
+    background: linear-gradient(135deg, #FF8A3D 0%, #FF4F7A 100%);
+  }
+
+  .devotion-hero-meta {
+    font-size: 0.8rem;
+    font-weight: 600;
+    opacity: 0.95;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .devotion-hero-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.25;
+    margin-bottom: 6px;
+  }
+
+  .devotion-hero-scripture {
+    font-size: 0.9rem;
+    opacity: 0.92;
+    margin-bottom: 20px;
+  }
+
+  .devotion-hero-read-btn {
+    background: #16152B !important;
+    color: #FFFFFF !important;
+    padding: 10px 24px !important;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+  }
+
+  /* Plan Box Desktop */
+  .desktop-plan-box {
+    background: var(--surface);
+    border-radius: var(--radius-card);
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+
+  .plan-box-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 16px;
+  }
+
+  .plan-box-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .desktop-plan-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: var(--bg);
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    width: 100%;
+    transition: background var(--duration-fast);
+  }
+
+  .desktop-plan-row:hover {
+    background: var(--surface-dim);
+  }
+
+  .plan-row-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--accent);
+  }
+
+  .desktop-plan-row.is-done .plan-row-icon {
+    background: var(--okbg);
+    color: var(--ok);
+    font-weight: 700;
+  }
+
+  .plan-row-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .plan-row-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--ink);
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .plan-row-sub {
+    font-size: 0.78rem;
+    color: var(--muted);
+    display: block;
+  }
+
+  .plan-row-frac {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  /* Daily Devotionals Feed List */
+  .desktop-devotionals-feed {
+    background: transparent;
+  }
+
+  .devotionals-feed-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 14px;
+  }
+
+  .devotionals-feed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .desktop-devotional-tile {
+    border-radius: 16px;
+    padding: 16px 18px;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    box-shadow: var(--shadow);
+  }
+
+  .tile-meta-block {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .tile-min {
+    font-size: 0.75rem;
+    font-weight: 600;
+    opacity: 0.9;
+    display: block;
+  }
+
+  .tile-name {
+    font-size: 0.92rem;
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 2px 0 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tile-read-btn {
+    background: #FFFFFF !important;
+    color: #16152B !important;
+    padding: 6px 18px !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    border-radius: 999px;
+  }
+
+  /* Practice Desktop Layout (Images 3 & 4) */
+  .practice-mobile-layout {
+    display: none !important;
+  }
+
+  .practice-desktop-layout {
+    display: block !important;
+  }
+
+  .practice-desktop-header {
+    margin-bottom: 24px;
+  }
+
+  .practice-desktop-header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+  }
+
+  .practice-desktop-sub {
+    font-size: 0.95rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .desktop-practice-modes-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 36px;
+  }
+
+  .desktop-mode-pill-card {
+    background: var(--surface);
+    border: 2px solid transparent;
+    border-radius: 18px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    text-align: left;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: border-color var(--duration-fast), transform var(--duration-fast);
+  }
+
+  .desktop-mode-pill-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .desktop-mode-pill-card.is-active {
+    border-color: var(--accent);
+  }
+
+  .mode-icon-badge {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .badge-orange { background: #FF5A36; color: #FFFFFF; }
+  .badge-indigo { background: #5D54A4; color: #FFFFFF; }
+  .badge-crimson { background: #B5173A; color: #FFFFFF; }
+  .badge-blue { background: #2F6FED; color: #FFFFFF; }
+
+  .mode-info .mode-title {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .mode-info .mode-desc {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .desktop-cover-section {
+    margin-bottom: 40px;
+  }
+
+  .desktop-cover-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .desktop-cover-head h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .desktop-toggle-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+  }
+
+  .toggle-label {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .toggle-pill-switch {
+    width: 46px;
+    height: 26px;
+    border-radius: 999px;
+    background: #D0D2E0;
+    border: none;
+    position: relative;
+    cursor: pointer;
+    transition: background var(--duration-fast);
+  }
+
+  .toggle-pill-switch.is-on {
+    background: var(--accent);
+  }
+
+  .switch-knob {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    transition: transform var(--duration-fast);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+
+  .toggle-pill-switch.is-on .switch-knob {
+    transform: translateX(20px);
+  }
+
+  .desktop-cover-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .desktop-cover-tile {
+    border-radius: 18px;
+    padding: 22px;
+    min-height: 125px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    text-align: left;
+    border: 2px solid transparent;
+    cursor: pointer;
+    color: #FFFFFF;
+    box-shadow: var(--shadow);
+    transition: transform var(--duration-fast), border-color var(--duration-fast);
+  }
+
+  .desktop-cover-tile:hover {
+    transform: translateY(-2px);
+  }
+
+  .desktop-cover-tile.is-selected {
+    border-color: #FFFFFF;
+    box-shadow: 0 0 0 2px var(--accent), var(--shadow-lg);
+  }
+
+  .desktop-cover-tile.tile-all {
+    background: #1D1A55;
+  }
+
+  .desktop-cover-tile.tile-mixed {
+    background: linear-gradient(135deg, #FF8A3D 0%, #FF4F7A 100%);
+  }
+
+  .tile-check-circle {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .tile-heading {
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 0 0 4px;
+  }
+
+  .tile-subtext {
+    font-size: 0.8rem;
+    opacity: 0.9;
+  }
+
+  .desktop-sticky-launch-bar {
+    position: sticky;
+    bottom: 24px;
+    background: var(--surface);
+    border-radius: 999px;
+    padding: 12px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--line);
+    z-index: 90;
+    margin-top: 32px;
+  }
+
+  .launch-status-text {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .desktop-launch-button {
+    padding: 12px 32px;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  /* Devotional Reader Desktop (Images 6 & 7) */
+  .devotional-desktop-hero-banner {
+    display: flex !important;
+    height: 120px;
+    border-radius: var(--radius-card);
+    position: relative;
+    overflow: hidden;
+    align-items: center;
+    padding: 0 24px;
+    margin-bottom: 28px;
+    box-shadow: var(--shadow);
+  }
+
+  .devotional-header {
+    display: none !important;
+  }
+
+  .devotional-back-circle-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    font-size: 1.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #16152B;
+    box-shadow: var(--shadow);
+    z-index: 2;
+    transition: transform var(--duration-fast);
+  }
+
+  .devotional-back-circle-btn:hover {
+    transform: scale(1.05);
+  }
+
+  .devotional-banner-svg {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    height: 100%;
+    width: 240px;
+  }
+
+  .devotional-desktop-split-container {
+    display: grid !important;
+    grid-template-columns: 1fr 300px !important;
+    gap: 36px !important;
+    align-items: flex-start !important;
+  }
+
+  .devotional-desktop-title-block {
+    display: block !important;
+    margin-bottom: 24px;
+  }
+
+  .devotional-desktop-heading {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    margin-bottom: 4px;
+  }
+
+  .devotional-desktop-subheading {
+    font-size: 1.1rem;
+    color: var(--ink-secondary);
+    margin-bottom: 8px;
+  }
+
+  .devotional-desktop-time {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .devotional-reading-card {
+    background: var(--surface);
+    border-radius: var(--radius-card);
+    padding: 32px;
+    box-shadow: var(--shadow);
+    margin-bottom: 24px;
+  }
+
+  .devotional-desktop-side-rail {
+    display: flex !important;
+    flex-direction: column;
+    gap: 24px;
+    position: sticky;
+    top: var(--space-xl);
+  }
+
+  .side-actions-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .side-action-pill {
+    flex: 1;
+    text-align: center;
+    padding: 10px 0;
+  }
+
+  .side-mark-read-btn {
+    width: 100%;
+    padding: 12px;
+    font-weight: 600;
+  }
+
+  .devotional-more-section {
+    margin-top: 12px;
+  }
+
+  .more-devotionals-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 14px;
+  }
+
+  .more-devotionals-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .devotional-side-tile {
+    border-radius: 16px;
+    padding: 18px 20px;
+    color: #FFFFFF;
+    text-align: left;
+    border: none;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: transform var(--duration-fast);
+  }
+
+  .devotional-side-tile:hover {
+    transform: translateY(-2px);
+  }
+
+  .devotional-side-tile .tile-meta {
+    font-size: 0.78rem;
+    opacity: 0.9;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .devotional-side-tile .tile-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 0;
+  }
+
+  /* Desktop Quiz / Study Split Layout (Images 8 & 9) */
+  .coaching-study-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    max-width: 960px;
+    margin: 0 auto 32px;
+  }
+
+  .coaching-question-panel {
+    max-width: 960px;
+    margin: 0 auto;
+    transition: all var(--duration-normal) var(--ease-out);
+  }
+
+  .coaching-question-panel:not(.has-feedback) .coaching-question-col {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  .coaching-question-panel.has-feedback {
+    display: flex !important;
+    gap: 32px !important;
+    align-items: flex-start !important;
+  }
+
+  .coaching-question-panel.has-feedback .coaching-question-col {
+    flex: 1 1 58%;
+    min-width: 0;
+  }
+
+  .coaching-question-panel.has-feedback .coaching-bottom-sheet {
+    flex: 1 1 42% !important;
+    position: static !important;
+    box-shadow: var(--shadow-card) !important;
+    border-radius: var(--radius-card) !important;
+    background: var(--surface) !important;
+    padding: 28px !important;
+    max-width: 440px !important;
+    animation: desktopFeedbackIn 0.35s var(--ease-out);
+  }
+
+  .coaching-question-panel.has-feedback .coaching-bottom-sheet .sheet-drag-handle {
+    display: none;
+  }
+
+  .feedback-desktop-headline {
+    display: block;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+
+  .feedback-desktop-headline.ok {
+    color: var(--ok);
+  }
+
+  .feedback-desktop-headline.bad {
+    color: var(--ok); /* "Nice try, here's why" is green in design references */
+  }
+
+  /* Chapter Detail Modal on Desktop (Image 10) */
+  .chapter-desktop-modal-sheet {
+    max-width: 480px !important;
+    margin: auto !important;
+    padding: 0 !important;
+    border-radius: var(--radius-card) !important;
+    overflow: hidden !important;
+    box-shadow: var(--shadow-lg) !important;
+  }
+
+  .modal-deck-hero {
+    padding: 32px 28px 24px;
+    color: #FFFFFF;
+  }
+
+  .modal-deck-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 0 0 4px;
+  }
+
+  .modal-deck-sub {
+    font-size: 0.85rem;
+    opacity: 0.92;
+    margin-bottom: 18px;
+  }
+
+  .modal-deck-progress-bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.28);
+    border-radius: 999px;
+  }
+
+  .modal-deck-progress-bar i {
+    background: #FFFFFF;
+  }
+
+  .modal-deck-stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 28px 24px;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .modal-deck-stat b {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--ink);
+    display: block;
+    line-height: 1.2;
+  }
+
+  .modal-deck-stat span {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 4px;
+    display: block;
+  }
+
+  .modal-deck-actions {
+    display: flex;
+    gap: 12px;
+    padding: 0 28px 28px;
+    justify-content: center;
+  }
+
+  .modal-study-btn {
+    flex: 1;
+    padding: 12px 24px;
+  }
+
+  .modal-close-btn {
+    padding: 12px 24px;
+    background: var(--btn-secondary-bg);
+    color: var(--btn-secondary-ink);
+  }
+}
+
+/* Dark Theme overrides for desktop components */
+:root[data-theme="dark"] .desktop-backup-banner,
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .desktop-backup-banner {
+    background: #2C203E;
+    color: #FFB74D;
+  }
+}
+
+:root[data-theme="dark"] .app-sidebar .sidebar-tab-btn.active,
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .app-sidebar .sidebar-tab-btn.active {
+    background: var(--surface) !important;
+    color: #F2F1FD !important;
+  }
+}
+
+:root[data-theme="dark"] .desktop-plan-row,
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .desktop-plan-row {
+    background: var(--surface-dim);
+  }
+}
+
+@keyframes desktopFeedbackIn {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
