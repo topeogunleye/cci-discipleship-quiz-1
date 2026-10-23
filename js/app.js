@@ -848,6 +848,12 @@
       '</div>' +
     '</div>';
 
+    var mobileStudyHeader = '<header class="mobile-study-header"><h1>Study</h1>' +
+      '<button class="top-icon-btn" data-act="nav-tab" data-tab="settings" aria-label="Settings">' +
+        tabIconSvg('settings') +
+      '</button>' +
+    '</header>';
+
     var milestoneCard = S.decks.length ? '<section class="home-milestone-card">' +
       '<div class="milestone-content">' +
         '<div class="milestone-title">Progress Overview</div>' +
@@ -861,7 +867,7 @@
     '</section>' : '';
 
     return '<div class="home-view">' +
-      '<div class="mobile-home-content">' + topBar + backupReminder + heroCard + devotionSection + (S.decks.length ? planSection + milestoneCard : '') + '</div>' +
+      '<div class="mobile-home-content">' + mobileStudyHeader + backupReminder + desktopHero + desktopStats + desktopLessons + devotionSection + '</div>' +
       desktopHome +
     '</div>';
   };
