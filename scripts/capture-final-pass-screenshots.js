@@ -123,7 +123,8 @@ async function clickVisible(client, selector) {
   if (!clicked) throw new Error(`Could not find visible control: ${selector}`);
 }
 
-async function resetPage(client, theme, viewport) {
+async function resetPage(client, theme, viewport, options = {}) {
+  const backupAnchor = options.backupDue ? Date.now() - 14 * 24 * 60 * 60 * 1000 : Date.now();
   await client.send('Emulation.setDeviceMetricsOverride', {
     width: viewport.width,
     height: viewport.height,
@@ -146,7 +147,7 @@ async function resetPage(client, theme, viewport) {
       theme: ${JSON.stringify(theme)},
       showDraftDevotionals: true
     });
-    state.backupReminder = { anchorAt: 0, cardsStudied: 0 };
+    state.backupReminder = { anchorAt: ${backupAnchor}, cardsStudied: 0 };
     state.pausedSession = null;
     localStorage.setItem(key, JSON.stringify(state));
     document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)});
@@ -172,21 +173,53 @@ async function showPractice(client) {
   await waitFor(client, 'document.querySelector("main h1")?.textContent.includes("Practice")', 'the Practice view');
 }
 
-async function showQuiz(client) {
+async function showJourney(client) {
   await clickVisible(client, '[data-act="nav-tab"][data-tab="journey"]');
   await waitFor(client, 'document.querySelector(".chapter-card-main-hit")', 'Journey chapters');
+}
+
+async function openFirstLesson(client) {
+  await showJourney(client);
   await clickVisible(client, '.chapter-card-main-hit');
+  await waitFor(client, 'document.querySelector(".chapter-view-header")', 'the lesson detail view');
+}
+
+async function startFirstLessonQuiz(client, questionCount = 10) {
+  await openFirstLesson(client);
   await waitFor(client, 'document.querySelector(\'[data-act="setup"][data-mode="quiz"]\')', 'the chapter quiz action');
   await clickVisible(client, '[data-act="setup"][data-mode="quiz"]');
   await waitFor(client, 'document.querySelector("#s-len")', 'the quiz setup dialog');
   await client.evaluate(`(() => {
     const count = document.getElementById('s-len');
-    if (count) count.value = '10';
+    if (count) count.value = ${questionCount};
     const start = document.querySelector('#modal [data-act="start"]');
     if (!start) throw new Error('Quiz start button is missing');
     start.click();
   })()`);
   await waitFor(client, 'document.querySelector(".quiz-session .coaching-question-text")', 'the Quiz view');
+}
+
+async function showQuiz(client) {
+  await startFirstLessonQuiz(client, 20);
+  for (let question = 0; question < 7; question++) {
+    await clickVisible(client, '.quiz-session .opt[data-i="0"]');
+    await clickVisible(client, '.quiz-session [data-act="next"]');
+    await waitFor(client, 'document.querySelector(".quiz-session .coaching-question-text")', 'the next Quiz question');
+  }
+  await clickVisible(client, '.quiz-session .opt[data-i="0"]');
+  await waitFor(client, 'document.querySelector(".quiz-session .coaching-bottom-sheet, .quiz-session .quiz-explanation-card")', 'the selected-answer feedback');
+}
+
+async function showSessionComplete(client) {
+  await startFirstLessonQuiz(client);
+  for (let question = 0; question < 10; question++) {
+    await clickVisible(client, '.quiz-session .opt[data-i="0"]');
+    await clickVisible(client, '.quiz-session [data-act="next"]');
+    if (question < 9) {
+      await waitFor(client, 'document.querySelector(".quiz-session .coaching-question-text")', 'the next Quiz question');
+    }
+  }
+  await waitFor(client, 'document.querySelector(".coaching-completion-screen")', 'the Session complete screen');
 }
 
 async function showDevotion(client) {
@@ -223,6 +256,27 @@ async function captureMatrix(client) {
   }
 }
 
+async function captureSupplemental(client) {
+  const desktop = viewports[0];
+  await resetPage(client, 'light', desktop, { backupDue: true });
+  await waitFor(client, 'document.querySelector(".desktop-backup-reminder")', 'the desktop backup reminder');
+  await capture(client, 'home-light-desktop-1440-backup-banner');
+
+  await resetPage(client, 'light', desktop);
+  await showJourney(client);
+  await capture(client, 'journey-light-desktop-1440');
+
+  await openFirstLesson(client);
+  await capture(client, 'lesson-detail-light-desktop-1440');
+  await clickVisible(client, '.chapter-info-btn');
+  await waitFor(client, 'document.querySelector("#chapter-info-title")', 'the lesson detail modal');
+  await capture(client, 'lesson-detail-modal-light-desktop-1440');
+
+  await resetPage(client, 'light', desktop);
+  await showSessionComplete(client);
+  await capture(client, 'session-complete-light-desktop-1440');
+}
+
 async function run() {
   if (!chromePath) throw new Error('Chrome not found; set CHROME_BIN to its executable path');
   fs.mkdirSync(outputDir, { recursive: true });
@@ -250,8 +304,9 @@ async function run() {
     await client.send('Page.enable');
     await client.send('Runtime.enable');
     await captureMatrix(client);
+    await captureSupplemental(client);
 
-    console.log(`Captured ${viewports.length * themes.length * 4} screenshots in ${outputDir}`);
+    console.log(`Captured ${viewports.length * themes.length * 4} matrix screenshots plus 5 supplemental screenshots in ${outputDir}`);
   } finally {
     const exited = new Promise(resolve => chrome.once('exit', resolve));
     if (client) {
