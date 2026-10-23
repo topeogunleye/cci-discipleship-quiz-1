@@ -1592,7 +1592,9 @@
   views.picker = function () {
     var mode = V.mode === 'quiz' ? 'quiz' : 'flash';
     var isQuiz = mode === 'quiz';
-    var modeTitle = isQuiz ? 'Quiz: Choose Lesson' : 'Flashcards: Choose Lesson';
+    var modeTitle = isQuiz ? 'Quiz' : 'Flashcards';
+    var multi = V.pickerMulti === true;
+    var mixed = V.pickerMixed === true;
     var formattedDecks = MobileStudy.formatPickerDecks(S.decks, function (deckId, cardId) {
       return isMastered(deckId, cardId);
     });
@@ -1602,11 +1604,12 @@
     var overallPct = totalCards ? Math.round(100 * totalMastered / totalCards) : 0;
 
     var tilesHtml = formattedDecks.map(function (d) {
-      return '<button class="picker-tile ' + d.gradientClass + '" data-act="setup" data-mode="' + mode + '" data-id="' + d.id + '" aria-label="' + esc(d.topic) + ', ' + d.totalCards + ' cards, ' + d.pct + '% mastered">' +
+      var selected = SEL.has(d.id);
+      return '<button class="picker-tile picker-selectable ' + d.gradientClass + (selected ? ' is-selected' : '') + '" data-act="picker-cover" data-id="' + d.id + '" aria-pressed="' + selected + '" aria-label="Lesson ' + d.sectionNum + ', ' + esc(d.topic) + ', ' + d.totalCards + ' cards, ' + d.pct + '% mastered">' +
         '<div class="picker-tile-top">' +
           '<span class="picker-tile-badge">' + d.sectionNum + '/12</span>' +
         '</div>' +
-        '<h3 class="picker-tile-title">' + esc(d.topic) + '</h3>' +
+        '<h3 class="picker-tile-title">Lesson ' + d.sectionNum + ' · ' + esc(d.topic) + '</h3>' +
         '<div class="picker-tile-bottom">' +
           '<span class="picker-tile-count">' + d.totalCards + ' cards</span>' +
           '<span class="picker-tile-pct">' + d.pct + '%</span>' +
@@ -1615,7 +1618,8 @@
       '</button>';
     }).join('');
 
-    var allTile = '<button class="picker-tile picker-tile-all hero-gradient-sunrise" data-act="setup" data-mode="' + mode + '" data-id="*" aria-label="All Lessons, ' + totalCards + ' cards, ' + overallPct + '% mastered">' +
+    var allSelected = S.decks.length > 0 && S.decks.every(function (d) { return SEL.has(d.id); });
+    var allTile = '<button class="picker-tile picker-tile-all hero-gradient-sunrise picker-selectable' + (allSelected ? ' is-selected' : '') + '" data-act="picker-cover" data-id="__all__" aria-pressed="' + allSelected + '" aria-label="All Lessons, ' + totalCards + ' cards, ' + overallPct + '% mastered">' +
       '<div class="picker-tile-top">' +
         '<span class="picker-tile-badge">All 12</span>' +
       '</div>' +
@@ -1633,17 +1637,20 @@
           '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
         '</button>' +
         '<div class="picker-title-wrap">' +
-          '<span class="eyebrow">' + (isQuiz ? 'QUIZ MODE' : 'FLASHCARDS MODE') + '</span>' +
           '<h1>' + esc(modeTitle) + '</h1>' +
         '</div>' +
       '</header>' +
       '<div class="picker-body">' +
-        '<p class="picker-subtitle">Select a chapter or practice all 12 lessons together.</p>' +
         '<div class="picker-grid">' +
           allTile +
+          '<button class="picker-tile picker-tile-mixed picker-selectable' + (mixed ? ' is-selected' : '') + '" data-act="picker-cover" data-id="__mixed__" aria-pressed="' + mixed + '"><span class="picker-tile-top"><span class="picker-tile-badge">REVIEW</span></span><h3 class="picker-tile-title">Mixed review</h3><div class="picker-tile-bottom"><span class="picker-tile-count">Due + weak spots</span></div></button>' +
           tilesHtml +
         '</div>' +
       '</div>' +
+      '<footer class="picker-selection-footer' + (multi ? ' is-visible' : '') + '">' +
+        '<div class="picker-footer-controls"><button type="button" class="picker-multi-toggle' + (multi ? ' is-on' : '') + '" data-act="picker-multi" aria-pressed="' + multi + '"><span>Select several</span><i aria-hidden="true"></i></button></div>' +
+        (multi ? '<button type="button" class="btn primary picker-start-button" data-act="picker-start" data-mode="' + mode + '"' + (SEL.size || mixed ? '' : ' disabled aria-disabled="true"') + '>' + (mixed ? 'Start mixed review' : 'Start' + (SEL.size ? ' · ' + SEL.size + ' ' + (SEL.size === 1 ? 'lesson' : 'lessons') : '')) + '</button>' : '') +
+      '</footer>' +
     '</div>';
   };
 
@@ -2504,12 +2511,42 @@
       case 'theme': S.settings.theme = { auto: 'light', light: 'dark', dark: 'auto' }[S.settings.theme]; applyTheme(); save(); render(true); break;
       case 'toggle-rocket': toggleRocketMenu(); break;
       case 'close-rocket': closeRocketMenu(); break;
-      case 'rocket-flash': closeRocketMenu(); go({ name: 'picker', mode: 'flash', from: V.name }); break;
-      case 'rocket-quiz': closeRocketMenu(); go({ name: 'picker', mode: 'quiz', from: V.name }); break;
+      case 'rocket-flash': closeRocketMenu(); SEL.clear(); go({ name: 'picker', mode: 'flash', from: V.name, pickerMulti: false, pickerMixed: false }); break;
+      case 'rocket-quiz': closeRocketMenu(); SEL.clear(); go({ name: 'picker', mode: 'quiz', from: V.name, pickerMulti: false, pickerMixed: false }); break;
       case 'rocket-challenge': closeRocketMenu(); startChallenge(); break;
       case 'rocket-exam': closeRocketMenu(); setupExam(); break;
       case 'close-picker': go({ name: V.from || 'home' }); break;
       case 'setup': setup(t.dataset.mode, t.dataset.id); break;
+      case 'picker-multi':
+        V.pickerMulti = !V.pickerMulti;
+        if (!V.pickerMulti && SEL.size > 1) SEL = new Set([Array.from(SEL).pop()]);
+        render(true);
+        break;
+      case 'picker-cover':
+        var pickerId = t.dataset.id;
+        if (!V.pickerMulti) {
+          if (pickerId === '__mixed__') startChallenge(null, V.mode === 'quiz' ? 'quiz' : 'flash');
+          else setup(V.mode === 'quiz' ? 'quiz' : 'flash', pickerId === '__all__' ? '*' : pickerId);
+        } else if (pickerId === '__mixed__') {
+          V.pickerMixed = !V.pickerMixed;
+          if (V.pickerMixed) SEL.clear();
+          render(true);
+        } else if (pickerId === '__all__') {
+          V.pickerMixed = false;
+          var pickerAllSelected = S.decks.length > 0 && S.decks.every(function (item) { return SEL.has(item.id); });
+          SEL = pickerAllSelected ? new Set() : new Set(S.decks.map(function (item) { return item.id; }));
+          render(true);
+        } else {
+          V.pickerMixed = false;
+          if (SEL.has(pickerId)) SEL.delete(pickerId); else SEL.add(pickerId);
+          render(true);
+        }
+        break;
+      case 'picker-start':
+        if (V.pickerMixed) startChallenge(null, V.mode === 'quiz' ? 'quiz' : 'flash');
+        else if (!SEL.size) toast('Choose one or more lessons to cover.');
+        else setup(V.mode === 'quiz' ? 'quiz' : 'flash', '*');
+        break;
       case 'practice-mode':
         V.practiceMode = t.dataset.mode;
         render(true);

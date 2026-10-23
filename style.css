@@ -5171,6 +5171,213 @@ button.opt.wrong .opt-badge {
   opacity: 1;
 }
 
+/* Selection states shared by the lesson pickers. */
+.picker-body {
+  padding-bottom: 12px;
+}
+
+.picker-view-shell .picker-title-wrap h1 {
+  font-size: 1.45rem;
+}
+
+.picker-view-shell .picker-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.picker-view-shell .picker-tile-all {
+  grid-column: auto;
+  min-height: 108px;
+  background: linear-gradient(135deg, #211d5d, #2d287c);
+  color: #fff;
+}
+
+.picker-view-shell .picker-tile-all .picker-tile-title,
+.picker-view-shell .picker-tile-all .picker-tile-bottom,
+.picker-view-shell .picker-tile-all .picker-tile-count {
+  color: #fff;
+}
+
+.picker-tile-mixed {
+  min-height: 108px;
+  background: linear-gradient(120deg, #ff8a39, #fb3b6d);
+  color: #241126;
+}
+
+.picker-tile-mixed .picker-tile-title,
+.picker-tile-mixed .picker-tile-count {
+  color: #241126;
+  text-shadow: none;
+}
+
+.picker-view-shell .picker-selectable {
+  min-height: 108px;
+  padding: 14px 16px;
+  border: 2px solid transparent;
+  border-radius: 22px;
+}
+
+.picker-view-shell .picker-selectable.is-selected {
+  border-color: #B5173A;
+  box-shadow: 0 0 0 3px rgba(181, 23, 58, .15);
+}
+
+.picker-view-shell .picker-tile-top {
+  margin-bottom: 0;
+}
+
+.picker-view-shell .picker-tile-badge {
+  display: none;
+}
+
+.picker-view-shell .picker-tile-title {
+  font-size: 15px;
+  line-height: 1.28;
+}
+
+.picker-view-shell .picker-tile-bottom {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.picker-view-shell .picker-tile-pct {
+  font-weight: 700;
+}
+
+.picker-view-shell .picker-tile-bar {
+  display: none;
+}
+
+.picker-view-shell .picker-selectable.is-selected::after {
+  position: absolute;
+  top: 11px;
+  right: 11px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  color: #087544;
+  content: '✓';
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.picker-selection-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  margin: 0 -16px calc(-1 * (var(--space-2xl) + env(safe-area-inset-bottom, 0px)));
+  padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(244, 245, 251, 0), #F4F5FB 28%);
+}
+
+.picker-footer-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.picker-multi-toggle {
+  display: inline-flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 500 14px/1.2 var(--font-sans);
+  cursor: pointer;
+}
+
+.picker-multi-toggle i {
+  position: relative;
+  width: 60px;
+  height: 36px;
+  border-radius: 999px;
+  background: #D0D2E9;
+}
+
+.picker-multi-toggle i::after {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #fff;
+  content: '';
+  transition: transform .15s ease;
+}
+
+.picker-multi-toggle.is-on i {
+  background: #B5173A;
+}
+
+.picker-multi-toggle.is-on i::after {
+  transform: translateX(24px);
+}
+
+.picker-start-button {
+  min-height: 52px;
+  width: 100%;
+  border-radius: 999px;
+}
+
+html[data-theme="dark"] .picker-selection-footer {
+  background: linear-gradient(180deg, rgba(18, 16, 58, 0), #12103A 28%);
+}
+
+@media (max-width: 520px) {
+  .picker-view-shell {
+    margin-right: -12px;
+    margin-left: -12px;
+    padding-right: 20px;
+    padding-left: 20px;
+    padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .picker-header {
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .picker-view-shell .picker-grid {
+    gap: 12px;
+  }
+
+  .picker-view-shell .picker-selectable {
+    min-height: 108px;
+    padding: 14px 16px;
+    border-radius: 22px;
+  }
+
+  .picker-view-shell .picker-tile-title {
+    font-size: 15px;
+  }
+
+  .picker-selection-footer {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    margin: 0;
+    padding: 8px 20px calc(22px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .picker-selection-footer.is-visible .picker-footer-controls {
+    justify-content: space-between;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rocket-fab-btn,
   .rocket-fab-btn.is-open,
