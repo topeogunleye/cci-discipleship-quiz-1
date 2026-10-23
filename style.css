@@ -7632,3 +7632,58 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     min-height: 242px;
   }
 }
+
+
+/* Desktop Practice reference corrections */
+@media (min-width: 901px) {
+  .desktop-main > .practice-selection-view {
+    width: calc(100% - 20px);
+    max-width: none;
+    margin-left: 0;
+  }
+
+  .practice-selection-view .practice-view-header h1 {
+    margin-bottom: 14px;
+  }
+
+  .practice-selection-view .practice-mode-grid {
+    margin: 26px 0 23px;
+  }
+
+  .practice-selection-view .practice-cover-heading {
+    margin-bottom: 24px;
+  }
+
+  .practice-selection-view .practice-mode-tile.is-selected {
+    border-width: 3px;
+  }
+
+  .practice-selection-view .practice-cover-tile.is-selected {
+    border-width: 3px;
+  }
+
+  .practice-selection-view .practice-cover-grid > .practice-cover-tile:nth-child(n+5):nth-child(-n+8) {
+    min-height: 156px;
+  }
+
+  .practice-selection-view .practice-start-button {
+    min-width: 226px;
+  }
+
+  .practice-selection-view .practice-start-bar {
+    margin-top: 25px;
+  }
+
+  .practice-selection-view .practice-cover-tile.deck-grad-11 .practice-cover-title {
+    max-width: 190px;
+    padding-right: 0;
+  }
+
+  .practice-selection-view .practice-mode-icon {
+    color: #3928B9;
+  }
+
+  :root[data-theme="dark"] .practice-selection-view .practice-mode-icon {
+    color: #8B9CFF;
+  }
+}

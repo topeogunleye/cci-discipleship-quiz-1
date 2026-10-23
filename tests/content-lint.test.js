@@ -414,6 +414,9 @@ test('main tabs and Devotion keep desktop navigation while study sessions use th
       assert.match(elements.app.innerHTML, /data-act="practice-mode" data-mode="flash"/);
       assert.match(elements.app.innerHTML, /aria-label="Lessons to cover"/);
       assert.match(elements.app.innerHTML, /data-act="practice-start"/);
+      assert.doesNotMatch(elements.app.innerHTML, /id="rocket-fab-btn"/, 'Practice already provides its own study-mode choices');
+      assert.match(elements.app.innerHTML, /M12 2 4\.5 13h6/, 'Practice navigation uses the lightning icon from the desktop design');
+      assert.match(elements.app.innerHTML, /Authority &amp; Charisma/, 'Practice uses the concise Lesson 11 label from the desktop reference');
     }
   }
 

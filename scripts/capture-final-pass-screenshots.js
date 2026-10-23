@@ -183,6 +183,54 @@ async function showPractice(client) {
   }
 }
 
+async function seedPracticeReferenceProgress(client) {
+  const result = await client.evaluate(`(async () => {
+    const request = indexedDB.open('cci-study-data', 1);
+    const db = await new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('Could not open screenshot storage'));
+    });
+    const read = db.transaction('state', 'readonly').objectStore('state').get('current');
+    const raw = await new Promise((resolve, reject) => {
+      read.onsuccess = () => resolve(read.result);
+      read.onerror = () => reject(read.error || new Error('Could not read screenshot state'));
+    });
+    const state = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!state || !Array.isArray(state.decks) || state.decks.length < 4) {
+      db.close();
+      return false;
+    }
+    state.progress = state.progress && typeof state.progress === 'object' ? state.progress : {};
+    const percentages = [100, 70, 45, 20];
+    const masteredCounts = [];
+    state.decks.slice(0, 4).forEach((deck, index) => {
+      const existing = state.progress[deck.id];
+      const record = existing && typeof existing === 'object' && !Array.isArray(existing)
+        ? existing
+        : { best: null, cards: {} };
+      record.cards = record.cards && typeof record.cards === 'object' && !Array.isArray(record.cards) ? record.cards : {};
+      const count = Math.round(deck.cards.length * percentages[index] / 100);
+      masteredCounts.push(count);
+      deck.cards.forEach((card, cardIndex) => {
+        if (cardIndex < count) record.cards[card.id] = Object.assign({}, record.cards[card.id], { box: 2 });
+      });
+      state.progress[deck.id] = record;
+    });
+    const transaction = db.transaction('state', 'readwrite');
+    transaction.objectStore('state').put(JSON.stringify(state), 'current');
+    await new Promise((resolve, reject) => {
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error || new Error('Could not save screenshot progress'));
+      transaction.onabort = () => reject(transaction.error || new Error('Screenshot progress write was aborted'));
+    });
+    db.close();
+    return masteredCounts;
+  })()`);
+  if (!Array.isArray(result)) throw new Error('Could not seed isolated Practice reference progress');
+  await client.send('Page.navigate', { url: distHtml });
+  await waitFor(client, 'document.querySelector(".home-view")', 'the app after seeding Practice progress');
+}
+
 async function showJourney(client) {
   await clickVisible(client, '[data-act="nav-tab"][data-tab="journey"]');
   await waitFor(client, 'document.querySelector(".chapter-card-main-hit")', 'Journey chapters');
@@ -274,7 +322,10 @@ async function captureMatrix(client) {
     ['home', async () => {
       await waitFor(client, 'document.querySelector(".home-view")', 'the Home view');
     }],
-    ['practice', () => showPractice(client)],
+    ['practice', async viewport => {
+      if (viewport.name === 'desktop-1440') await seedPracticeReferenceProgress(client);
+      await showPractice(client);
+    }],
     ['quiz', () => showQuiz(client)],
     ['devotion', () => showDevotion(client)]
   ];
@@ -283,7 +334,7 @@ async function captureMatrix(client) {
     for (const theme of themes) {
       for (const [scene, prepare] of scenes) {
         await resetPage(client, theme, viewport);
-        await prepare();
+        await prepare(viewport, theme);
         await sleep(200);
         const title = await client.evaluate(`(() => {
           const heading = document.querySelector(".quiz-question-text, .devotional-title, main h1, .home-view h1");
