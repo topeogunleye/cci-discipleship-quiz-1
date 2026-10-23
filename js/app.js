@@ -367,6 +367,37 @@
     var first = modal.querySelector('button, input, select, textarea');
     if (first) first.focus();
   }
+  function openLessonDetailSheet(lessonId) {
+    var detailDeck = deck(lessonId);
+    if (!detailDeck) return;
+    var detailProgress = prog(detailDeck.id);
+    var detailMastered = detailDeck.cards.filter(function (card) { return isMastered(detailDeck.id, card.id); }).length;
+    var detailWeak = detailDeck.cards.filter(function (card) {
+      var record = detailProgress.cards[card.id];
+      return record && typeof record === 'object' && record.attempts > 0 && record.misses > 0;
+    }).length;
+    var parsedDetail = MobileStudy.parseChapterTitle(detailDeck.title);
+    var sectionNumber = parsedDetail.sectionNum || 1;
+    var progressPct = detailDeck.cards.length ? Math.round(100 * detailMastered / detailDeck.cards.length) : 0;
+    var gradient = 'deck-grad-' + (((sectionNumber - 1) % 12) + 1);
+    openModal('<div class="scrim" data-act="close"></div><section class="sheet lesson-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="lesson-detail-title">' +
+      '<span class="lesson-detail-handle" aria-hidden="true"></span>' +
+      '<div class="lesson-detail-hero ' + gradient + '">' +
+        '<h2 id="lesson-detail-title">' + esc(parsedDetail.topic) + '</h2>' +
+        '<p>Lesson ' + sectionNumber + ' · Section ' + sectionNumber + '</p>' +
+        '<div class="lesson-detail-progress" role="progressbar" aria-label="' + esc(parsedDetail.topic) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progressPct + '"><i style="width:' + progressPct + '%"></i></div>' +
+      '</div>' +
+      '<div class="lesson-detail-stats" aria-label="Lesson statistics">' +
+        '<div><b>' + detailDeck.cards.length + '</b><span>Cards</span></div>' +
+        '<div><b>' + detailMastered + '</b><span>Mastered</span></div>' +
+        '<div><b>' + detailWeak + '</b><span>Weak spots</span></div>' +
+      '</div>' +
+      '<div class="lesson-detail-actions">' +
+        '<button type="button" class="btn primary lesson-detail-study" data-act="lesson-detail-study" data-id="' + detailDeck.id + '">Study this lesson</button>' +
+        '<button type="button" class="btn lesson-detail-close" data-act="close">Close</button>' +
+      '</div>' +
+    '</section>');
+  }
   function ask(msg, label, fn) { pendingAsk = fn; openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><h2 id="dialog-title" class="dialog-title">Please confirm</h2><p>' + esc(msg) + '</p><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn danger" data-act="askok">' + esc(label) + '</button></div></div>'); }
   function closeModal() {
     modal.innerHTML = ''; pendingAsk = null;
@@ -778,7 +809,7 @@
           var total = d.cards.length;
           var pct = total ? Math.round(100 * mastered / total) : 0;
           var gradient = 'deck-grad-' + (((sectionNum - 1) % 12) + 1);
-          return '<button type="button" class="desktop-lesson-card ' + gradient + '" data-act="open-chapter" data-id="' + d.id + '" aria-label="Open ' + esc(parsed.topic) + ', ' + pct + ' percent mastered">' +
+          return '<button type="button" class="desktop-lesson-card ' + gradient + '" data-act="lesson-detail-open" data-id="' + d.id + '" aria-label="View details for ' + esc(parsed.topic) + '">' +
             '<span class="desktop-lesson-card-top"><strong>' + esc(parsed.topic) + '</strong><span class="desktop-lesson-section">' + sectionNum + '/12</span></span>' +
             '<span class="desktop-lesson-card-bottom"><span>' + plural(total, 'card') + '</span><strong>' + pct + '%</strong></span>' +
             '<span class="desktop-lesson-progress" role="progressbar" aria-label="' + esc(parsed.topic) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></span>' +
@@ -2326,26 +2357,13 @@
     switch (a) {
       case 'home': closeModal(); go({ name: 'home' }); break;
       case 'open-chapter': go({ name: 'chapter', id: t.dataset.id }); break;
+      case 'lesson-detail-open': openLessonDetailSheet(t.dataset.id); break;
+      case 'lesson-detail-study':
+        closeModal();
+        go({ name: 'chapter', id: t.dataset.id });
+        break;
       case 'chapter-info':
-        var infoDeck = deck(t.dataset.id);
-        if (infoDeck) {
-          var infoProg = prog(infoDeck.id);
-          var infoMastered = infoDeck.cards.filter(function (c) { return isMastered(infoDeck.id, c.id); }).length;
-          var infoDue = infoDeck.cards.filter(function (c) { return StudyLogic.isDueToday(infoProg.cards[c.id], Date.now()); }).length;
-          var infoWeak = infoDeck.cards.filter(function (c) { var r = infoProg.cards[c.id]; return r && typeof r === 'object' && r.attempts > 0 && r.misses > 0; }).length;
-          var infoParsed = MobileStudy.parseChapterTitle(infoDeck.title);
-          openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="chapter-info-title">' +
-            '<h2 id="chapter-info-title">' + esc(infoParsed.topic) + '</h2>' +
-            '<p class="meta">' + infoParsed.sectionNum + '/12 · ' + plural(infoDeck.cards.length, 'question') + '</p>' +
-            '<div class="statline" style="margin: 16px 0">' +
-              '<div class="stat"><b>' + infoMastered + ' / ' + infoDeck.cards.length + '</b><span>Mastered</span></div>' +
-              '<div class="stat"><b>' + (infoProg.best ? infoProg.best.pct + '%' : '—') + '</b><span>Best Quiz</span></div>' +
-              '<div class="stat"><b>' + infoDue + '</b><span>Due</span></div>' +
-              '<div class="stat"><b>' + infoWeak + '</b><span>Weak</span></div>' +
-            '</div>' +
-            '<div class="row end"><button class="btn primary" data-act="close">Done</button></div>' +
-          '</div>');
-        }
+        openLessonDetailSheet(t.dataset.id);
         break;
       case 'chapter-menu':
         var menuDeck = deck(t.dataset.id);
