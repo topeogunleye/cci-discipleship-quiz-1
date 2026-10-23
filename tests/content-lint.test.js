@@ -364,7 +364,7 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
   assert.equal(fileState.decks.reduce((count, deck) => count + deck.cards.length, 0), expectedCardCount);
 });
 
-test('main tabs render desktop navigation while quiz and devotional routes use the full shell', async () => {
+test('main tabs and Devotion keep desktop navigation while study sessions use the full shell', async () => {
   const devotionals = JSON.parse(fs.readFileSync(path.join(root, 'content', 'devotionals.json'), 'utf8'));
   const elements = {
     app: { innerHTML: '', querySelectorAll: () => [], querySelector: () => null },
@@ -406,6 +406,15 @@ test('main tabs render desktop navigation while quiz and devotional routes use t
     assert.match(elements.app.innerHTML, /<aside class="desktop-sidebar">/, `${tab} should render desktop navigation`);
     assert.match(elements.app.innerHTML, /<nav class="bottom-tab-bar"/, `${tab} should retain mobile navigation markup`);
     assert.match(elements.app.innerHTML, new RegExp(`data-tab="${tab}" aria-selected="true"`), `${tab} should be selected`);
+    if (tab === 'practice') {
+      assert.match(elements.app.innerHTML, /Pick how you want to practice, then choose what to cover\./);
+      assert.match(elements.app.innerHTML, /data-act="practice-mode" data-mode="challenge"/);
+      assert.match(elements.app.innerHTML, /data-act="practice-mode" data-mode="exam"/);
+      assert.match(elements.app.innerHTML, /data-act="practice-mode" data-mode="quiz"/);
+      assert.match(elements.app.innerHTML, /data-act="practice-mode" data-mode="flash"/);
+      assert.match(elements.app.innerHTML, /aria-label="Lessons to cover"/);
+      assert.match(elements.app.innerHTML, /data-act="practice-start"/);
+    }
   }
 
   window.shellTestApi.setView({
@@ -430,9 +439,12 @@ test('main tabs render desktop navigation while quiz and devotional routes use t
 
   window.shellTestApi.setView({ name: 'devotional', id: devotionals[0].id });
   window.shellTestApi.render();
-  assert.match(elements.app.innerHTML, /class="desktop-shell desktop-shell-full"/);
+  assert.match(elements.app.innerHTML, /class="desktop-shell"/);
   assert.match(elements.app.innerHTML, /class="devotional-view-shell"/);
-  assert.doesNotMatch(elements.app.innerHTML, /<aside class="desktop-sidebar">/);
+  assert.match(elements.app.innerHTML, /<aside class="desktop-sidebar">/);
+  assert.match(elements.app.innerHTML, /data-tab="home" aria-current="page"/);
+  assert.match(elements.app.innerHTML, /class="devotional-banner-art"/);
+  assert.match(elements.app.innerHTML, /class="devotional-reading-card"/);
   assert.doesNotMatch(elements.app.innerHTML, /<nav class="bottom-tab-bar"/);
 });
 

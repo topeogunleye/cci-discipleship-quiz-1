@@ -6650,3 +6650,985 @@ button.opt.wrong .opt-badge {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Reference-aligned Practice chooser */
+.practice-selection-view {
+  padding-bottom: 28px;
+}
+
+.practice-view-header h1 {
+  font-size: clamp(2rem, 3vw, 2.5rem);
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.practice-view-header .view-sub {
+  margin: 0;
+}
+
+.practice-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 30px 0 26px;
+}
+
+.practice-mode-tile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  min-height: 90px;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease, transform var(--duration-fast) ease;
+}
+
+.practice-mode-tile:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card);
+}
+
+.practice-mode-tile.is-selected {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 3px rgba(190, 18, 74, 0.1);
+}
+
+.practice-mode-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  background: var(--surface-dim);
+  color: var(--link);
+}
+
+.practice-mode-tile:first-child .practice-mode-icon {
+  background: linear-gradient(135deg, #ff8b3d, #f03358);
+  color: #fff;
+}
+
+.practice-mode-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.practice-mode-copy strong {
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.practice-mode-copy small {
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.3;
+}
+
+.practice-cover-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.practice-cover-heading h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.25rem;
+}
+
+.practice-multi-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 4px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-secondary);
+  font: 600 var(--text-sm)/1.2 var(--font-sans);
+  cursor: pointer;
+}
+
+.practice-multi-toggle i {
+  position: relative;
+  width: 60px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--line);
+  transition: background var(--duration-fast) ease;
+}
+
+.practice-multi-toggle i::after {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  content: '';
+  transition: transform var(--duration-fast) ease;
+}
+
+.practice-multi-toggle.is-on i {
+  background: var(--accent);
+}
+
+.practice-multi-toggle.is-on i::after {
+  transform: translateX(28px);
+}
+
+.practice-cover-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.practice-cover-tile {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 130px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 22px 18px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: 20px;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--duration-fast) ease, box-shadow var(--duration-fast) ease, border-color var(--duration-fast) ease;
+}
+
+.practice-cover-tile:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(24, 17, 60, 0.16);
+}
+
+.practice-cover-tile.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(190, 18, 74, 0.12);
+}
+
+.practice-cover-tile.cover-all {
+  background: linear-gradient(135deg, #25177e, #17145e);
+}
+
+.practice-cover-tile.cover-mixed {
+  background: linear-gradient(120deg, #ff8a39, #fb3b5d);
+}
+
+.practice-cover-title {
+  display: block;
+  max-width: 190px;
+  padding-right: 28px;
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.practice-cover-stats {
+  display: block;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.practice-cover-check {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  color: #087544;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.practice-start-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 92px;
+  margin-top: 24px;
+  padding: 16px 22px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink-secondary);
+  box-shadow: var(--shadow-card);
+}
+
+.practice-start-button {
+  min-width: 220px;
+  min-height: 56px;
+  border-radius: 999px;
+}
+
+.practice-start-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (min-width: 901px) {
+  .practice-selection-view {
+    margin-top: 10px;
+  }
+
+  .desktop-shell {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .desktop-main {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+}
+
+@media (max-width: 900px) {
+  .practice-mode-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .practice-cover-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .practice-mode-grid {
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .practice-mode-tile {
+    min-height: 90px;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .practice-mode-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .practice-mode-copy strong {
+    font-size: 0.9rem;
+  }
+
+  .practice-mode-copy small {
+    font-size: 0.75rem;
+  }
+
+  .practice-cover-grid {
+    gap: 10px;
+  }
+
+  .practice-cover-tile {
+    min-height: 112px;
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .practice-cover-title {
+    font-size: 0.9rem;
+  }
+
+  .practice-cover-stats {
+    font-size: 0.74rem;
+  }
+
+  .practice-start-bar {
+    position: sticky;
+    bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+    z-index: 5;
+    min-height: 72px;
+    padding: 10px 12px;
+  }
+
+  .practice-start-button {
+    min-width: 0;
+    min-height: 48px;
+    padding: 0 14px;
+  }
+}
+
+
+/* Reference-aligned desktop session-complete screen */
+@media (min-width: 901px) {
+  .coaching-completion-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    width: auto;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100vh;
+    max-width: none !important;
+    margin: 0;
+    padding: 0 24px 44px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    box-sizing: border-box;
+    background: linear-gradient(122deg, #FF843C 0%, #FF7650 42%, #F64F70 100%);
+    color: #171333;
+  }
+
+  .coaching-completion-screen .results-header {
+    display: none;
+  }
+
+  .coaching-completion-hero {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
+  .completion-hero-card {
+    min-height: 100vh;
+    padding: 410px 0 18px;
+    overflow: hidden;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: #171333;
+  }
+
+  .completion-landscape {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    display: block;
+    width: 100%;
+    height: 400px;
+    margin: 0;
+  }
+
+  .completion-landscape svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .completion-score-badge,
+  .completion-hero-title {
+    display: none;
+  }
+
+  .completion-desktop-title {
+    display: block;
+    margin: 0 0 8px;
+    color: #171333;
+    font-size: clamp(2.5rem, 4vw, 3.6rem);
+    font-weight: 750;
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+  }
+
+  .completion-hero-message {
+    max-width: 720px;
+    margin: 0 auto 26px;
+    color: #2A204F;
+    font-size: 1.12rem;
+    line-height: 1.5;
+  }
+
+  .completion-stats-row {
+    width: min(100%, 720px);
+    max-width: none;
+    gap: 16px;
+  }
+
+  .stat-pill {
+    min-height: 112px;
+    padding: 22px 18px;
+    border: 0;
+    border-radius: 20px;
+    background: #FFFFFF;
+    box-shadow: 0 10px 26px rgba(49, 25, 78, 0.12);
+    backdrop-filter: none;
+  }
+
+  .stat-pill b {
+    color: #181337;
+    font-size: clamp(1.5rem, 2.2vw, 2rem);
+    line-height: 1.2;
+  }
+
+  .stat-pill span {
+    color: #403A59;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .completion-actions-bar {
+    display: flex;
+    width: min(100%, 380px);
+    margin: 0 auto 28px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .completion-actions-bar .btn {
+    min-height: 56px;
+    border-radius: 999px;
+  }
+
+  .completion-actions-bar button[data-act="results-continue"],
+  .exam-results .completion-actions-bar button[data-act="home"] {
+    order: -1;
+    border: 0;
+    background: var(--accent);
+    color: #FFFFFF;
+    box-shadow: 0 10px 24px rgba(103, 9, 55, 0.18);
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .result-actions button[data-act="review"],
+  .result-actions button[data-act="again"] {
+    min-height: 42px;
+    padding: 0 12px;
+    border: 0;
+    background: transparent;
+    color: #2A204F;
+    box-shadow: none;
+    font-size: 0.9rem;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .exam-results .exam-review {
+    width: min(100%, 1120px);
+    margin: 28px auto;
+    padding: 28px;
+    border-radius: 24px;
+    background: #FFFFFF;
+    color: #171333;
+  }
+}
+
+@media (min-width: 901px) {
+  .practice-selection-view {
+    margin-top: 10px;
+  }
+}
+
+@media (min-width: 901px) {
+  .coaching-completion-screen .completion-hero-card {
+    min-height: 0;
+  }
+}
+
+
+/* Reference-aligned Devotion reader */
+.devotional-header {
+  position: relative;
+  display: block;
+  min-height: 168px;
+  padding: 20px;
+  overflow: hidden;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #4823B2 0%, #2E1A83 100%);
+  box-shadow: var(--shadow-lg);
+}
+
+.devotional-nav-row {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-start;
+  margin: 0;
+}
+
+.devotional-banner-art {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.devotional-back-btn {
+  position: relative;
+  z-index: 2;
+}
+
+.devotional-back-desktop {
+  display: none;
+}
+
+.devotional-reader-heading {
+  margin: 0 0 22px;
+}
+
+.devotional-reader-heading .devotional-title {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  line-height: 1.12;
+}
+
+.devotional-reader-heading .devotional-sub {
+  margin: 0 0 10px;
+  color: var(--ink-secondary);
+  font-size: var(--text-md);
+  line-height: 1.5;
+}
+
+.devotional-reader-meta {
+  display: inline-block;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.devotional-reading-card {
+  margin: 0 0 22px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.devotional-reading-card .devotional-scripture-quote {
+  margin: 0 0 20px;
+  padding: 0 0 18px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.devotional-reading-card .devotional-scripture-quote p {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-lg);
+  font-style: normal;
+  line-height: 1.6;
+}
+
+.devotional-reading-card .devotional-scripture-link {
+  display: inline-block;
+  min-height: 0;
+  margin: 0 0 10px;
+  color: var(--link);
+  font-size: var(--text-base);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.devotional-reading-card .devotional-p {
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: 1.75;
+}
+
+.devotional-reading-card .devotional-more-btn {
+  min-height: 44px;
+  margin: 8px 0 0;
+  padding: 0 16px;
+  border: 0;
+  background: var(--surface-dim);
+  color: var(--link);
+  font-weight: 700;
+}
+
+@media (min-width: 901px) {
+  .desktop-main > .devotional-view-shell {
+    width: 100%;
+    max-width: 1120px;
+    margin: 0 auto;
+  }
+
+  .devotional-header {
+    min-height: 230px;
+    padding: 24px 28px;
+    margin-bottom: 30px;
+    border-radius: 24px;
+  }
+
+  .devotional-nav-row {
+    margin: 0;
+  }
+
+  .devotional-back-btn {
+    display: grid;
+    width: 48px;
+    height: 48px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.22);
+    color: #FFFFFF;
+    font-size: 1.6rem;
+    cursor: pointer;
+  }
+
+  .devotional-back-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+  }
+
+  .devotional-back-mobile {
+    display: none;
+  }
+
+  .devotional-back-desktop {
+    display: inline;
+  }
+
+  .devotional-reader-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+    gap: 32px;
+  }
+
+  .devotional-content-body {
+    min-width: 0;
+    padding: 0;
+  }
+
+  .devotional-reader-heading {
+    margin: 0 0 24px;
+  }
+
+  .devotional-reader-heading .devotional-title {
+    max-width: 740px;
+    font-size: clamp(2.25rem, 3.3vw, 2.85rem);
+    letter-spacing: -0.035em;
+  }
+
+  .devotional-reader-heading .devotional-sub {
+    max-width: 760px;
+    font-size: var(--text-lg);
+  }
+
+  .devotional-reading-card {
+    padding: 28px;
+    margin-bottom: 22px;
+    border: 0;
+    border-radius: 22px;
+  }
+
+  .devotional-reading-card .devotional-p {
+    margin-bottom: 20px;
+    font-size: 1.05rem;
+    line-height: 1.78;
+  }
+
+  .devotional-reader-rail {
+    top: 28px;
+  }
+}
+
+@media (max-width: 900px) {
+  .devotional-header {
+    margin-bottom: 24px;
+  }
+
+  .devotional-reader-layout {
+    display: contents;
+  }
+
+  .devotional-reader-heading {
+    margin: 0 0 18px;
+  }
+}
+
+
+/* Final visual refinements for the reference states */
+.practice-cover-tile.cover-mixed .practice-cover-stats {
+  font-weight: 600;
+}
+
+@media (min-width: 901px) {
+  .coaching-completion-hero {
+    width: auto;
+    margin-right: -24px;
+    margin-left: -24px;
+  }
+
+  .completion-hero-card {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+
+  .completion-actions-bar button.btn[data-act="results-continue"] {
+    background: var(--accent);
+    color: #FFFFFF;
+  }
+
+  .completion-actions-bar.result-actions button.btn[data-act="review"],
+  .completion-actions-bar.result-actions button.btn[data-act="again"] {
+    border: 0;
+    background: transparent;
+    color: #2A204F;
+    box-shadow: none;
+  }
+
+  .desktop-main > .devotional-view-shell {
+    margin-left: 0;
+    margin-right: auto;
+  }
+
+  .devotional-reader-heading {
+    margin-bottom: 14px;
+  }
+
+  .devotional-back-btn {
+    background: #FFFFFF;
+    color: #2D1D77;
+  }
+}
+
+html[data-theme="dark"] .desktop-sidebar .desktop-nav-item.active,
+html[data-theme="dark"] .desktop-sidebar .desktop-nav-item.active:hover {
+  background: #241A5C;
+  color: #FF74AA;
+  box-shadow: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .desktop-sidebar .desktop-nav-item.active,
+  html:not([data-theme="light"]) .desktop-sidebar .desktop-nav-item.active:hover {
+    background: #241A5C;
+    color: #FF74AA;
+    box-shadow: none;
+  }
+}
+
+@media (min-width: 901px) and (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .desktop-sidebar .desktop-nav-item.active,
+  html:not([data-theme="light"]) .desktop-sidebar .desktop-nav-item.active:hover {
+    background: #241A5C;
+    color: #FF74AA;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .practice-mode-tile.is-selected,
+  html:not([data-theme="light"]) .practice-cover-tile.is-selected {
+    border-color: #FF74AA;
+    box-shadow: 0 0 0 3px rgba(255, 116, 170, 0.17);
+  }
+}
+
+html[data-theme="dark"] .practice-mode-tile.is-selected,
+html[data-theme="dark"] .practice-cover-tile.is-selected {
+  border-color: #FF74AA;
+  box-shadow: 0 0 0 3px rgba(255, 116, 170, 0.17);
+}
+
+
+/* Reference-aligned desktop Quiz feedback layout */
+@media (min-width: 901px) {
+  .quiz-session {
+    position: relative;
+    width: 100%;
+    max-width: 1160px;
+    min-height: 0;
+  }
+
+  .quiz-session .coaching-study-header {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    margin: 0 0 14px;
+    padding: 0;
+  }
+
+  .quiz-session .study-heading {
+    display: none;
+  }
+
+  .quiz-session .session-status {
+    min-width: 44px;
+    margin-left: auto;
+    font-size: var(--text-base);
+  }
+
+  .quiz-session .study-progress {
+    position: absolute;
+    top: 24px;
+    right: 60px;
+    left: 72px;
+    height: 8px;
+    margin: 0;
+  }
+
+  .quiz-session .quiz-question-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 32px;
+    margin-top: 30px;
+  }
+
+  .quiz-session .quiz-question-layout.has-feedback {
+    grid-template-columns: minmax(0, 2.13fr) minmax(340px, 1fr);
+  }
+
+  .quiz-session .coaching-question-panel {
+    min-width: 0;
+    padding: 10px 0 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .quiz-session .question-meta-row {
+    display: none;
+  }
+
+  .quiz-session .coaching-question-text {
+    margin: 0 0 28px;
+    font-size: clamp(2rem, 2.5vw, 2.25rem);
+    line-height: 1.2;
+  }
+
+  .quiz-session .coaching-opts-group {
+    gap: 22px;
+  }
+
+  .quiz-session button.opt {
+    min-height: 82px;
+    border: 1px solid #6B6397;
+    border-radius: 20px;
+  }
+
+  .quiz-session .quiz-explanation-card {
+    align-self: start;
+    min-height: 0;
+    height: auto;
+    padding: 32px;
+    border: 0;
+    border-radius: 22px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .quiz-session .quiz-explanation-card.sheet-correct,
+  .quiz-session .quiz-explanation-card.sheet-incorrect {
+    border-top: 0;
+  }
+
+  .quiz-session .quiz-explanation-content {
+    flex: 0 0 auto;
+  }
+
+  .quiz-session .quiz-explanation-card .btn-continue {
+    min-height: 58px;
+    margin-top: 24px;
+  }
+
+  .quiz-session .study-shortcuts {
+    display: none;
+  }
+}
+
+
+.completion-desktop-copy {
+  display: none;
+}
+
+.completion-mobile-copy {
+  display: inline;
+}
+
+@media (min-width: 901px) {
+  .desktop-main > .quiz-session {
+    max-width: 1160px;
+  }
+
+  .completion-desktop-copy {
+    display: inline;
+  }
+
+  .completion-mobile-copy {
+    display: none;
+  }
+}
+
+
+/* Reference-aligned desktop Home proportions */
+@media (min-width: 901px) {
+  .desktop-shell-home .desktop-home-content {
+    width: calc(100% - 20px);
+    margin-left: 0;
+  }
+
+  .desktop-home-header {
+    margin-bottom: 30px;
+  }
+
+  .desktop-backup-reminder {
+    min-height: 72px;
+  }
+
+  .desktop-home-columns {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 28px;
+  }
+
+  .desktop-today-card {
+    min-height: 232px;
+    padding: 24px 36px;
+  }
+
+  .desktop-today-eyebrow {
+    margin-bottom: 8px;
+  }
+
+  .desktop-today-copy h2 {
+    margin-bottom: 8px;
+  }
+
+  .desktop-today-action {
+    margin-top: 14px;
+  }
+
+  .desktop-home-stats {
+    margin-bottom: 40px;
+  }
+
+  .desktop-stat-card {
+    min-height: 112px;
+  }
+
+  .desktop-featured-devotion {
+    min-height: 242px;
+  }
+}
