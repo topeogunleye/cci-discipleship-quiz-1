@@ -364,6 +364,78 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
   assert.equal(fileState.decks.reduce((count, deck) => count + deck.cards.length, 0), expectedCardCount);
 });
 
+test('main tabs render desktop navigation while quiz and devotional routes use the full shell', async () => {
+  const devotionals = JSON.parse(fs.readFileSync(path.join(root, 'content', 'devotionals.json'), 'utf8'));
+  const elements = {
+    app: { innerHTML: '', querySelectorAll: () => [], querySelector: () => null },
+    modal: { innerHTML: '' },
+    toast: { textContent: '', className: '' },
+    'starter-fallback': { textContent: JSON.stringify(starter) },
+    'devotionals-fallback': { textContent: JSON.stringify(devotionals) }
+  };
+  const document = {
+    getElementById: id => elements[id],
+    addEventListener: () => {},
+    documentElement: { removeAttribute: () => {}, setAttribute: () => {} },
+    activeElement: null
+  };
+  const window = {
+    DeckParser: parser,
+    StudyLogic,
+    StudyStorage,
+    MobileStudy,
+    location: { protocol: 'file:' },
+    scrollTo: () => {},
+    addEventListener: () => {}
+  };
+  const testAppSource = appSource.replace(
+    '  boot();',
+    '  window.shellTestApi = { render: render, setView: function (view) { V = view; } }; window.testAppReady = boot();'
+  );
+  vm.runInNewContext(testAppSource, {
+    window,
+    document,
+    localStorage: { getItem: () => null, setItem: () => {} }
+  });
+  await window.testAppReady;
+
+  for (const tab of ['home', 'journey', 'practice', 'progress', 'settings']) {
+    window.shellTestApi.setView({ name: tab });
+    window.shellTestApi.render();
+    assert.match(elements.app.innerHTML, /class="desktop-shell(?: desktop-shell-home)?"/, `${tab} should use the shared shell`);
+    assert.match(elements.app.innerHTML, /<aside class="desktop-sidebar">/, `${tab} should render desktop navigation`);
+    assert.match(elements.app.innerHTML, /<nav class="bottom-tab-bar"/, `${tab} should retain mobile navigation markup`);
+    assert.match(elements.app.innerHTML, new RegExp(`data-tab="${tab}" aria-selected="true"`), `${tab} should be selected`);
+  }
+
+  window.shellTestApi.setView({
+    name: 'quiz',
+    cards: [{
+      deckId: 'test-deck',
+      card: { id: 'test-card', question: 'Test question?', options: ['One', 'Two', 'Three', 'Four'], answer: 'A' },
+      optionOrder: [0, 1, 2, 3]
+    }],
+    i: 0,
+    picked: null,
+    score: 0,
+    answers: [],
+    opts: {},
+    ids: ['test-deck']
+  });
+  window.shellTestApi.render();
+  assert.match(elements.app.innerHTML, /class="desktop-shell desktop-shell-full"/);
+  assert.match(elements.app.innerHTML, /<section class="study-shell quiz-session/);
+  assert.doesNotMatch(elements.app.innerHTML, /<aside class="desktop-sidebar">/);
+  assert.doesNotMatch(elements.app.innerHTML, /<nav class="bottom-tab-bar"/);
+
+  window.shellTestApi.setView({ name: 'devotional', id: devotionals[0].id });
+  window.shellTestApi.render();
+  assert.match(elements.app.innerHTML, /class="desktop-shell desktop-shell-full"/);
+  assert.match(elements.app.innerHTML, /class="devotional-view-shell"/);
+  assert.doesNotMatch(elements.app.innerHTML, /<aside class="desktop-sidebar">/);
+  assert.doesNotMatch(elements.app.innerHTML, /<nav class="bottom-tab-bar"/);
+});
+
 test('saved starter decks refresh from source while custom cards and matching progress survive', async () => {
   const source = parsed.decks[0];
   const deckId = 'd-' + source.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
