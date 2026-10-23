@@ -724,9 +724,15 @@
       '</button>' +
     '</header>';
 
+    var backupAgeDays = S.backupReminder && S.backupReminder.anchorAt
+      ? Math.floor((now - S.backupReminder.anchorAt) / (24 * 60 * 60 * 1000))
+      : 0;
+    var desktopBackupCopy = backupAgeDays >= 14
+      ? 'Last backup was ' + backupAgeDays + ' days ago.'
+      : 'You have studied ' + ((S.backupReminder && S.backupReminder.cardsStudied) || 50) + ' cards since your last backup.';
     var desktopBackupReminder = StudyLogic.backupReminderDue(S.backupReminder, now)
       ? '<aside class="desktop-backup-reminder" role="status" aria-labelledby="desktop-backup-reminder-title">' +
-          '<p id="desktop-backup-reminder-title">Make a quick backup to keep your study progress safe.</p>' +
+          '<p id="desktop-backup-reminder-title">' + esc(desktopBackupCopy) + '</p>' +
           '<button class="desktop-backup-action" type="button" data-act="backup">Back up now</button>' +
           '<button class="desktop-backup-dismiss" type="button" data-act="backup-dismiss" aria-label="Dismiss backup reminder">×</button>' +
         '</aside>'

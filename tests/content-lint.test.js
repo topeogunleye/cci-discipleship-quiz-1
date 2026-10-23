@@ -634,6 +634,7 @@ test('home shows the backup reminder and dismissing it resets stored thresholds'
   });
   await window.testAppReady;
   assert.match(elements.app.innerHTML, /Back up now\?/);
+  assert.match(elements.app.innerHTML, /Last backup was 15 days ago\./);
   listeners.click({ target: { closest: () => ({ dataset: { act: 'backup-dismiss' } }) } });
   await window.reminderTestApi.flush();
   assert.doesNotMatch(elements.app.innerHTML, /Back up now\?/);
