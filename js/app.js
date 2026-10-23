@@ -499,13 +499,13 @@
       case 'home':
         return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>';
       case 'journey':
-        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>';
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 4h14l-3 4 3 4H5"/></svg>';
       case 'practice':
-        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="9" x2="12" y2="9.01"/><line x1="12" y1="15" x2="12" y2="15.01"/></svg>';
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 4.5 13h6L9 22l10.5-13H13z"/></svg>';
       case 'progress':
         return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>';
       case 'settings':
-        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="3" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="3" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="3"/></svg>';
       default:
         return '';
     }
@@ -886,6 +886,14 @@
 
   function getStepIconSvg(icon) {
     switch (icon) {
+      case 'practice-challenge':
+        return '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4"/><path d="M6 4h12l-3.5 4 3.5 4H6"/></svg>';
+      case 'practice-exam':
+        return '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1"/></svg>';
+      case 'practice-quiz':
+        return '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="1"/><line x1="9" y1="6" x2="20" y2="6"/><circle cx="5" cy="12" r="1"/><line x1="9" y1="12" x2="20" y2="12"/><circle cx="5" cy="18" r="1"/><line x1="9" y1="18" x2="20" y2="18"/></svg>';
+      case 'practice-flash':
+        return '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>';
       case 'flash':
         return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="13" y2="12"/></svg>';
       case 'quiz':
@@ -1051,10 +1059,10 @@
     var allSelected = S.decks.length > 0 && S.decks.every(function (d) { return SEL.has(d.id); });
     var selectedCount = SEL.size + (V.practiceMixed ? 1 : 0);
     var modeTiles = [
-      { id: 'challenge', title: 'Start a Challenge', description: 'About 5 minutes', icon: 'target' },
-      { id: 'exam', title: 'Start Exam', description: 'Full run', icon: 'trophy' },
-      { id: 'quiz', title: 'Quiz', description: 'Multiple choice', icon: 'quiz' },
-      { id: 'flash', title: 'Flashcards', description: 'Flip and recall', icon: 'flash' }
+      { id: 'challenge', title: 'Start a Challenge', description: 'About 5 minutes', icon: 'practice-challenge' },
+      { id: 'exam', title: 'Start Exam', description: 'Full run', icon: 'practice-exam' },
+      { id: 'quiz', title: 'Quiz', description: 'Multiple choice', icon: 'practice-quiz' },
+      { id: 'flash', title: 'Flashcards', description: 'Flip and recall', icon: 'practice-flash' }
     ].map(function (item) {
       var selected = mode === item.id;
       return '<button type="button" class="practice-mode-tile' + (selected ? ' is-selected' : '') + '" data-act="practice-mode" data-mode="' + item.id + '" aria-pressed="' + selected + '">' +
@@ -1065,11 +1073,12 @@
     var deckTiles = S.decks.map(function (d, index) {
       var parsed = MobileStudy.parseChapterTitle(d.title);
       var section = parsed.sectionNum || index + 1;
+      var displayTopic = section === 11 && parsed.topic === "Believers' Authority/Charisma" ? 'Authority & Charisma' : parsed.topic;
       var mastered = d.cards.filter(function (card) { return isMastered(d.id, card.id); }).length;
       var pct = d.cards.length ? Math.round(100 * mastered / d.cards.length) : 0;
       var selected = SEL.has(d.id);
-      return '<button type="button" class="practice-cover-tile deck-grad-' + (((section - 1) % 12) + 1) + (selected ? ' is-selected' : '') + '" data-act="practice-cover" data-id="' + esc(d.id) + '" aria-pressed="' + selected + '" aria-label="Lesson ' + section + ', ' + esc(parsed.topic) + ', ' + d.cards.length + ' cards, ' + pct + ' percent mastered">' +
-        '<span class="practice-cover-title">Lesson ' + section + ' · ' + esc(parsed.topic) + '</span>' +
+      return '<button type="button" class="practice-cover-tile deck-grad-' + (((section - 1) % 12) + 1) + (selected ? ' is-selected' : '') + '" data-act="practice-cover" data-id="' + esc(d.id) + '" aria-pressed="' + selected + '" aria-label="Lesson ' + section + ', ' + esc(displayTopic) + ', ' + d.cards.length + ' cards, ' + pct + ' percent mastered">' +
+        '<span class="practice-cover-title">Lesson ' + section + ' · ' + esc(displayTopic) + '</span>' +
         '<span class="practice-cover-stats">' + d.cards.length + ' cards · ' + pct + '%</span>' +
         (selected ? '<span class="practice-cover-check" aria-hidden="true">✓</span>' : '') +
       '</button>';
@@ -2068,7 +2077,7 @@
     var view = V.name === 'exam' ? views.quiz : views[V.name];
     if (typeof view !== 'function') view = views.home;
     var tabBarHtml = isMainTab ? renderTabBar(V.name) : '';
-    var showRocket = V.name === 'home' || V.name === 'journey' || V.name === 'practice';
+    var showRocket = V.name === 'home' || V.name === 'journey';
     var rocketHtml = showRocket ? renderRocketFab() : '';
     app.innerHTML = banner() +
       '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + '">' +
