@@ -21,7 +21,7 @@ const chromeCandidates = [
 ].filter(Boolean);
 const chromePath = chromeCandidates.find(candidate => fs.existsSync(candidate));
 const viewports = [
-  { name: 'desktop-1440', width: 1440, height: 1000 },
+  { name: 'desktop-1440', width: 1440, height: 1400 },
   { name: 'tablet-834', width: 834, height: 1112 },
   { name: 'mobile-390', width: 390, height: 844 }
 ];
@@ -171,6 +171,16 @@ async function capture(client, name) {
 async function showPractice(client) {
   await clickVisible(client, '[data-act="nav-tab"][data-tab="practice"]');
   await waitFor(client, 'document.querySelector("main h1")?.textContent.includes("Practice")', 'the Practice view');
+  for (const prefix of ['Lesson 1 ·', 'Lesson 3 ·']) {
+    const selected = await client.evaluate(`(() => {
+      const tile = [...document.querySelectorAll('.practice-cover-tile[data-act="practice-cover"]')]
+        .find(element => element.textContent.trim().startsWith(${JSON.stringify(prefix)}));
+      if (!tile) return false;
+      tile.click();
+      return true;
+    })()`);
+    if (!selected) throw new Error(`Could not select ${prefix} in Practice`);
+  }
 }
 
 async function showJourney(client) {
@@ -206,8 +216,16 @@ async function showQuiz(client) {
     await clickVisible(client, '.quiz-session [data-act="next"]');
     await waitFor(client, 'document.querySelector(".quiz-session .coaching-question-text")', 'the next Quiz question');
   }
-  await clickVisible(client, '.quiz-session .opt[data-i="0"]');
+  await clickVisible(client, '.quiz-session .opt[data-i="1"]');
   await waitFor(client, 'document.querySelector(".quiz-session .coaching-bottom-sheet, .quiz-session .quiz-explanation-card")', 'the selected-answer feedback');
+  if (await client.evaluate('window.innerWidth >= 901')) {
+    await client.send('Emulation.setDeviceMetricsOverride', {
+      width: 1440,
+      height: 920,
+      deviceScaleFactor: 1,
+      mobile: false
+    });
+  }
 }
 
 async function showSessionComplete(client) {
@@ -225,8 +243,30 @@ async function showSessionComplete(client) {
 async function showDevotion(client) {
   await clickVisible(client, '[data-act="nav-tab"][data-tab="home"]');
   await waitFor(client, 'document.querySelector(".home-view")', 'Home before opening a devotional');
-  await clickVisible(client, '[data-act="open-devotional"]');
+  if (await client.evaluate('window.innerWidth >= 901')) {
+    await client.send('Emulation.setDeviceMetricsOverride', {
+      width: 1440,
+      height: 1551,
+      deviceScaleFactor: 1,
+      mobile: false
+    });
+  }
+  const referenceArticle = await client.evaluate(`(() => {
+    const button = [...document.querySelectorAll('[data-act="open-devotional"]')]
+      .find(element => element.textContent.includes('Grace That Sets You Free'));
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`);
+  if (!referenceArticle) await clickVisible(client, '[data-act="open-devotional"]');
   await waitFor(client, 'document.querySelector(".devotional-view-shell .devotional-title")', 'the Devotion view');
+  const expand = await client.evaluate(`(() => {
+    const button = document.querySelector('.devotional-more-btn[aria-expanded="false"]');
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`);
+  if (expand) await waitFor(client, 'document.querySelector(".devotional-more-btn[aria-expanded=\\\"true\\\"]")', 'the expanded devotional');
 }
 
 async function captureMatrix(client) {
@@ -258,7 +298,7 @@ async function captureMatrix(client) {
 
 async function captureSupplemental(client) {
   const desktop = viewports[0];
-  await resetPage(client, 'light', desktop, { backupDue: true });
+  await resetPage(client, 'light', { name: 'desktop-1440', width: 1440, height: 1500 }, { backupDue: true });
   await waitFor(client, 'document.querySelector(".desktop-backup-reminder")', 'the desktop backup reminder');
   await capture(client, 'home-light-desktop-1440-backup-banner');
 
@@ -272,7 +312,7 @@ async function captureSupplemental(client) {
   await waitFor(client, 'document.querySelector("#chapter-info-title")', 'the lesson detail modal');
   await capture(client, 'lesson-detail-modal-light-desktop-1440');
 
-  await resetPage(client, 'light', desktop);
+  await resetPage(client, 'light', { name: 'desktop-1440', width: 1440, height: 900 });
   await showSessionComplete(client);
   await capture(client, 'session-complete-light-desktop-1440');
 }
