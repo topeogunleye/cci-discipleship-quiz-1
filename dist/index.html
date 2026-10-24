@@ -7014,6 +7014,10 @@ html[data-theme="dark"] .picker-selection-footer {
     height: 100%;
   }
 
+  .completion-mobile-sun {
+    display: none;
+  }
+
   .completion-score-badge {
     display: none;
   }
@@ -7957,6 +7961,10 @@ html[data-theme="dark"] .picker-selection-footer {
     height: 100%;
   }
 
+  .completion-mobile-sun {
+    display: none;
+  }
+
   .completion-score-badge,
   .completion-hero-title {
     display: none;
@@ -8439,6 +8447,198 @@ html[data-theme="dark"] .picker-selection-footer {
 
 .devotional-mobile-actions {
   display: none;
+}
+
+/* Full-screen completion presentation on phone and tablet widths. */
+@media (max-width: 900px) {
+  .coaching-completion-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    max-width: none !important;
+    flex-direction: column;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0 20px calc(24px + env(safe-area-inset-bottom, 0px));
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: linear-gradient(135deg, #FF843C 0%, #FF7650 44%, #F64F70 100%);
+    color: #171333;
+  }
+
+  .coaching-completion-screen .results-header {
+    display: none;
+  }
+
+  .coaching-completion-hero {
+    width: 100%;
+    margin: 0;
+  }
+
+  .completion-hero-card {
+    position: relative;
+    min-height: 0;
+    padding: 400px 0 0;
+    overflow: visible;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: #171333;
+  }
+
+  .completion-landscape {
+    position: absolute;
+    top: 0;
+    right: -20px;
+    left: -20px;
+    display: block;
+    width: calc(100% + 40px);
+    height: 400px;
+    margin: 0;
+  }
+
+  .completion-landscape svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .completion-score-badge,
+  .completion-hero-title {
+    display: none;
+  }
+
+  .completion-desktop-title {
+    display: block;
+    margin: 12px 0 4px;
+    color: #171333;
+    font-size: 2.65rem;
+    font-weight: 700;
+    line-height: 1.12;
+    text-align: center;
+  }
+
+  .completion-hero-message {
+    max-width: none;
+    margin: 0 auto 26px;
+    color: #24154D;
+    font-size: 1.08rem;
+    line-height: 1.4;
+    text-align: center;
+  }
+
+  .coaching-completion-screen .completion-desktop-copy {
+    display: inline;
+  }
+
+  .coaching-completion-screen .completion-mobile-copy {
+    display: none;
+  }
+
+  .completion-stats-row {
+    width: 100%;
+    max-width: none;
+    gap: 12px;
+  }
+
+  .stat-pill {
+    min-width: 0;
+    min-height: 96px;
+    padding: 16px 8px;
+    border: 0;
+    border-radius: 20px;
+    background: #FFFFFF;
+    box-shadow: 0 8px 22px rgba(49, 25, 78, .12);
+    backdrop-filter: none;
+  }
+
+  .stat-pill b {
+    color: #32152B;
+    font-size: clamp(1.45rem, 7vw, 1.9rem);
+    line-height: 1.15;
+  }
+
+  .stat-pill span {
+    color: #523246;
+    font-size: .88rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .completion-actions-bar.result-actions {
+    position: fixed;
+    right: 20px;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    left: 20px;
+    z-index: 101;
+    display: block;
+    width: auto;
+    max-width: none;
+    margin: 0;
+  }
+
+  .completion-actions-bar.result-actions .btn[data-act="results-continue"] {
+    display: block;
+    width: 100%;
+    min-height: 60px;
+    margin: 0;
+    border: 0;
+    border-radius: 999px;
+    background: #B5173A;
+    color: #FFFFFF;
+    box-shadow: none;
+    font-size: 1rem;
+    font-weight: 700;
+    order: 0;
+  }
+
+  .completion-actions-bar.result-actions .btn[data-act="review"],
+  .completion-actions-bar.result-actions .btn[data-act="again"] {
+    position: absolute;
+    bottom: 68px;
+    width: calc(50% - 6px);
+    min-height: 32px;
+    padding: 0 4px;
+    border: 0;
+    background: transparent;
+    color: #32152B;
+    box-shadow: none;
+    font-size: .82rem;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .completion-actions-bar.result-actions .btn[data-act="review"] {
+    left: 0;
+  }
+
+  .completion-actions-bar.result-actions .btn[data-act="again"] {
+    right: 0;
+  }
+
+  .completion-actions-bar.result-actions .result-note {
+    position: absolute;
+    bottom: 68px;
+    left: 0;
+    width: 100%;
+    color: #32152B;
+  }
+}
+
+@media (max-width: 520px) {
+  .completion-landscape circle {
+    display: none;
+  }
+
+  .completion-landscape .completion-mobile-sun {
+    display: inline;
+  }
 }
 
 
@@ -11223,6 +11423,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     var completionArt = '<div class="completion-landscape" aria-hidden="true">' +
       '<svg viewBox="0 0 1440 400" preserveAspectRatio="none" focusable="false">' +
         '<circle cx="720" cy="148" r="82" fill="#FFE9A7"/>' +
+        '<ellipse class="completion-mobile-sun" cx="720" cy="120" rx="236" ry="64" fill="#FFE9A7"/>' +
         '<path d="M0 216c177-66 337-48 510 7s355 65 535-6 278-91 395-41v139H0z" fill="#D83B50"/>' +
         '<path d="M0 302c198-55 374-26 562 26s372 45 548-1 250-66 330-42v115H0z" fill="#3928B9"/>' +
         '</svg>' +

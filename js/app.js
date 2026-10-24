@@ -1415,6 +1415,7 @@
     var completionArt = '<div class="completion-landscape" aria-hidden="true">' +
       '<svg viewBox="0 0 1440 400" preserveAspectRatio="none" focusable="false">' +
         '<circle cx="720" cy="148" r="82" fill="#FFE9A7"/>' +
+        '<ellipse class="completion-mobile-sun" cx="720" cy="120" rx="236" ry="64" fill="#FFE9A7"/>' +
         '<path d="M0 216c177-66 337-48 510 7s355 65 535-6 278-91 395-41v139H0z" fill="#D83B50"/>' +
         '<path d="M0 302c198-55 374-26 562 26s372 45 548-1 250-66 330-42v115H0z" fill="#3928B9"/>' +
         '</svg>' +
