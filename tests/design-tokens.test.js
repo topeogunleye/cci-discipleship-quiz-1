@@ -18,6 +18,16 @@ function contrastRatio(foreground, background) {
     (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
 }
 
+test('hint and text tokens meet contrast targets in light and dark themes', () => {
+  const darkHint = styles.match(/:root\[data-theme="dark"\]\s*\{[^}]*--faint:\s*(#[\da-f]{6});/i);
+  assert.ok(darkHint, 'Expected the dark hint token');
+  assert.ok(contrastRatio(darkHint[1], '#12103A') >= 4.5, 'Dark hint text must meet WCAG AA on the page background');
+  assert.ok(contrastRatio(darkHint[1], '#1D1A55') >= 4.5, 'Dark hint text must meet WCAG AA on the card surface');
+  assert.ok(contrastRatio('#4A486F', '#F5F6FB') >= 4.5, 'Light body text must meet WCAG AA');
+  assert.ok(contrastRatio('#F2F1FD', '#12103A') >= 4.5, 'Dark body and large text must meet WCAG AA');
+  assert.ok(contrastRatio('#F2F1FD', '#1D1A55') >= 3, 'Dark large text must meet WCAG AA');
+});
+
 test('white text meets WCAG AA contrast across all deck gradient stops', () => {
   const gradients = [...styles.matchAll(/--deck-grad-(\d+):\s*(linear-gradient\([^;]*\));/g)];
   assert.equal(gradients.length, 12, 'Expected one gradient token for each deck');
