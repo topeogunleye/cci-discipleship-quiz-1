@@ -8278,6 +8278,156 @@ html[data-theme="dark"] .picker-selection-footer {
   }
 }
 
+@media (max-width: 520px) {
+  .devotional-view-shell {
+    position: relative;
+    width: 100vw;
+    max-width: none;
+    margin: 0 0 0 calc(50% - 50vw);
+    margin-top: -16px;
+    padding: 0 0 calc(112px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .devotional-header {
+    min-height: 200px;
+    height: 200px;
+    margin: 0 0 16px;
+    padding: 16px;
+    border-radius: 0;
+  }
+
+  .devotional-header::before {
+    position: absolute;
+    top: 32px;
+    right: 48px;
+    z-index: 1;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #FFE8AC;
+    content: '';
+  }
+
+  .devotional-banner-art circle {
+    display: none;
+  }
+
+  .devotional-back-btn {
+    display: grid;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    place-items: center;
+    padding: 0;
+    border-radius: 50%;
+    background: #FFFFFF;
+    color: #241A5C;
+    font-size: 2.5rem;
+    font-weight: 400;
+    line-height: 1;
+  }
+
+  .devotional-back-btn:hover {
+    background: #FFFFFF;
+  }
+
+  .devotional-back-mobile {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-size: 0;
+    line-height: 0;
+  }
+
+  .devotional-back-mobile::before {
+    display: block;
+    content: '‹';
+    font-size: 2.5rem;
+    line-height: 44px;
+    text-align: center;
+  }
+
+  .devotional-view-shell .devotional-mobile-actions {
+    display: flex;
+    gap: 10px;
+    margin: 0 20px 18px;
+  }
+
+  .devotional-mobile-actions .devotional-rail-action {
+    display: inline-flex;
+    min-width: 88px;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink);
+    font: 600 var(--text-sm)/1.2 var(--font-sans);
+    cursor: pointer;
+    box-shadow: var(--shadow-card);
+  }
+
+  .devotional-mobile-actions .devotional-rail-action.active {
+    color: var(--accent);
+  }
+
+  .devotional-mobile-actions .devotional-rail-action svg {
+    display: none;
+  }
+
+  .devotional-reader-layout {
+    display: block;
+  }
+
+  .devotional-content-body {
+    padding: 0 20px;
+  }
+
+  .devotional-reader-heading {
+    margin: 0 0 18px;
+  }
+
+  .devotional-reader-heading .devotional-title {
+    font-size: 1.7rem;
+    line-height: 1.2;
+  }
+
+  .devotional-reading-card {
+    margin-bottom: 20px;
+    padding: 20px;
+    border-radius: 22px;
+  }
+
+  .devotional-footer-bar {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    margin: 0;
+    padding: 12px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(180deg, rgba(244, 245, 251, 0), #F4F5FB 28%);
+  }
+
+  .devotional-footer-bar .btn {
+    min-height: 56px;
+    border-radius: 999px;
+  }
+
+  html[data-theme="dark"] .devotional-footer-bar {
+    background: linear-gradient(180deg, rgba(18, 16, 58, 0), #12103A 28%);
+  }
+}
+
+.devotional-mobile-actions {
+  display: none;
+}
+
 
 /* Final visual refinements for the reference states */
 .practice-cover-tile.cover-mixed .practice-cover-stats {

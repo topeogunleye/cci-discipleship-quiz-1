@@ -1522,6 +1522,10 @@
     var bookmarkIcon = isSaved
       ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>'
       : '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+    var mobileActionButtons = '<div class="devotional-mobile-actions">' +
+      '<button class="devotional-rail-action" data-act="devotion-share" data-id="' + dev.id + '">' + shareIcon + '<span>Share</span></button>' +
+      '<button class="devotional-rail-action' + (isSaved ? ' active' : '') + '" data-act="devotion-toggle-save" data-id="' + dev.id + '">' + bookmarkIcon + '<span>' + (isSaved ? 'Saved' : 'Save') + '</span></button>' +
+    '</div>';
 
     return '<article class="devotional-view-shell" aria-labelledby="devotional-title">' +
       '<header class="devotional-header ' + gradClass + '">' +
@@ -1534,6 +1538,7 @@
           '<path d="M0 198c174-48 304-26 463 14 186 47 341 42 493-7 111-36 178-43 244-22v67H0z" fill="#302078"/>' +
         '</svg>' +
       '</header>' +
+      mobileActionButtons +
       '<div class="devotional-reader-layout">' +
         '<div class="devotional-content-body">' +
           '<header class="devotional-reader-heading">' +
@@ -1562,7 +1567,7 @@
           '<div class="devotional-footer-bar">' +
             (isRead
               ? '<button class="btn primary full btn-continue" data-act="devotion-study-lesson" data-id="' + dev.lessonId + '">Study this lesson →</button>'
-              : '<button class="btn primary full btn-continue" data-act="devotion-mark-read" data-id="' + dev.id + '">Mark as read ✓</button>') +
+              : '<button class="btn primary full btn-continue" data-act="devotion-mark-read" data-id="' + dev.id + '">Mark as read</button>') +
           '</div>' +
         '</div>' +
         '<aside class="devotional-reader-rail" aria-label="Devotional actions and more">' +
