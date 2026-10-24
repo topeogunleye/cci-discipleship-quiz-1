@@ -8,7 +8,7 @@ _None._
 ## Discipleship Experience (Section 2) Soteriology II (0)
 _None._
 
-## Discipleship Experience (Section 3) Predestination and Trinity (0)
+## Discipleship Experience (Section 3) Predestination & Trinity (0)
 _None._
 
 ## Discipleship Experience (Section 4) Christology (0)

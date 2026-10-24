@@ -367,6 +367,37 @@
     var first = modal.querySelector('button, input, select, textarea');
     if (first) first.focus();
   }
+  function openLessonDetailSheet(lessonId) {
+    var detailDeck = deck(lessonId);
+    if (!detailDeck) return;
+    var detailProgress = prog(detailDeck.id);
+    var detailMastered = detailDeck.cards.filter(function (card) { return isMastered(detailDeck.id, card.id); }).length;
+    var detailWeak = detailDeck.cards.filter(function (card) {
+      var record = detailProgress.cards[card.id];
+      return record && typeof record === 'object' && record.attempts > 0 && record.misses > 0;
+    }).length;
+    var parsedDetail = MobileStudy.parseChapterTitle(detailDeck.title);
+    var sectionNumber = parsedDetail.sectionNum || 1;
+    var progressPct = detailDeck.cards.length ? Math.round(100 * detailMastered / detailDeck.cards.length) : 0;
+    var gradient = 'deck-grad-' + (((sectionNumber - 1) % 12) + 1);
+    openModal('<div class="scrim" data-act="close"></div><section class="sheet lesson-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="lesson-detail-title">' +
+      '<span class="lesson-detail-handle" aria-hidden="true"></span>' +
+      '<div class="lesson-detail-hero ' + gradient + '">' +
+        '<h2 id="lesson-detail-title">' + esc(parsedDetail.topic) + '</h2>' +
+        '<p>Lesson ' + sectionNumber + ' · Section ' + sectionNumber + '</p>' +
+        '<div class="lesson-detail-progress" role="progressbar" aria-label="' + esc(parsedDetail.topic) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + progressPct + '"><i style="width:' + progressPct + '%"></i></div>' +
+      '</div>' +
+      '<div class="lesson-detail-stats" aria-label="Lesson statistics">' +
+        '<div><b>' + detailDeck.cards.length + '</b><span>Cards</span></div>' +
+        '<div><b>' + detailMastered + '</b><span>Mastered</span></div>' +
+        '<div><b>' + detailWeak + '</b><span>Weak spots</span></div>' +
+      '</div>' +
+      '<div class="lesson-detail-actions">' +
+        '<button type="button" class="btn primary lesson-detail-study" data-act="lesson-detail-study" data-id="' + detailDeck.id + '">Study this lesson</button>' +
+        '<button type="button" class="btn lesson-detail-close" data-act="close">Close</button>' +
+      '</div>' +
+    '</section>');
+  }
   function ask(msg, label, fn) { pendingAsk = fn; openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><h2 id="dialog-title" class="dialog-title">Please confirm</h2><p>' + esc(msg) + '</p><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn danger" data-act="askok">' + esc(label) + '</button></div></div>'); }
   function closeModal() {
     modal.innerHTML = ''; pendingAsk = null;
@@ -499,13 +530,13 @@
       case 'home':
         return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>';
       case 'journey':
-        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>';
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 4h14l-3 4 3 4H5"/></svg>';
       case 'practice':
-        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="9" x2="12" y2="9.01"/><line x1="12" y1="15" x2="12" y2="15.01"/></svg>';
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 4.5 13h6L9 22l10.5-13H13z"/></svg>';
       case 'progress':
         return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>';
       case 'settings':
-        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="3" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="3" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="3"/></svg>';
       default:
         return '';
     }
@@ -543,6 +574,33 @@
         '</button>';
       }).join('') +
     '</nav>';
+  }
+
+  function renderDesktopSidebar(currentTab) {
+    var tabs = [
+      { id: 'home', label: 'Home', icon: 'home' },
+      { id: 'journey', label: 'Journey', icon: 'journey' },
+      { id: 'practice', label: 'Practice', icon: 'practice' },
+      { id: 'progress', label: 'Progress', icon: 'progress' },
+      { id: 'settings', label: 'Settings', icon: 'settings' }
+    ];
+    var activeTab = currentTab === 'chapter' ? 'journey' : currentTab;
+    return '<aside class="desktop-sidebar">' +
+      '<div class="desktop-logo">' +
+        '<span class="desktop-logo-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><rect x="2" y="2" width="36" height="36" rx="13" fill="#4B35C5"/><circle cx="27" cy="13" r="4" fill="#FFE6A8"/><path d="M3 27c6-7 11-11 17-8 5 3 9 8 17 1v18H3V27Z" fill="#7A3FD0"/></svg></span>' +
+        '<span class="desktop-logo-name">Study</span>' +
+      '</div>' +
+      '<nav class="desktop-nav" aria-label="Main navigation">' +
+        tabs.map(function (tab) {
+          var isActive = tab.id === activeTab;
+          return '<button class="desktop-nav-item' + (isActive ? ' active' : '') + '" type="button" data-act="nav-tab" data-tab="' + tab.id + '"' +
+            (isActive ? ' aria-current="page"' : '') + '>' +
+            tabIconSvg(tab.icon) +
+            '<span>' + tab.label + '</span>' +
+          '</button>';
+        }).join('') +
+      '</nav>' +
+    '</aside>';
   }
 
   views.home = function () {
@@ -690,6 +748,143 @@
       '</div>' +
     '</section>';
 
+    var desktopTopBar = '<header class="desktop-home-header">' +
+      '<h1>Study</h1>' +
+      '<button class="start-practising-btn" type="button" data-act="toggle-rocket" aria-haspopup="menu" aria-expanded="' + (rocketMenuOpen ? 'true' : 'false') + '">' +
+        '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 13h6l-1 8 11-12h-7l-1-6Z"/></svg><span>Start practising</span>' +
+      '</button>' +
+    '</header>';
+
+    var backupAgeDays = S.backupReminder && S.backupReminder.anchorAt
+      ? Math.floor((now - S.backupReminder.anchorAt) / (24 * 60 * 60 * 1000))
+      : 0;
+    var desktopBackupCopy = backupAgeDays >= 14
+      ? 'Last backup was ' + backupAgeDays + ' days ago.'
+      : 'You have studied ' + ((S.backupReminder && S.backupReminder.cardsStudied) || 50) + ' cards since your last backup.';
+    var desktopBackupReminder = StudyLogic.backupReminderDue(S.backupReminder, now)
+      ? '<aside class="desktop-backup-reminder" role="status" aria-labelledby="desktop-backup-reminder-title">' +
+          '<p id="desktop-backup-reminder-title">' + esc(desktopBackupCopy) + '</p>' +
+          '<button class="desktop-backup-action" type="button" data-act="backup">Back up now</button>' +
+          '<button class="desktop-backup-dismiss" type="button" data-act="backup-dismiss" aria-label="Dismiss backup reminder">×</button>' +
+        '</aside>'
+      : '';
+
+    var dailyAction = totalCards > 0 && totalKnown >= totalCards ? 'exam' : 'daily-study';
+    var dailyMinutes = (S.onboarding && S.onboarding.dailyMinutes) || 10;
+    var dailyFocusCount = Math.min(dueCount || Math.max(totalCards - totalKnown, 0), dailyMinutes);
+    var desktopHeroTitle = S.pausedSession
+      ? 'Continue · ' + Math.min((S.pausedSession.i || 0) + 1, (S.pausedSession.cards || []).length) + ' of ' + S.pausedSession.cards.length + ' cards'
+      : (dueCount ? 'Your next step: ' + plural(dailyFocusCount, 'card') : (totalKnown < totalCards ? 'A little progress goes a long way' : 'You’ve mastered every card'));
+    var desktopHeroDescription = S.pausedSession
+      ? 'Your study session is ready when you are.'
+      : (dueCount ? plural(dueCount, 'card') + ' are ready for review. Start with your daily focus.' : 'Keep your rhythm going with a focused review.');
+    var desktopHeroAction = S.pausedSession ? 'resume-study' : dailyAction;
+    var desktopHero = '<section class="desktop-today-card" aria-label="Today’s study">' +
+      '<div class="desktop-today-copy">' +
+        '<p class="desktop-today-eyebrow">Today’s study</p>' +
+        '<h2>' + esc(desktopHeroTitle) + '</h2>' +
+        '<p>' + esc(desktopHeroDescription) + '</p>' +
+        '<button type="button" class="desktop-today-action" data-act="' + desktopHeroAction + '">Continue</button>' +
+      '</div>' +
+      '<svg class="desktop-today-landscape" viewBox="0 0 440 170" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">' +
+        '<circle cx="335" cy="48" r="30" fill="#FFE6A8"/>' +
+        '<path d="M0 116c65-42 119-57 175-31 63 30 106 42 164 17 38-16 70-39 101-61v129H0Z" fill="rgba(255,255,255,.22)"/>' +
+        '<path d="M0 135c73-38 127-43 188-19 53 21 102 36 159 11 32-14 62-34 93-58v102H0Z" fill="rgba(20,15,75,.25)"/>' +
+      '</svg>' +
+    '</section>';
+
+    var desktopStats = '<section class="desktop-home-stats" aria-label="Study statistics">' +
+      '<div class="desktop-stat-card"><strong>' + masterPct + '%</strong><span>Mastered</span></div>' +
+      '<div class="desktop-stat-card"><strong>' + dueCount + '</strong><span>Due today</span></div>' +
+      '<div class="desktop-stat-card"><strong>' + totalCards.toLocaleString() + '</strong><span>Cards</span></div>' +
+    '</section>';
+
+    var desktopLessons = '<section class="desktop-lessons" aria-labelledby="desktop-lessons-title">' +
+      '<div class="desktop-section-heading"><h2 id="desktop-lessons-title">Lessons</h2><span>' + plural(S.decks.length, 'chapter') + '</span></div>' +
+      '<div class="desktop-lesson-grid">' +
+        S.decks.map(function (d, index) {
+          var parsed = MobileStudy.parseChapterTitle(d.title);
+          var sectionNum = parsed.sectionNum || (index + 1);
+          var mastered = d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length;
+          var total = d.cards.length;
+          var pct = total ? Math.round(100 * mastered / total) : 0;
+          var gradient = 'deck-grad-' + (((sectionNum - 1) % 12) + 1);
+          return '<button type="button" class="desktop-lesson-card ' + gradient + '" data-act="lesson-detail-open" data-id="' + d.id + '" aria-label="View details for ' + esc(parsed.topic) + '">' +
+            '<span class="desktop-lesson-card-top"><strong>' + esc(parsed.topic) + '</strong><span class="desktop-lesson-section">' + sectionNum + '/12</span></span>' +
+            '<span class="desktop-lesson-card-bottom"><span>' + plural(total, 'card') + '</span><strong>' + pct + '%</strong></span>' +
+            '<span class="desktop-lesson-progress" role="progressbar" aria-label="' + esc(parsed.topic) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></span>' +
+          '</button>';
+        }).join('') +
+      '</div>' +
+    '</section>';
+
+    var desktopPlanCards = [];
+    var devotionalTask = planCards.filter(function (c) { return c.type === 'devotion'; })[0];
+    var reviewTask = planCards.filter(function (c) { return c.type === 'review'; })[0];
+    var nextTask = planCards.filter(function (c) { return c.type === 'lesson' || c.type === 'exam'; })[0];
+    if (devotionalTask) desktopPlanCards.push(devotionalTask);
+    if (reviewTask) desktopPlanCards.push(reviewTask);
+    if (nextTask) desktopPlanCards.push(nextTask);
+    if (desktopPlanCards.length < 3) {
+      planCards.forEach(function (c) {
+        if (desktopPlanCards.length < 3 && desktopPlanCards.indexOf(c) < 0) desktopPlanCards.push(c);
+      });
+    }
+
+    var desktopPlan = '<section class="desktop-plan-section" aria-labelledby="desktop-plan-title">' +
+      '<h2 id="desktop-plan-title">Your plan for today</h2>' +
+      '<div class="desktop-plan-list">' +
+        desktopPlanCards.slice(0, 3).map(function (c, index) {
+          return '<button type="button" class="desktop-plan-row" data-act="' + c.action + '"' + (c.mode ? ' data-mode="' + c.mode + '"' : '') + (c.deckId ? ' data-id="' + c.deckId + '"' : '') + (c.devotionalId ? ' data-id="' + c.devotionalId + '"' : '') + ' aria-label="' + esc(c.oneLine) + '">' +
+            '<span class="desktop-plan-icon desktop-plan-icon-' + index + '" aria-hidden="true">' + planIconSvg(c.icon) + '</span>' +
+            '<span class="desktop-plan-copy"><strong>' + esc(c.title) + '</strong><small>' + (c.minuteEstimate ? c.minuteEstimate + ' min' : (c.state === 'done' ? 'Completed today' : 'Ready')) + '</small></span>' +
+            '<span class="desktop-plan-count">' + (index + 1) + '/3</span>' +
+          '</button>';
+        }).join('') +
+      '</div>' +
+    '</section>';
+
+    var desktopDevotionFeature = todayDevotion && !isDevotionHiddenToday
+      ? '<article class="desktop-featured-devotion">' +
+          '<p>Today’s devotion · ' + todayDevotion.readMinutes + ' min</p>' +
+          '<h2>' + esc(todayDevotion.title) + '</h2>' +
+          '<p class="desktop-featured-scripture">' + esc(todayDevotion.scripture) + '</p>' +
+          '<button type="button" data-act="open-devotional" data-id="' + todayDevotion.id + '">Read now</button>' +
+        '</article>'
+      : '';
+
+    var desktopDevotionList = activeDevotionals.length && !isDevotionHiddenToday
+      ? '<section class="desktop-devotion-list" aria-labelledby="desktop-devotions-title">' +
+          '<h2 id="desktop-devotions-title">Daily devotionals</h2>' +
+          '<div class="desktop-devotion-rows">' +
+            orderedDevotionals.slice(0, 3).map(function (dev) {
+              var isRead = !!(S.devotions && S.devotions.read && S.devotions.read[dev.id]);
+              return '<article class="desktop-devotion-row ' + (dev.gradient || 'deck-grad-1') + '">' +
+                '<span><small>' + dev.readMinutes + ' min</small><strong>' + esc(dev.title) + '</strong></span>' +
+                '<button type="button" data-act="open-devotional" data-id="' + dev.id + '" aria-label="' + (isRead ? 'Read again: ' : 'Read: ') + esc(dev.title) + '">' + (isRead ? 'Read again' : 'Read') + '</button>' +
+              '</article>';
+            }).join('') +
+          '</div>' +
+        '</section>'
+      : '';
+
+    var desktopHome = '<div class="desktop-home-content">' +
+      desktopTopBar +
+      desktopBackupReminder +
+      '<div class="desktop-home-columns">' +
+        '<div class="desktop-home-primary">' + desktopHero + desktopStats + desktopLessons + '</div>' +
+        '<aside class="desktop-home-rail" aria-label="Your daily study">' +
+          desktopDevotionFeature + desktopPlan + desktopDevotionList +
+        '</aside>' +
+      '</div>' +
+    '</div>';
+
+    var mobileStudyHeader = '<header class="mobile-study-header"><h1>Study</h1>' +
+      '<button class="top-icon-btn" data-act="nav-tab" data-tab="settings" aria-label="Settings">' +
+        tabIconSvg('settings') +
+      '</button>' +
+    '</header>';
+
     var milestoneCard = S.decks.length ? '<section class="home-milestone-card">' +
       '<div class="milestone-content">' +
         '<div class="milestone-title">Progress Overview</div>' +
@@ -702,7 +897,10 @@
       '<button class="btn sm ghost" data-act="nav-tab" data-tab="progress">View Details →</button>' +
     '</section>' : '';
 
-    return topBar + backupReminder + heroCard + devotionSection + (S.decks.length ? planSection + milestoneCard : '');
+    return '<div class="home-view">' +
+      '<div class="mobile-home-content">' + mobileStudyHeader + backupReminder + desktopHero + desktopStats + desktopLessons + devotionSection + '</div>' +
+      desktopHome +
+    '</div>';
   };
 
   
@@ -725,6 +923,14 @@
 
   function getStepIconSvg(icon) {
     switch (icon) {
+      case 'practice-challenge':
+        return '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V4"/><path d="M6 4h12l-3.5 4 3.5 4H6"/></svg>';
+      case 'practice-exam':
+        return '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1"/></svg>';
+      case 'practice-quiz':
+        return '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="1"/><line x1="9" y1="6" x2="20" y2="6"/><circle cx="5" cy="12" r="1"/><line x1="9" y1="12" x2="20" y2="12"/><circle cx="5" cy="18" r="1"/><line x1="9" y1="18" x2="20" y2="18"/></svg>';
+      case 'practice-flash':
+        return '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>';
       case 'flash':
         return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="13" y2="12"/></svg>';
       case 'quiz':
@@ -763,6 +969,7 @@
             '<span class="chapter-sec-pill">' + secNum + '/12</span>' +
             bestBadge +
           '</div>' +
+          '<span class="chapter-pct-desktop">' + pct + '%</span>' +
           '<div class="chapter-card-actions">' +
             '<button class="chapter-icon-btn chapter-info-btn" data-act="chapter-info" data-id="' + d.id + '" aria-label="Deck info for ' + esc(parsed.topic) + '" title="View deck details">' +
               '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' +
@@ -774,7 +981,7 @@
         '</div>' +
         '<button class="chapter-card-main-hit" data-act="open-chapter" data-id="' + d.id + '" aria-label="Open chapter ' + esc(parsed.topic) + '">' +
           '<h2 class="chapter-title">' + esc(parsed.topic) + '</h2>' +
-          '<p class="chapter-sub">CCI Discipleship Experience</p>' +
+          '<p class="chapter-sub"><span class="chapter-sub-mobile">CCI Discipleship Experience</span><span class="chapter-sub-desktop">Section ' + secNum + '</span></p>' +
           '<div class="chapter-card-bottom">' +
             '<div class="chapter-progress-info">' +
               '<span class="chapter-count">' + mastered + ' / ' + total + ' mastered</span>' +
@@ -791,7 +998,7 @@
 
     return '<header class="view-header">' +
       '<div class="row spread">' +
-        '<div><h1>Journey</h1><p class="view-sub">12 Discipleship Chapters · ' + plural(S.decks.length, 'chapter') + ' · ' + plural(totalCards, 'card') + '</p></div>' +
+        '<div><h1>Journey</h1><p class="view-sub journey-subtitle-mobile">12 Discipleship Chapters · ' + plural(S.decks.length, 'chapter') + ' · ' + plural(totalCards, 'card') + '</p><p class="view-sub journey-subtitle-desktop">Pick any chapter. Nothing is ever locked.</p></div>' +
         '<button class="btn sm" data-act="import">Add deck</button>' +
       '</div>' +
     '</header>' +
@@ -880,48 +1087,66 @@
 
 
   views.practice = function () {
-    var now = Date.now();
+    var mode = V.practiceMode || 'quiz';
+    var multi = V.practiceMulti !== false;
     var all = allCardItems();
-    var dueCount = StudyLogic.dueItems(all, now).length;
+    var dueCount = StudyLogic.dueItems(all, Date.now()).length;
     var weakCount = StudyLogic.weakSpots(all, 10).length;
-    return '<header class="view-header">' +
-      '<h1>Practice</h1>' +
-      '<p class="view-sub">Master your questions through focused study modes</p>' +
-    '</header>' +
-    '<div class="practice-grid">' +
-      '<button class="practice-card" data-act="daily-study">' +
-        '<div class="practice-icon">' + planIconSvg('review') + '</div>' +
-        '<div class="practice-body">' +
-          '<div class="practice-title">Today’s Focus Study</div>' +
-          '<div class="practice-desc">Focused 10-card daily review prioritized by spaced repetition.</div>' +
+    var totalCards = all.length;
+    var allSelected = S.decks.length > 0 && S.decks.every(function (d) { return SEL.has(d.id); });
+    var selectedCount = SEL.size + (V.practiceMixed ? 1 : 0);
+    var modeTiles = [
+      { id: 'challenge', title: 'Start a Challenge', description: 'About 5 minutes', icon: 'practice-challenge' },
+      { id: 'exam', title: 'Start Exam', description: 'Full run', icon: 'practice-exam' },
+      { id: 'quiz', title: 'Quiz', description: 'Multiple choice', icon: 'practice-quiz' },
+      { id: 'flash', title: 'Flashcards', description: 'Flip and recall', icon: 'practice-flash' }
+    ].map(function (item) {
+      var selected = mode === item.id;
+      return '<button type="button" class="practice-mode-tile' + (selected ? ' is-selected' : '') + '" data-act="practice-mode" data-mode="' + item.id + '" aria-pressed="' + selected + '">' +
+        '<span class="practice-mode-icon" aria-hidden="true">' + getStepIconSvg(item.icon) + '</span>' +
+        '<span class="practice-mode-copy"><strong>' + item.title + '</strong><small>' + item.description + '</small></span>' +
+      '</button>';
+    }).join('');
+    var deckTiles = S.decks.map(function (d, index) {
+      var parsed = MobileStudy.parseChapterTitle(d.title);
+      var section = parsed.sectionNum || index + 1;
+      var displayTopic = section === 11 && parsed.topic === "Believers' Authority/Charisma" ? 'Authority & Charisma' : parsed.topic;
+      var mastered = d.cards.filter(function (card) { return isMastered(d.id, card.id); }).length;
+      var pct = d.cards.length ? Math.round(100 * mastered / d.cards.length) : 0;
+      var selected = SEL.has(d.id);
+      return '<button type="button" class="practice-cover-tile deck-grad-' + (((section - 1) % 12) + 1) + (selected ? ' is-selected' : '') + '" data-act="practice-cover" data-id="' + esc(d.id) + '" aria-pressed="' + selected + '" aria-label="Lesson ' + section + ', ' + esc(displayTopic) + ', ' + d.cards.length + ' cards, ' + pct + ' percent mastered">' +
+        '<span class="practice-cover-title">Lesson ' + section + ' · ' + esc(displayTopic) + '</span>' +
+        '<span class="practice-cover-stats">' + d.cards.length + ' cards · ' + pct + '%</span>' +
+        (selected ? '<span class="practice-cover-check" aria-hidden="true">✓</span>' : '') +
+      '</button>';
+    }).join('');
+    var startText = mode === 'challenge' ? 'Start challenge' : mode === 'exam' ? 'Start exam' : V.practiceMixed ? (mode === 'flash' ? 'Start mixed flashcards' : 'Start mixed review') : 'Start ' + (mode === 'flash' ? 'flashcards' : 'quiz') + (selectedCount ? ' · ' + selectedCount + ' ' + (selectedCount === 1 ? 'set' : 'sets') : '');
+    var startDisabled = !selectedCount && mode !== 'challenge' && mode !== 'exam';
+    return '<section class="practice-selection-view" aria-labelledby="practice-title">' +
+      '<header class="view-header practice-view-header">' +
+        '<h1 id="practice-title">Practice</h1>' +
+        '<p class="view-sub">Pick how you want to practice, then choose what to cover.</p>' +
+      '</header>' +
+      '<div class="practice-mode-grid" role="group" aria-label="Choose a practice mode">' + modeTiles + '</div>' +
+      '<section class="practice-cover-section" aria-labelledby="practice-cover-title">' +
+        '<div class="practice-cover-heading">' +
+          '<h2 id="practice-cover-title">What to cover</h2>' +
+          '<button type="button" class="practice-multi-toggle' + (multi ? ' is-on' : '') + '" data-act="practice-multi" aria-pressed="' + multi + '"><span>Select several</span><i aria-hidden="true"></i></button>' +
         '</div>' +
-        '<span class="practice-arrow" aria-hidden="true">→</span>' +
-      '</button>' +
-      '<button class="practice-card" data-act="due">' +
-        '<div class="practice-icon">' + planIconSvg('review') + '</div>' +
-        '<div class="practice-body">' +
-          '<div class="practice-title">Due Cards Review ' + (dueCount ? '<span class="badge">' + dueCount + '</span>' : '') + '</div>' +
-          '<div class="practice-desc">' + (dueCount ? plural(dueCount, 'card') + ' scheduled for review today.' : 'All caught up! No cards currently due.') + '</div>' +
+        '<div class="practice-cover-grid" role="group" aria-label="Lessons to cover">' +
+          '<button type="button" class="practice-cover-tile cover-all' + (allSelected ? ' is-selected' : '') + '" data-act="practice-cover" data-id="__all__" aria-pressed="' + allSelected + '">' +
+            '<span class="practice-cover-title">All lessons</span><span class="practice-cover-stats">' + totalCards + ' cards</span>' + (allSelected ? '<span class="practice-cover-check" aria-hidden="true">✓</span>' : '') +
+          '</button>' +
+          '<button type="button" class="practice-cover-tile cover-mixed' + (V.practiceMixed ? ' is-selected' : '') + '" data-act="practice-cover" data-id="__mixed__" aria-pressed="' + !!V.practiceMixed + '">' +
+            '<span class="practice-cover-title">Mixed review</span><span class="practice-cover-stats">Due + weak spots</span>' + (V.practiceMixed ? '<span class="practice-cover-check" aria-hidden="true">✓</span>' : '') +
+          '</button>' + deckTiles +
         '</div>' +
-        '<span class="practice-arrow" aria-hidden="true">→</span>' +
-      '</button>' +
-      '<button class="practice-card" data-act="weak">' +
-        '<div class="practice-icon">' + planIconSvg('target') + '</div>' +
-        '<div class="practice-body">' +
-          '<div class="practice-title">Weak Spots</div>' +
-          '<div class="practice-desc">' + (weakCount ? 'Practice questions you have missed most frequently.' : 'Build stats by studying cards to surface weak spots.') + '</div>' +
-        '</div>' +
-        '<span class="practice-arrow" aria-hidden="true">→</span>' +
-      '</button>' +
-      '<button class="practice-card" data-act="exam">' +
-        '<div class="practice-icon">' + planIconSvg('trophy') + '</div>' +
-        '<div class="practice-body">' +
-          '<div class="practice-title">Comprehensive Timed Exam</div>' +
-          '<div class="practice-desc">Timed exam across all 12 decks with complete answer review upon submission.</div>' +
-        '</div>' +
-        '<span class="practice-arrow" aria-hidden="true">→</span>' +
-      '</button>' +
-    '</div>';
+      '</section>' +
+      '<div class="practice-start-bar" aria-live="polite">' +
+        '<span>' + (selectedCount ? selectedCount + ' ' + (selectedCount === 1 ? 'selection' : 'selections') + ' ready' : 'Choose what to cover') + '</span>' +
+        '<button type="button" class="btn primary practice-start-button" data-act="practice-start" data-mode="' + mode + '"' + (startDisabled ? ' disabled aria-disabled="true"' : '') + '>' + startText + '</button>' +
+      '</div>' +
+    '</section>';
   };
 
   views.progress = function () {
@@ -1106,10 +1331,12 @@
       return '<button class="' + cls + '" data-act="pick" data-i="' + k + '" aria-label="' + LET[k] + '. ' + esc(c.options[source]) + '" aria-pressed="' + (done && k === picked) + '"' + (done ? ' disabled' : '') + '>' +
         '<span class="opt-badge" aria-hidden="true">' + LET[k] + '</span>' +
         '<span class="opt-text">' + esc(c.options[source]) + '</span>' +
+        (done && !isExam && (cls.indexOf(' right') >= 0 || cls.indexOf(' wrong') >= 0) ? '<span class="opt-result-icon" aria-hidden="true">' + (cls.indexOf(' right') >= 0 ? '✓' : '✕') + '</span>' : '') +
       '</button>';
     }).join('');
 
     var fbSheet = '';
+    var desktopFeedback = '';
     if (done) {
       var answerAt = order.indexOf(LET.indexOf(c.answer));
       if (isExam) {
@@ -1120,9 +1347,7 @@
         '</div>';
       } else {
         var ok = picked === answerAt;
-        fbSheet = '<div class="coaching-bottom-sheet ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '" role="status" aria-live="polite">' +
-          '<div class="sheet-drag-handle" aria-hidden="true"></div>' +
-          '<div class="sheet-content">' +
+        var feedbackContent =
             '<div class="feedback-panel ' + (ok ? 'is-correct' : 'is-incorrect') + '">' +
               '<div class="feedback-header">' +
                 '<span class="feedback-mark-icon" aria-hidden="true">' + (ok ? '✓' : '✗') + '</span>' +
@@ -1132,30 +1357,41 @@
               (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') +
               (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') +
               bibleNote(c) +
-            '</div>' +
+            '</div>';
+        fbSheet = '<div class="coaching-bottom-sheet ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '" role="status" aria-live="polite">' +
+          '<div class="sheet-drag-handle" aria-hidden="true"></div>' +
+          '<div class="sheet-content">' +
+            feedbackContent +
             '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Next question') + '</button>' +
           '</div>' +
         '</div>';
+        desktopFeedback = '<aside class="quiz-explanation-card ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '" role="status" aria-live="polite">' +
+          '<div class="quiz-explanation-content">' + feedbackContent + '</div>' +
+          '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Continue') + '</button>' +
+        '</aside>';
       }
     }
 
     var title = isExam ? 'Exam' : 'Quiz';
     var status = isExam
       ? '<span id="exam-clock" role="timer" aria-label="Time remaining ' + formatClock(V.remaining) + '">' + formatClock(V.remaining) + '</span>'
-      : '<span class="score-inline">' + V.score + '<span aria-hidden="true"> / </span><span class="sr-only">out of</span>' + V.answers.length + '</span>';
+      : '<span class="score-inline" aria-label="Question ' + (V.i + 1) + ' of ' + V.cards.length + '">' + (V.i + 1) + '<span aria-hidden="true"> / </span><span class="sr-only">of</span>' + V.cards.length + '</span>';
 
     return '<section class="study-shell ' + (isExam ? 'exam-session' : 'quiz-session') + ' coaching-study-flow" aria-label="' + (isExam ? 'Timed exam' : 'Quiz') + '">' +
       sessionHead(sessionTitle, status, isExam) +
       progressBar(V.i + (done ? 1 : 0), V.cards.length) +
-      '<article class="question-panel coaching-question-panel">' +
-        '<div class="question-meta-row">' +
-          '<span class="count">Question ' + (V.i + 1) + ' of ' + V.cards.length + '</span>' +
-          (showTooltip ? '<div class="coaching-first-tooltip" role="tooltip"><span class="tooltip-dot" aria-hidden="true"></span>Tap an answer to check it</div>' : '') +
-        '</div>' +
-        '<h2 class="qtext coaching-question-text" id="question-prompt" tabindex="-1">' + esc(c.question) + '</h2>' +
-        '<div class="opts coaching-opts-group" role="group" aria-labelledby="question-prompt">' + opts + '</div>' +
-        (done ? fbSheet : '') +
-      '</article>' +
+      '<div class="quiz-question-layout' + (desktopFeedback ? ' has-feedback' : '') + '">' +
+        '<article class="question-panel coaching-question-panel">' +
+          '<div class="question-meta-row">' +
+            '<span class="count">Question ' + (V.i + 1) + ' of ' + V.cards.length + '</span>' +
+            (showTooltip ? '<div class="coaching-first-tooltip" role="tooltip"><span class="tooltip-dot" aria-hidden="true"></span>Tap an answer to check it</div>' : '') +
+          '</div>' +
+          '<h2 class="qtext coaching-question-text" id="question-prompt" tabindex="-1">' + esc(c.question) + '</h2>' +
+          '<div class="opts coaching-opts-group" role="group" aria-labelledby="question-prompt">' + opts + '</div>' +
+          (done ? fbSheet : '') +
+        '</article>' +
+        desktopFeedback +
+      '</div>' +
       '<p class="study-shortcuts">Choose A–D or 1–4' + (done ? '' : ' · Enter a selection to continue') + '</p>' +
     '</section>';
   };
@@ -1176,6 +1412,14 @@
       minutes: minutes,
       cardsMastered: cardsMastered
     });
+    var completionArt = '<div class="completion-landscape" aria-hidden="true">' +
+      '<svg viewBox="0 0 1440 400" preserveAspectRatio="none" focusable="false">' +
+        '<circle cx="720" cy="148" r="82" fill="#FFE9A7"/>' +
+        '<ellipse class="completion-mobile-sun" cx="720" cy="120" rx="236" ry="64" fill="#FFE9A7"/>' +
+        '<path d="M0 216c177-66 337-48 510 7s355 65 535-6 278-91 395-41v139H0z" fill="#D83B50"/>' +
+        '<path d="M0 302c198-55 374-26 562 26s372 45 548-1 250-66 330-42v115H0z" fill="#3928B9"/>' +
+        '</svg>' +
+      '</div>';
 
     if (R.kind === 'exam') {
       var examPct = feedback.pct;
@@ -1206,12 +1450,14 @@
         '</header>' +
         '<div class="coaching-completion-hero">' +
           '<div class="completion-hero-card">' +
+            completionArt +
             '<div class="completion-score-badge">' + examPct + '%</div>' +
             '<h2 class="completion-hero-title">' + esc(feedback.title) + '</h2>' +
-            '<p class="completion-hero-message">' + esc(feedback.message) + (R.expired ? ' <span class="expired-tag">(Time expired)</span>' : '') + '</p>' +
+            '<h2 class="completion-desktop-title">Well done!</h2>' +
+            '<p class="completion-hero-message"><span class="completion-desktop-copy">Every session counts. See you tomorrow.</span><span class="completion-mobile-copy">' + esc(feedback.message) + '</span>' + (R.expired ? ' <span class="expired-tag">(Time expired)</span>' : '') + '</p>' +
             '<div class="completion-stats-row">' +
               '<div class="stat-pill"><b>' + R.score + ' / ' + R.total + '</b><span>Score</span></div>' +
-              '<div class="stat-pill"><b>' + minutes + ' min</b><span>Time</span></div>' +
+              '<div class="stat-pill"><b>' + minutes + '</b><span>Minutes</span></div>' +
               '<div class="stat-pill"><b>' + cardsMastered + '</b><span>Mastered</span></div>' +
             '</div>' +
           '</div>' +
@@ -1240,13 +1486,15 @@
       '</header>' +
       '<div class="coaching-completion-hero">' +
         '<div class="completion-hero-card">' +
+          completionArt +
           '<div class="completion-score-badge">' + (R.kind === 'quiz' ? feedback.pct + '%' : '✓') + '</div>' +
           '<h2 class="completion-hero-title">' + esc(feedback.title) + '</h2>' +
-          '<p class="completion-hero-message">' + esc(feedback.message) + '</p>' +
+          '<h2 class="completion-desktop-title">Well done!</h2>' +
+          '<p class="completion-hero-message"><span class="completion-desktop-copy">Every session counts. See you tomorrow.</span><span class="completion-mobile-copy">' + esc(feedback.message) + '</span></p>' +
           '<div class="completion-stats-row">' +
             (R.kind === 'quiz' ? '<div class="stat-pill"><b>' + R.score + ' / ' + R.total + '</b><span>Score</span></div>' : '<div class="stat-pill"><b>' + R.known + '</b><span>Known</span></div>') +
-            '<div class="stat-pill"><b>' + minutes + ' min</b><span>Study Time</span></div>' +
-            '<div class="stat-pill"><b>' + cardsMastered + '</b><span>Cards Mastered</span></div>' +
+            '<div class="stat-pill"><b>' + minutes + '</b><span>Minutes</span></div>' +
+            '<div class="stat-pill"><b>' + cardsMastered + '</b><span>Mastered</span></div>' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -1267,47 +1515,82 @@
     var gradClass = dev.gradient || 'deck-grad-1';
     var bodyParagraphs = dev.body || [];
     var visibleParagraphs = expanded ? bodyParagraphs : bodyParagraphs.slice(0, 1);
+    var moreDevotionals = MobileStudy.filterDevotionals(DEVOTIONALS, S.settings.showDraftDevotionals)
+      .filter(function (item) { return item.id !== dev.id; })
+      .slice(0, 3);
 
     var shareIcon = '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
     var bookmarkIcon = isSaved
       ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>'
       : '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+    var mobileActionButtons = '<div class="devotional-mobile-actions">' +
+      '<button class="devotional-rail-action" data-act="devotion-share" data-id="' + dev.id + '">' + shareIcon + '<span>Share</span></button>' +
+      '<button class="devotional-rail-action' + (isSaved ? ' active' : '') + '" data-act="devotion-toggle-save" data-id="' + dev.id + '">' + bookmarkIcon + '<span>' + (isSaved ? 'Saved' : 'Save') + '</span></button>' +
+    '</div>';
 
     return '<article class="devotional-view-shell" aria-labelledby="devotional-title">' +
       '<header class="devotional-header ' + gradClass + '">' +
         '<div class="devotional-nav-row">' +
-          '<button class="devotional-back-btn" data-act="close-devotional" aria-label="Go back to Home">‹ Home</button>' +
-          '<div class="devotional-actions">' +
-            '<button class="devotional-icon-btn' + (isSaved ? ' active' : '') + '" data-act="devotion-toggle-save" data-id="' + dev.id + '" aria-label="' + (isSaved ? 'Remove from saved' : 'Save article') + '" title="Save">' + bookmarkIcon + '</button>' +
-            '<button class="devotional-icon-btn" data-act="devotion-share" data-id="' + dev.id + '" aria-label="Share devotional" title="Share">' + shareIcon + '</button>' +
+          '<button class="devotional-back-btn" data-act="close-devotional" aria-label="Go back to Home"><span class="devotional-back-mobile">‹ Home</span><span class="devotional-back-desktop" aria-hidden="true">←</span></button>' +
+        '</div>' +
+        '<svg class="devotional-banner-art" viewBox="0 0 1200 250" preserveAspectRatio="none" aria-hidden="true" focusable="false">' +
+          '<circle cx="900" cy="76" r="46" fill="#F5D17B"/>' +
+          '<path d="M0 158c160-42 300-36 458 8 166 47 314 51 450-8s206-75 292-42v134H0z" fill="#4A2AB9"/>' +
+          '<path d="M0 198c174-48 304-26 463 14 186 47 341 42 493-7 111-36 178-43 244-22v67H0z" fill="#302078"/>' +
+        '</svg>' +
+      '</header>' +
+      mobileActionButtons +
+      '<div class="devotional-reader-layout">' +
+        '<div class="devotional-content-body">' +
+          '<header class="devotional-reader-heading">' +
+            '<h1 id="devotional-title" class="devotional-title">' + esc(dev.title) + '</h1>' +
+            '<p class="devotional-sub">' + esc(dev.subtitle) + '</p>' +
+            '<span class="devotional-reader-meta">' + esc(dev.scripture) + ' · ' + dev.readMinutes + ' min read</span>' +
+          '</header>' +
+          '<section class="devotional-reading-card" aria-label="Devotional reading">' +
+            (dev.scriptureText ? '<blockquote class="devotional-scripture-quote" id="devotional-scripture"><a class="devotional-scripture-link" href="#devotional-scripture-text">' + esc(dev.scripture) + '</a><p id="devotional-scripture-text">' + esc(dev.scriptureText) + '</p></blockquote>' : '') +
+            '<div class="devotional-paragraphs">' +
+              visibleParagraphs.map(function (p) { return '<p class="devotional-p">' + esc(p) + '</p>'; }).join('') +
+            '</div>' +
+            (bodyParagraphs.length > 1 ? '<button class="devotional-more-btn" data-act="toggle-devotion-expand" aria-expanded="' + (expanded ? 'true' : 'false') + '">' + (expanded ? 'Less ↑' : 'Read more ↓') + '</button>' : '') +
+          '</section>' +
+          '<div class="devotional-callout reflection-box">' +
+            '<div class="callout-head"><span class="callout-icon" aria-hidden="true">💭</span><h2 class="callout-title">Reflection</h2></div>' +
+            '<p class="callout-text">' + esc(dev.reflection) + '</p>' +
+          '</div>' +
+          '<div class="devotional-callout step-box">' +
+            '<div class="callout-head"><span class="callout-icon" aria-hidden="true">👣</span><h2 class="callout-title">Today’s Step</h2></div>' +
+            '<p class="callout-text">' + esc(dev.step) + '</p>' +
+            (isRead
+              ? '<button class="btn primary full btn-continue desktop-step-action" data-act="devotion-study-lesson" data-id="' + dev.lessonId + '">Study this lesson →</button>'
+              : '<button class="btn primary full btn-continue desktop-step-action" data-act="devotion-mark-read" data-id="' + dev.id + '">Done! What’s next?</button>') +
+          '</div>' +
+          '<div class="devotional-footer-bar">' +
+            (isRead
+              ? '<button class="btn primary full btn-continue" data-act="devotion-study-lesson" data-id="' + dev.lessonId + '">Study this lesson →</button>'
+              : '<button class="btn primary full btn-continue" data-act="devotion-mark-read" data-id="' + dev.id + '">Mark as read</button>') +
           '</div>' +
         '</div>' +
-        '<div class="devotional-hero-content">' +
-          '<span class="devotional-pill">' + esc(dev.scripture) + ' · ' + dev.readMinutes + ' min read</span>' +
-          '<h1 id="devotional-title" class="devotional-title">' + esc(dev.title) + '</h1>' +
-          '<p class="devotional-sub">' + esc(dev.subtitle) + '</p>' +
-        '</div>' +
-        chapterSvgIllustration(1) +
-      '</header>' +
-      '<div class="devotional-content-body">' +
-        (dev.scriptureText ? '<blockquote class="devotional-scripture-quote"><strong>' + esc(dev.scripture) + '</strong><p>' + esc(dev.scriptureText) + '</p></blockquote>' : '') +
-        '<div class="devotional-paragraphs">' +
-          visibleParagraphs.map(function (p) { return '<p class="devotional-p">' + esc(p) + '</p>'; }).join('') +
-        '</div>' +
-        (bodyParagraphs.length > 1 ? '<button class="devotional-more-btn" data-act="toggle-devotion-expand" aria-expanded="' + (expanded ? 'true' : 'false') + '">' + (expanded ? 'Show less ↑' : 'Read more ↓') + '</button>' : '') +
-        '<div class="devotional-callout reflection-box">' +
-          '<div class="callout-head"><span class="callout-icon" aria-hidden="true">💭</span><h2 class="callout-title">Reflection</h2></div>' +
-          '<p class="callout-text">' + esc(dev.reflection) + '</p>' +
-        '</div>' +
-        '<div class="devotional-callout step-box">' +
-          '<div class="callout-head"><span class="callout-icon" aria-hidden="true">👣</span><h2 class="callout-title">Today’s Step</h2></div>' +
-          '<p class="callout-text">' + esc(dev.step) + '</p>' +
-        '</div>' +
-        '<div class="devotional-footer-bar">' +
+        '<aside class="devotional-reader-rail" aria-label="Devotional actions and more">' +
+          '<div class="devotional-rail-actions">' +
+            '<button class="devotional-rail-action" data-act="devotion-share" data-id="' + dev.id + '">' + shareIcon + '<span>Share</span></button>' +
+            '<button class="devotional-rail-action' + (isSaved ? ' active' : '') + '" data-act="devotion-toggle-save" data-id="' + dev.id + '">' + bookmarkIcon + '<span>' + (isSaved ? 'Saved' : 'Save') + '</span></button>' +
+          '</div>' +
           (isRead
-            ? '<button class="btn primary full btn-continue" data-act="devotion-study-lesson" data-id="' + dev.lessonId + '">Study this lesson →</button>'
-            : '<button class="btn primary full btn-continue" data-act="devotion-mark-read" data-id="' + dev.id + '">Mark as read ✓</button>') +
-        '</div>' +
+            ? '<button class="btn primary full devotional-mark-read" data-act="devotion-study-lesson" data-id="' + dev.lessonId + '">Study this lesson</button>'
+            : '<button class="btn primary full devotional-mark-read" data-act="devotion-mark-read" data-id="' + dev.id + '">Mark as read</button>') +
+          '<section class="devotional-more-card" aria-labelledby="more-devotionals-title">' +
+            '<h2 id="more-devotionals-title">More devotionals</h2>' +
+            (moreDevotionals.length
+              ? '<div class="devotional-more-list">' + moreDevotionals.map(function (item) {
+                  return '<button class="devotional-more-item ' + esc(item.gradient || 'deck-grad-1') + '" data-act="open-devotional" data-id="' + esc(item.id) + '">' +
+                    '<span>' + esc(item.title) + '</span><span class="devotional-more-readtime">' + esc(item.readMinutes) + ' min</span>' +
+                  '</button>';
+                }).join('') + '</div>'
+              : '<p class="devotional-more-empty">More stories will be available here.</p>') +
+            '<button class="devotional-view-all" data-act="nav-tab" data-tab="home">View all devotionals</button>' +
+          '</section>' +
+      '</aside>' +
       '</div>' +
     '</article>';
   };
@@ -1315,7 +1598,9 @@
   views.picker = function () {
     var mode = V.mode === 'quiz' ? 'quiz' : 'flash';
     var isQuiz = mode === 'quiz';
-    var modeTitle = isQuiz ? 'Quiz: Choose Lesson' : 'Flashcards: Choose Lesson';
+    var modeTitle = isQuiz ? 'Quiz' : 'Flashcards';
+    var multi = V.pickerMulti === true;
+    var mixed = V.pickerMixed === true;
     var formattedDecks = MobileStudy.formatPickerDecks(S.decks, function (deckId, cardId) {
       return isMastered(deckId, cardId);
     });
@@ -1325,11 +1610,12 @@
     var overallPct = totalCards ? Math.round(100 * totalMastered / totalCards) : 0;
 
     var tilesHtml = formattedDecks.map(function (d) {
-      return '<button class="picker-tile ' + d.gradientClass + '" data-act="setup" data-mode="' + mode + '" data-id="' + d.id + '" aria-label="' + esc(d.topic) + ', ' + d.totalCards + ' cards, ' + d.pct + '% mastered">' +
+      var selected = SEL.has(d.id);
+      return '<button class="picker-tile picker-selectable ' + d.gradientClass + (selected ? ' is-selected' : '') + '" data-act="picker-cover" data-id="' + d.id + '" aria-pressed="' + selected + '" aria-label="Lesson ' + d.sectionNum + ', ' + esc(d.topic) + ', ' + d.totalCards + ' cards, ' + d.pct + '% mastered">' +
         '<div class="picker-tile-top">' +
           '<span class="picker-tile-badge">' + d.sectionNum + '/12</span>' +
         '</div>' +
-        '<h3 class="picker-tile-title">' + esc(d.topic) + '</h3>' +
+        '<h3 class="picker-tile-title">Lesson ' + d.sectionNum + ' · ' + esc(d.topic) + '</h3>' +
         '<div class="picker-tile-bottom">' +
           '<span class="picker-tile-count">' + d.totalCards + ' cards</span>' +
           '<span class="picker-tile-pct">' + d.pct + '%</span>' +
@@ -1338,7 +1624,8 @@
       '</button>';
     }).join('');
 
-    var allTile = '<button class="picker-tile picker-tile-all hero-gradient-sunrise" data-act="setup" data-mode="' + mode + '" data-id="*" aria-label="All Lessons, ' + totalCards + ' cards, ' + overallPct + '% mastered">' +
+    var allSelected = S.decks.length > 0 && S.decks.every(function (d) { return SEL.has(d.id); });
+    var allTile = '<button class="picker-tile picker-tile-all hero-gradient-sunrise picker-selectable' + (allSelected ? ' is-selected' : '') + '" data-act="picker-cover" data-id="__all__" aria-pressed="' + allSelected + '" aria-label="All Lessons, ' + totalCards + ' cards, ' + overallPct + '% mastered">' +
       '<div class="picker-tile-top">' +
         '<span class="picker-tile-badge">All 12</span>' +
       '</div>' +
@@ -1356,17 +1643,20 @@
           '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
         '</button>' +
         '<div class="picker-title-wrap">' +
-          '<span class="eyebrow">' + (isQuiz ? 'QUIZ MODE' : 'FLASHCARDS MODE') + '</span>' +
           '<h1>' + esc(modeTitle) + '</h1>' +
         '</div>' +
       '</header>' +
       '<div class="picker-body">' +
-        '<p class="picker-subtitle">Select a chapter or practice all 12 lessons together.</p>' +
         '<div class="picker-grid">' +
           allTile +
+          '<button class="picker-tile picker-tile-mixed picker-selectable' + (mixed ? ' is-selected' : '') + '" data-act="picker-cover" data-id="__mixed__" aria-pressed="' + mixed + '"><span class="picker-tile-top"><span class="picker-tile-badge">REVIEW</span></span><h3 class="picker-tile-title">Mixed review</h3><div class="picker-tile-bottom"><span class="picker-tile-count">Due + weak spots</span></div></button>' +
           tilesHtml +
         '</div>' +
       '</div>' +
+      '<footer class="picker-selection-footer' + (multi ? ' is-visible' : '') + '">' +
+        '<div class="picker-footer-controls"><button type="button" class="picker-multi-toggle' + (multi ? ' is-on' : '') + '" data-act="picker-multi" aria-pressed="' + multi + '"><span>Select several</span><i aria-hidden="true"></i></button></div>' +
+        (multi ? '<button type="button" class="btn primary picker-start-button" data-act="picker-start" data-mode="' + mode + '"' + (SEL.size || mixed ? '' : ' disabled aria-disabled="true"') + '>' + (mixed ? 'Start mixed review' : 'Start' + (SEL.size ? ' · ' + SEL.size + ' ' + (SEL.size === 1 ? 'lesson' : 'lessons') : '')) + '</button>' : '') +
+      '</footer>' +
     '</div>';
   };
 
@@ -1786,18 +2076,6 @@
     if (rocketMenuOpen) {
       backdropHtml = '<div class="rocket-backdrop" data-act="close-rocket" aria-hidden="true"></div>';
       pillsHtml = '<div class="rocket-pills" role="menu" aria-label="Study menu">' +
-        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-flash">' +
-          '<span class="pill-icon" aria-hidden="true">' +
-            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="14" rx="2"/><path d="M6 3h12a2 2 0 0 1 2 2v12"/></svg>' +
-          '</span>' +
-          '<span class="rocket-pill-text"><strong>Flashcards</strong></span>' +
-        '</button>' +
-        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-quiz">' +
-          '<span class="pill-icon" aria-hidden="true">' +
-            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
-          '</span>' +
-          '<span class="rocket-pill-text"><strong>Quiz</strong></span>' +
-        '</button>' +
         '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-challenge">' +
           '<span class="pill-icon" aria-hidden="true">' +
             '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>' +
@@ -1809,6 +2087,18 @@
             '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="10" y1="2" x2="14" y2="2"/></svg>' +
           '</span>' +
           '<span class="rocket-pill-text"><strong>Start Exam</strong></span>' +
+        '</button>' +
+        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-quiz">' +
+          '<span class="pill-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+          '</span>' +
+          '<span class="rocket-pill-text"><strong>Quiz</strong></span>' +
+        '</button>' +
+        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-flash">' +
+          '<span class="pill-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="14" rx="2"/><path d="M6 3h12a2 2 0 0 1 2 2v12"/></svg>' +
+          '</span>' +
+          '<span class="rocket-pill-text"><strong>Flashcards</strong></span>' +
         '</button>' +
       '</div>';
     }
@@ -1833,12 +2123,17 @@
   /* ---------- render ---------- */
   function render(keep) {
     var isMainTab = MAIN_TABS.indexOf(V.name) >= 0;
+    var hasDesktopSidebar = isMainTab || V.name === 'devotional';
     var view = V.name === 'exam' ? views.quiz : views[V.name];
     if (typeof view !== 'function') view = views.home;
     var tabBarHtml = isMainTab ? renderTabBar(V.name) : '';
-    var showRocket = V.name === 'home' || V.name === 'journey' || V.name === 'practice';
+    var showRocket = V.name === 'home' || V.name === 'journey';
     var rocketHtml = showRocket ? renderRocketFab() : '';
-    app.innerHTML = banner() + view() + tabBarHtml + rocketHtml;
+    app.innerHTML = banner() +
+      '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + '">' +
+        (hasDesktopSidebar ? renderDesktopSidebar(V.name === 'devotional' ? 'home' : V.name) : '') +
+        '<main class="desktop-main">' + view() + tabBarHtml + rocketHtml + '</main>' +
+      '</div>';
     if (!keep) window.scrollTo(0, 0);
     if (V.name === 'flash') {
       var f = app.querySelector('.flip');
@@ -1931,8 +2226,9 @@
     if (!cards.length) { toast('Answer some questions first to build weak-spot stats.'); return; }
     begin('quiz', shuffle(cards), { unk: false, limit: 0, shuf: true, saveBest: false }, deckIdsFor(cards));
   }
-  function startChallenge() {
+  function startChallenge(ids, requestedMode) {
     var all = allCardItems();
+    if (ids && ids.length) all = all.filter(function (item) { return ids.indexOf(item.deckId) >= 0; });
     var due = StudyLogic.dueItems(all, Date.now());
     var weak = StudyLogic.weakSpots(all, 10);
     var cards = MobileStudy.selectChallengeItems(
@@ -1943,7 +2239,8 @@
       10
     );
     if (!cards.length) { toast('No challenge questions available.'); return; }
-    begin('quiz', shuffle(cards), { unk: false, limit: 10, shuf: true, challenge: true, saveBest: false }, deckIdsFor(cards));
+    var mode = requestedMode === 'flash' ? 'flash' : 'quiz';
+    begin(mode, shuffle(cards), { unk: false, limit: mode === 'quiz' ? 10 : 0, shuf: true, challenge: true, saveBest: false }, deckIdsFor(cards));
   }
   function begin(mode, cards, o, ids) {
     if (mode === 'quiz' || mode === 'exam') {
@@ -2073,26 +2370,13 @@
     switch (a) {
       case 'home': closeModal(); go({ name: 'home' }); break;
       case 'open-chapter': go({ name: 'chapter', id: t.dataset.id }); break;
+      case 'lesson-detail-open': openLessonDetailSheet(t.dataset.id); break;
+      case 'lesson-detail-study':
+        closeModal();
+        go({ name: 'chapter', id: t.dataset.id });
+        break;
       case 'chapter-info':
-        var infoDeck = deck(t.dataset.id);
-        if (infoDeck) {
-          var infoProg = prog(infoDeck.id);
-          var infoMastered = infoDeck.cards.filter(function (c) { return isMastered(infoDeck.id, c.id); }).length;
-          var infoDue = infoDeck.cards.filter(function (c) { return StudyLogic.isDueToday(infoProg.cards[c.id], Date.now()); }).length;
-          var infoWeak = infoDeck.cards.filter(function (c) { var r = infoProg.cards[c.id]; return r && typeof r === 'object' && r.attempts > 0 && r.misses > 0; }).length;
-          var infoParsed = MobileStudy.parseChapterTitle(infoDeck.title);
-          openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="chapter-info-title">' +
-            '<h2 id="chapter-info-title">' + esc(infoParsed.topic) + '</h2>' +
-            '<p class="meta">' + infoParsed.sectionNum + '/12 · ' + plural(infoDeck.cards.length, 'question') + '</p>' +
-            '<div class="statline" style="margin: 16px 0">' +
-              '<div class="stat"><b>' + infoMastered + ' / ' + infoDeck.cards.length + '</b><span>Mastered</span></div>' +
-              '<div class="stat"><b>' + (infoProg.best ? infoProg.best.pct + '%' : '—') + '</b><span>Best Quiz</span></div>' +
-              '<div class="stat"><b>' + infoDue + '</b><span>Due</span></div>' +
-              '<div class="stat"><b>' + infoWeak + '</b><span>Weak</span></div>' +
-            '</div>' +
-            '<div class="row end"><button class="btn primary" data-act="close">Done</button></div>' +
-          '</div>');
-        }
+        openLessonDetailSheet(t.dataset.id);
         break;
       case 'chapter-menu':
         var menuDeck = deck(t.dataset.id);
@@ -2233,12 +2517,76 @@
       case 'theme': S.settings.theme = { auto: 'light', light: 'dark', dark: 'auto' }[S.settings.theme]; applyTheme(); save(); render(true); break;
       case 'toggle-rocket': toggleRocketMenu(); break;
       case 'close-rocket': closeRocketMenu(); break;
-      case 'rocket-flash': closeRocketMenu(); go({ name: 'picker', mode: 'flash', from: V.name }); break;
-      case 'rocket-quiz': closeRocketMenu(); go({ name: 'picker', mode: 'quiz', from: V.name }); break;
+      case 'rocket-flash': closeRocketMenu(); SEL.clear(); go({ name: 'picker', mode: 'flash', from: V.name, pickerMulti: false, pickerMixed: false }); break;
+      case 'rocket-quiz': closeRocketMenu(); SEL.clear(); go({ name: 'picker', mode: 'quiz', from: V.name, pickerMulti: false, pickerMixed: false }); break;
       case 'rocket-challenge': closeRocketMenu(); startChallenge(); break;
       case 'rocket-exam': closeRocketMenu(); setupExam(); break;
       case 'close-picker': go({ name: V.from || 'home' }); break;
       case 'setup': setup(t.dataset.mode, t.dataset.id); break;
+      case 'picker-multi':
+        V.pickerMulti = !V.pickerMulti;
+        if (!V.pickerMulti && SEL.size > 1) SEL = new Set([Array.from(SEL).pop()]);
+        render(true);
+        break;
+      case 'picker-cover':
+        var pickerId = t.dataset.id;
+        if (!V.pickerMulti) {
+          if (pickerId === '__mixed__') startChallenge(null, V.mode === 'quiz' ? 'quiz' : 'flash');
+          else setup(V.mode === 'quiz' ? 'quiz' : 'flash', pickerId === '__all__' ? '*' : pickerId);
+        } else if (pickerId === '__mixed__') {
+          V.pickerMixed = !V.pickerMixed;
+          if (V.pickerMixed) SEL.clear();
+          render(true);
+        } else if (pickerId === '__all__') {
+          V.pickerMixed = false;
+          var pickerAllSelected = S.decks.length > 0 && S.decks.every(function (item) { return SEL.has(item.id); });
+          SEL = pickerAllSelected ? new Set() : new Set(S.decks.map(function (item) { return item.id; }));
+          render(true);
+        } else {
+          V.pickerMixed = false;
+          if (SEL.has(pickerId)) SEL.delete(pickerId); else SEL.add(pickerId);
+          render(true);
+        }
+        break;
+      case 'picker-start':
+        if (V.pickerMixed) startChallenge(null, V.mode === 'quiz' ? 'quiz' : 'flash');
+        else if (!SEL.size) toast('Choose one or more lessons to cover.');
+        else setup(V.mode === 'quiz' ? 'quiz' : 'flash', '*');
+        break;
+      case 'practice-mode':
+        V.practiceMode = t.dataset.mode;
+        render(true);
+        break;
+      case 'practice-multi':
+        V.practiceMulti = V.practiceMulti === false;
+        if (!V.practiceMulti && SEL.size > 1) SEL = new Set([Array.from(SEL).pop()]);
+        render(true);
+        break;
+      case 'practice-cover':
+        var coverId = t.dataset.id;
+        if (coverId === '__mixed__') {
+          V.practiceMixed = !V.practiceMixed;
+          if (V.practiceMixed) SEL.clear();
+        } else if (coverId === '__all__') {
+          V.practiceMixed = false;
+          var selectedEveryDeck = S.decks.length > 0 && S.decks.every(function (item) { return SEL.has(item.id); });
+          SEL = selectedEveryDeck ? new Set() : new Set(S.decks.map(function (item) { return item.id; }));
+        } else {
+          V.practiceMixed = false;
+          if (V.practiceMulti === false && !SEL.has(coverId)) SEL.clear();
+          if (SEL.has(coverId)) SEL.delete(coverId); else SEL.add(coverId);
+        }
+        render(true);
+        break;
+      case 'practice-start':
+        var practiceMode = t.dataset.mode || V.practiceMode || 'quiz';
+        var practiceIds = Array.from(SEL);
+        if (practiceMode === 'exam') setupExam();
+        else if (practiceMode === 'challenge') startChallenge(practiceIds.length ? practiceIds : null);
+        else if (V.practiceMixed) startChallenge(null, practiceMode);
+        else if (!practiceIds.length) toast('Choose one or more lessons to cover.');
+        else setup(practiceMode, '*');
+        break;
       case 'due': startDue(); break;
       case 'daily-study': startDailyStudy(); break;
       case 'resume-study': resumeStudySession(); break;
