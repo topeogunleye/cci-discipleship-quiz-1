@@ -12084,18 +12084,6 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     if (rocketMenuOpen) {
       backdropHtml = '<div class="rocket-backdrop" data-act="close-rocket" aria-hidden="true"></div>';
       pillsHtml = '<div class="rocket-pills" role="menu" aria-label="Study menu">' +
-        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-flash">' +
-          '<span class="pill-icon" aria-hidden="true">' +
-            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="14" rx="2"/><path d="M6 3h12a2 2 0 0 1 2 2v12"/></svg>' +
-          '</span>' +
-          '<span class="rocket-pill-text"><strong>Flashcards</strong></span>' +
-        '</button>' +
-        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-quiz">' +
-          '<span class="pill-icon" aria-hidden="true">' +
-            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
-          '</span>' +
-          '<span class="rocket-pill-text"><strong>Quiz</strong></span>' +
-        '</button>' +
         '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-challenge">' +
           '<span class="pill-icon" aria-hidden="true">' +
             '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>' +
@@ -12107,6 +12095,18 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
             '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="10" y1="2" x2="14" y2="2"/></svg>' +
           '</span>' +
           '<span class="rocket-pill-text"><strong>Start Exam</strong></span>' +
+        '</button>' +
+        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-quiz">' +
+          '<span class="pill-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+          '</span>' +
+          '<span class="rocket-pill-text"><strong>Quiz</strong></span>' +
+        '</button>' +
+        '<button class="rocket-pill-btn" role="menuitem" data-act="rocket-flash">' +
+          '<span class="pill-icon" aria-hidden="true">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="14" rx="2"/><path d="M6 3h12a2 2 0 0 1 2 2v12"/></svg>' +
+          '</span>' +
+          '<span class="rocket-pill-text"><strong>Flashcards</strong></span>' +
         '</button>' +
       '</div>';
     }
