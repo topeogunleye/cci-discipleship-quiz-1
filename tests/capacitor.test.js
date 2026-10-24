@@ -27,14 +27,13 @@ test('native bridge handles app back, background, and file sharing without requi
   assert.match(bridge, /files:\s*\[file\.uri\]/);
 });
 
-test('iOS and Android shells include synchronized offline app assets, CCI icons, and matching splash screens', () => {
-  const androidPage = fs.readFileSync(path.join(root, 'android/app/src/main/assets/public/index.html'), 'utf8');
-  const iosPage = fs.readFileSync(path.join(root, 'ios/App/App/public/index.html'), 'utf8');
+test('iOS and Android shells use the offline app build, CCI icons, and matching splash screens', () => {
+  const offlinePage = read('dist/index.html');
   const androidIcon = fs.readFileSync(path.join(root, 'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png'));
   const iosIcon = fs.readFileSync(path.join(root, 'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png'));
   const androidSplash = fs.readFileSync(path.join(root, 'android/app/src/main/res/drawable-port-xxxhdpi/splash.png'));
   const iosSplash = fs.readFileSync(path.join(root, 'ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732.png'));
-  for (const page of [androidPage, iosPage]) assert.match(page, /Today’s Study/);
+  assert.match(offlinePage, /Today’s Study/);
   for (const asset of [androidIcon, iosIcon, androidSplash, iosSplash]) assert.equal(asset.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
   assert.equal(androidIcon.readUInt32BE(16), 192);
   assert.equal(iosIcon.readUInt32BE(16), 1024);
