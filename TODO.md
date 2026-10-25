@@ -54,4 +54,4 @@
 - [x] Added 12 questions, Q247–Q258, using only `NEW-AGE-SPIRITUALITY-IV` and `NEW-AGE-SPIRITUALITY-V` transcript material; no external sources were used for question facts or wording.
 - [x] Audited existing Q197–Q208; kept additions distinct, attributed speaker claims, and cited the transcript timestamp in every new `REF:` line. Existing 229 question records remain byte-for-byte equivalent after parsing; parser reports 241 total questions, zero errors, zero warnings, and IDs Q1–Q258 in increasing order.
 - [x] Bumped the service-worker cache to v28, updated its PWA assertions, rebuilt `dist`, and verified exact source/offline deck parity. `node --test`: 73 tests, 71 pass, 0 fail, 2 known `# TODO` tests.
-- [ ] Commit and push only `feature/evangelism-deck-questions`; never push to `main`.
+- [x] Committed as `328ed37` (`feat: add transcript-grounded ATR questions`) and pushed only to `feature/evangelism-deck-questions`; `main` was not pushed.
