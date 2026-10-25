@@ -46,3 +46,12 @@
 - [x] Added the other 165 questions with unique increasing labels Q82–Q246. All question text, options, answers, and explanations are preserved; lesson names and timestamps remain in REF, with redundant “Celebration Church International - LMS.mp4” filenames removed to satisfy the repository's reference-lint rule. Any BIBLE lines are retained as supplied.
 - [x] Parser validation reports one Evangelism deck, 229 questions, zero errors and warnings, and strictly increasing IDs. `node --test`: 73 tests, 71 pass, zero non-TODO failures, two existing `# TODO` content-lint tests. Branch is `feature/evangelism-deck-questions`, based on fetched `origin/main`; no push to `main`.
 - [x] Bump the service-worker cache to v27 and align its PWA assertions because the offline deck asset changed; rebuild `dist/` so web and offline bundles include all 229 Evangelism questions.
+
+---
+
+## Additional African traditional religion questions — transcript-only scope
+
+- [x] Added 12 questions, Q247–Q258, using only `NEW-AGE-SPIRITUALITY-IV` and `NEW-AGE-SPIRITUALITY-V` transcript material; no external sources were used for question facts or wording.
+- [x] Audited existing Q197–Q208; kept additions distinct, attributed speaker claims, and cited the transcript timestamp in every new `REF:` line. Existing 229 question records remain byte-for-byte equivalent after parsing; parser reports 241 total questions, zero errors, zero warnings, and IDs Q1–Q258 in increasing order.
+- [x] Bumped the service-worker cache to v28, updated its PWA assertions, rebuilt `dist`, and verified exact source/offline deck parity. `node --test`: 73 tests, 71 pass, 0 fail, 2 known `# TODO` tests.
+- [ ] Commit and push only `feature/evangelism-deck-questions`; never push to `main`.
