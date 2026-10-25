@@ -35,3 +35,14 @@
 - [x] **Prompt 6 — QA, Accessibility & Native Sync:** WCAG AA contrast audit across light/dark modes and all 12 deck gradients, 48dp minimum touch targets, keyboard navigation and visible focus rings, ARIA roles and labels, 200% text scaling resilience, prefers-reduced-motion media query coverage, offline service worker cache `v15`, and Capacitor native sync for iOS & Android. All 57 tests passing.
 - [x] **Prompt 2B — Rocket Study Menu & Lesson Picker:** 56px rocket FAB button on Home, Journey, and Practice; tap reveals dimmed backdrop, morphing X button, and 4 stacked pills (Flashcards, Quiz, Start a Challenge, Start Exam); full-screen Lesson Picker with All Lessons tile and 2-column chapter grid; 10-item mixed Challenge quiz; focus trap, Escape, native back handling, and reduced-motion support.
 - [x] **Prompt 2C — Hide Section Labels & Devotional Feed:** Remove "Section N" labels in favor of clean topic titles, introduce bundled devotional articles (`content/devotionals.json`) gated by leader review, swipeable daily devotional home feed card, article reader view with expandable body, reflection, today's step integration with Plan, and `DATA_VERSION` 10 migration.
+
+
+---
+
+## Evangelism deck question append
+
+- [x] Append the supplied questions to the existing Section 9 Evangelism deck without changing any existing question, option, answer, explanation, reference, or Bible-reference line.
+- [x] Compare exact wording and clear same-concept paraphrases against the deck and attachment. Skipped five confirmed repeats: source Q53→existing Q53, source Q77→existing Q56, source Q85→existing Q58, source Q99→existing Q61, and source Q177→existing Q77. Kept related-but-distinct Q150 (acknowledging a Supreme Being versus the existing question's detached/transcendent characterization), Q31 (Penn Gillette's statement versus the existing practical application), Q38 (the event after prayer versus its significance), and Q163 (Jesus' Middle Eastern identity versus African Christian history).
+- [x] Added the other 165 questions with unique increasing labels Q82–Q246. All question text, options, answers, and explanations are preserved; lesson names and timestamps remain in REF, with redundant “Celebration Church International - LMS.mp4” filenames removed to satisfy the repository's reference-lint rule. Any BIBLE lines are retained as supplied.
+- [x] Parser validation reports one Evangelism deck, 229 questions, zero errors and warnings, and strictly increasing IDs. `node --test`: 73 tests, 71 pass, zero non-TODO failures, two existing `# TODO` content-lint tests. Branch is `feature/evangelism-deck-questions`, based on fetched `origin/main`; no push to `main`.
+- [x] Bump the service-worker cache to v27 and align its PWA assertions because the offline deck asset changed; rebuild `dist/` so web and offline bundles include all 229 Evangelism questions.
