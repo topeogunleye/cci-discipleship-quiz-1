@@ -21,11 +21,11 @@ function contrastRatio(foreground, background) {
 test('hint and text tokens meet contrast targets in light and dark themes', () => {
   const darkHint = styles.match(/:root\[data-theme="dark"\]\s*\{[^}]*--faint:\s*(#[\da-f]{6});/i);
   assert.ok(darkHint, 'Expected the dark hint token');
-  assert.ok(contrastRatio(darkHint[1], '#12103A') >= 4.5, 'Dark hint text must meet WCAG AA on the page background');
-  assert.ok(contrastRatio(darkHint[1], '#1D1A55') >= 4.5, 'Dark hint text must meet WCAG AA on the card surface');
-  assert.ok(contrastRatio('#4A486F', '#F5F6FB') >= 4.5, 'Light body text must meet WCAG AA');
-  assert.ok(contrastRatio('#F2F1FD', '#12103A') >= 4.5, 'Dark body and large text must meet WCAG AA');
-  assert.ok(contrastRatio('#F2F1FD', '#1D1A55') >= 3, 'Dark large text must meet WCAG AA');
+  assert.ok(contrastRatio(darkHint[1], '#0F1013') >= 4.5, 'Dark hint text must meet WCAG AA on the page background');
+  assert.ok(contrastRatio(darkHint[1], '#1A1C22') >= 4.5, 'Dark hint text must meet WCAG AA on the card surface');
+  assert.ok(contrastRatio('#3F424D', '#F3F4F6') >= 4.5, 'Light body text must meet WCAG AA');
+  assert.ok(contrastRatio('#F4F5F7', '#0F1013') >= 4.5, 'Dark body and large text must meet WCAG AA');
+  assert.ok(contrastRatio('#F4F5F7', '#1A1C22') >= 3, 'Dark large text must meet WCAG AA');
 });
 
 test('white text meets WCAG AA contrast across all deck gradient stops', () => {
@@ -44,43 +44,34 @@ test('white text meets WCAG AA contrast across all deck gradient stops', () => {
   }
 });
 
-test('sunrise gradient text uses dark ink with WCAG AA contrast', () => {
+test('sunrise gradient text uses white ink with WCAG AA contrast', () => {
   const gradient = styles.match(/--grad-hero-sunrise:\s*linear-gradient\([^;]*\);/);
   assert.ok(gradient, 'Expected the sunrise hero gradient token');
   const stops = gradient[0].match(/#[\da-f]{6}/gi) || [];
   assert.equal(stops.length, 2, 'The sunrise gradient must define two stops');
   for (const stop of stops) {
     assert.ok(
-      contrastRatio('#241126', stop) >= 4.5,
-      `Dark text contrast on sunrise gradient stop ${stop} must be at least 4.5:1`
+      contrastRatio('#FFFFFF', stop) >= 4.5,
+      `White text contrast on crimson gradient stop ${stop} must be at least 4.5:1`
     );
   }
-
-  for (const selector of [
-    /\.hero-today\s*\{[^}]*color:\s*#241126;/,
-    /\.hero-today \.hero-meta,[\s\S]*?\.hero-card-desc\s*\{\s*color:\s*#241126;/,
-    /\.picker-tile-all\s*\{[^}]*color:\s*#241126;/,
-    /\.picker-tile-all \.picker-tile-title\s*\{[^}]*color:\s*#241126;/,
-    /\.streak-hero-card\s*\{[^}]*color:\s*#241126;/,
-    /\.desktop-featured-devotion\s*\{[^}]*color:\s*#241126;/
-  ]) {
-    assert.match(styles, selector, `Expected accessible sunrise text styling matching ${selector}`);
-  }
+  assert.match(styles, /\.hero-today,[\s\S]*?\.picker-tile-all[\s\S]*?\{[^}]*color:\s*#FFFFFF/i, 'Expected white text on crimson hero surfaces');
 });
 
 test('dark desktop feedback and the active navigation item retain accessible contrast', () => {
   const requiredTokens = [
-    '--desktop-quiz-correct-bg: #14402C;',
-    '--desktop-quiz-correct-color: #5FD39A;',
-    '--desktop-quiz-wrong-bg: #4A1830;',
-    '--desktop-quiz-wrong-color: #FF8FAB;',
-    '--desktop-reflection-bg: #2D2A70;',
-    '--desktop-step-bg: #14402C;'
+    '--desktop-quiz-correct-bg: #12402A;',
+    '--desktop-quiz-correct-color: #6EE0A2;',
+    '--desktop-quiz-wrong-bg: #4A1620;',
+    '--desktop-quiz-wrong-color: #FF9AA6;',
+    '--desktop-reflection-bg: #2A2D36;',
+    '--desktop-step-bg: #12402A;'
   ];
   for (const token of requiredTokens) assert.ok(styles.includes(token), `Missing ${token}`);
 
-  assert.ok(contrastRatio('#5FD39A', '#14402C') >= 4.5, 'Dark correct state must meet WCAG AA');
-  assert.ok(contrastRatio('#FF8FAB', '#4A1830') >= 4.5, 'Dark incorrect state must meet WCAG AA');
-  assert.ok(contrastRatio('#B5173A', '#FFFFFF') >= 4.5, 'Active navigation text must meet WCAG AA');
-  assert.match(styles, /\.desktop-sidebar \.desktop-nav-item\.active,[\s\S]*?background: #FFFFFF;/);
+  assert.ok(contrastRatio('#6EE0A2', '#12402A') >= 4.5, 'Dark correct state must meet WCAG AA');
+  assert.ok(contrastRatio('#FF9AA6', '#4A1620') >= 4.5, 'Dark incorrect state must meet WCAG AA');
+  assert.ok(contrastRatio('#FFFFFF', '#B5173A') >= 4.5, 'Active navigation text must meet WCAG AA');
+  assert.ok(contrastRatio('#FFFFFF', '#167A3F') >= 4.5 && contrastRatio('#FFFFFF', '#178046') >= 4.5, 'Correct answer fill must meet WCAG AA with white text');
+  assert.match(styles, /\.desktop-sidebar \.desktop-nav-item\.active,[\s\S]*?background: var\(--accent\)/);
 });

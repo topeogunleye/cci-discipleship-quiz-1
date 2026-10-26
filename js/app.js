@@ -1331,7 +1331,7 @@
       return '<button class="' + cls + '" data-act="pick" data-i="' + k + '" aria-label="' + LET[k] + '. ' + esc(c.options[source]) + '" aria-pressed="' + (done && k === picked) + '"' + (done ? ' disabled' : '') + '>' +
         '<span class="opt-badge" aria-hidden="true">' + LET[k] + '</span>' +
         '<span class="opt-text">' + esc(c.options[source]) + '</span>' +
-        (done && !isExam && (cls.indexOf(' right') >= 0 || cls.indexOf(' wrong') >= 0) ? '<span class="opt-result-icon" aria-hidden="true">' + (cls.indexOf(' right') >= 0 ? '✓' : '✕') + '</span>' : '') +
+        (done && !isExam && (cls.indexOf(' right') >= 0 || cls.indexOf(' wrong') >= 0) ? '<span class="opt-result-label" aria-hidden="true">' + (cls.indexOf(' right') >= 0 ? 'Correct' : 'Incorrect') + '</span><span class="opt-result-icon" aria-hidden="true">' + (cls.indexOf(' right') >= 0 ? '✓' : '✕') + '</span>' : '') +
       '</button>';
     }).join('');
 
@@ -1416,8 +1416,8 @@
       '<svg viewBox="0 0 1440 400" preserveAspectRatio="none" focusable="false">' +
         '<circle cx="720" cy="148" r="82" fill="#FFE9A7"/>' +
         '<ellipse class="completion-mobile-sun" cx="720" cy="120" rx="236" ry="64" fill="#FFE9A7"/>' +
-        '<path d="M0 216c177-66 337-48 510 7s355 65 535-6 278-91 395-41v139H0z" fill="#D83B50"/>' +
-        '<path d="M0 302c198-55 374-26 562 26s372 45 548-1 250-66 330-42v115H0z" fill="#3928B9"/>' +
+        '<path d="M0 216c177-66 337-48 510 7s355 65 535-6 278-91 395-41v139H0z" fill="#B5173A"/>' +
+        '<path d="M0 302c198-55 374-26 562 26s372 45 548-1 250-66 330-42v115H0z" fill="#1B1D24"/>' +
         '</svg>' +
       '</div>';
 
@@ -1535,8 +1535,8 @@
         '</div>' +
         '<svg class="devotional-banner-art" viewBox="0 0 1200 250" preserveAspectRatio="none" aria-hidden="true" focusable="false">' +
           '<circle cx="900" cy="76" r="46" fill="#F5D17B"/>' +
-          '<path d="M0 158c160-42 300-36 458 8 166 47 314 51 450-8s206-75 292-42v134H0z" fill="#4A2AB9"/>' +
-          '<path d="M0 198c174-48 304-26 463 14 186 47 341 42 493-7 111-36 178-43 244-22v67H0z" fill="#302078"/>' +
+          '<path d="M0 158c160-42 300-36 458 8 166 47 314 51 450-8s206-75 292-42v134H0z" fill="#8E1030"/>' +
+          '<path d="M0 198c174-48 304-26 463 14 186 47 341 42 493-7 111-36 178-43 244-22v67H0z" fill="#1B1D24"/>' +
         '</svg>' +
       '</header>' +
       mobileActionButtons +
@@ -1742,7 +1742,7 @@
               '<path d="M50 22v56M32 38h36" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>' +
               '<defs>' +
                 '<linearGradient id="splash-grad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">' +
-                  '<stop stop-color="#3B2BB0" />' +
+                  '<stop stop-color="#1B1D24" />' +
                   '<stop offset="1" stop-color="#B5173A" />' +
                 '</linearGradient>' +
               '</defs>' +
