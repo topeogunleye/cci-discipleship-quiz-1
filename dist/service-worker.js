@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v26';
+const CACHE_NAME = CACHE_PREFIX + 'v27';
 const CORE_FILES = [
   './',
   'offline.html',
@@ -16,9 +16,12 @@ const CORE_FILES = [
   'js/storage.js',
   'js/native-bridge.bundle.js',
   'js/mobile-study.js',
+  'js/sermons.js',
+  'js/sermon-audio.js',
   'js/app.js',
   'decks/manifest.json',
-  'content/devotionals.json'
+  'content/devotionals.json',
+  'content/sermons.json'
 ];
 
 function assetUrl(file) {
@@ -34,6 +37,14 @@ self.addEventListener('install', event => {
     const deckFiles = await manifestResponse.json();
     if (!Array.isArray(deckFiles)) throw new Error('Invalid deck manifest');
     await cache.addAll(deckFiles.map(file => assetUrl('decks/' + file)));
+    // Sermon study decks are small text files; recordings are never precached (members download them on request).
+    try {
+      const sermonResponse = await fetch(assetUrl('content/sermons.json'));
+      const sermons = sermonResponse.ok ? await sermonResponse.json() : [];
+      const sermonDeckFiles = (Array.isArray(sermons) ? sermons : []).map(item => item && item.deckFile)
+        .filter(file => typeof file === 'string' && !file.includes('/') && !file.includes('..'));
+      await cache.addAll(sermonDeckFiles.map(file => assetUrl('content/sermons/' + file)));
+    } catch (error) {}
   })());
 });
 
@@ -69,11 +80,15 @@ self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+  // Audio is streamed with Range requests (206 responses cannot be cached); let the browser handle it directly.
+  if ((request.headers && request.headers.has('range')) || request.destination === 'audio' || request.destination === 'video') return;
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
     const deckBase = new URL('decks/', self.registration.scope).href;
-    if (url.href.startsWith(deckBase)) {
+    const sermonBase = new URL('content/sermons/', self.registration.scope).href;
+    const sermonIndex = assetUrl('content/sermons.json');
+    if (url.href.startsWith(deckBase) || url.href === sermonIndex || (url.href.startsWith(sermonBase) && !url.pathname.includes('/audio/'))) {
       try {
         const response = await fetch(request);
         if (response.ok) await cache.put(request, response.clone());

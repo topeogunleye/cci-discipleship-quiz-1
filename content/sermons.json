@@ -1,0 +1,28 @@
+[
+  {
+    "id": "sample-sermon",
+    "title": "The Good Shepherd (Sample)",
+    "subtitle": "Placeholder entry for testing the Sermons tab",
+    "date": "2026-10-25",
+    "speaker": "Sample Speaker",
+    "series": "Sample Series",
+    "scripture": "Luke 15:4-7",
+    "scriptureText": "What man of you, having a hundred sheep, if he has lost one of them, does not leave the ninety-nine in the open country, and go after the one that is lost, until he finds it?",
+    "body": [
+      "This is placeholder text for the sample sermon. Replace it with the written version of a real Sunday sermon: an edited devotional of about two to five minutes.",
+      "The shepherd leaves the flock to find the one lost sheep. When he finds it, he does not scold it. He lifts it onto his shoulders and carries it home rejoicing.",
+      "Grace begins with the shepherd, not the sheep. The lost one contributes nothing but its need, and heaven rejoices over the one who is found."
+    ],
+    "reflection": "Who in your life has drifted from the flock, and how could you go after them this week?",
+    "step": "Pray for one person who has drifted and send them a kind message today.",
+    "readMinutes": 2,
+    "gradient": "deck-grad-1",
+    "status": "draft",
+    "deckFile": "sample-sermon.txt",
+    "audio": {
+      "url": "content/sermons/audio/sample-sermon.mp3",
+      "durationSec": 24,
+      "sizeBytes": 192514
+    }
+  }
+]

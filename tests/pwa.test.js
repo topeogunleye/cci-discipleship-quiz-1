@@ -26,7 +26,7 @@ test('web app manifest declares standalone install metadata and valid icon asset
 test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
   const serviceWorker = read('service-worker.js');
   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v26'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v27'/);
   assert.match(serviceWorker, /decks\/manifest\.json/);
   assert.match(serviceWorker, /content\/devotionals\.json/);
   assert.match(serviceWorker, /js\/native-bridge\.bundle\.js/);
@@ -50,7 +50,7 @@ test('activation deletes previous app caches and deck assets absent from the cur
     [url('settings.json'), {}]
   ]);
   const cacheStore = new Map([
-    ['cci-study-pwa-v26', activeEntries],
+    ['cci-study-pwa-v27', activeEntries],
     ['cci-study-pwa-v3', new Map()],
     ['unrelated-app-cache', new Map()]
   ]);
@@ -130,6 +130,44 @@ test('deck requests refresh from network and fall back to the cached copy offlin
   assert.equal(await (await entries.get(deckUrl)).text(), 'fresh deck');
   offline = true;
   assert.equal(await (await requestDeck()).text(), 'fresh deck');
+});
+
+test('sermon index and decks refresh from the network, while audio and range requests bypass the cache', async () => {
+  const scope = 'https://example.test/app/';
+  const indexUrl = new URL('content/sermons.json', scope).href;
+  const audioUrl = new URL('content/sermons/audio/sample.mp3', scope).href;
+  const entries = new Map([[indexUrl, { text: async () => 'old index' }]]);
+  let offline = false;
+  const cache = {
+    match: async request => entries.get(request.url) || null,
+    put: async (request, response) => { if (response.status === 206) throw new TypeError('partial'); entries.set(request.url, response); }
+  };
+  const listeners = {};
+  const self = { location: new URL(scope), registration: { scope }, addEventListener: (name, handler) => { listeners[name] = handler; } };
+  vm.runInNewContext(read('service-worker.js'), {
+    self,
+    caches: { open: async () => cache },
+    URL,
+    fetch: async () => {
+      if (offline) throw new Error('offline');
+      return { ok: true, status: 200, text: async () => 'fresh index', clone() { return this; } };
+    },
+    Response
+  });
+  function handle(request) {
+    let responsePromise = null;
+    listeners.fetch({ request, respondWith: promise => { responsePromise = promise; } });
+    return responsePromise;
+  }
+  assert.equal(await (await handle({ method: 'GET', url: indexUrl, mode: 'cors', headers: new Map() })).text(), 'fresh index');
+  offline = true;
+  assert.equal(await (await handle({ method: 'GET', url: indexUrl, mode: 'cors', headers: new Map() })).text(), 'fresh index');
+  assert.equal(handle({ method: 'GET', url: audioUrl, mode: 'cors', destination: 'audio', headers: new Map() }), null, 'audio must not be handled by the service worker');
+  assert.equal(handle({ method: 'GET', url: audioUrl, mode: 'cors', headers: new Map([['range', 'bytes=0-']]) }), null, 'range requests must not be handled by the service worker');
+  const worker = read('service-worker.js');
+  assert.match(worker, /'content\/sermons\.json'/);
+  assert.match(worker, /js\/sermons\.js/);
+  assert.doesNotMatch(worker, /cci-sermon-audio/, 'sermon audio cache must not be managed (or deleted) by the app-shell cache logic');
 });
 
 test('PWA source and offline build contain their required registration/assets', () => {
