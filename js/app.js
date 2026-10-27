@@ -1754,7 +1754,7 @@
             '</svg>' +
           '</div>' +
         '</div>' +
-        '<h1 class="onboarding-title">CCI Discipleship</h1>' +
+        '<h1 class="onboarding-title">Discipleship</h1>' +
         '<p class="onboarding-lead">A steady, thoughtful rhythm for spiritual growth and doctrinal mastery.</p>' +
         '<div class="onboarding-bottom-bar">' +
           '<button class="btn primary full btn-continue" data-act="onboarding-next">Get Started</button>' +
