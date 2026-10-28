@@ -1,9 +1,9 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 10;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 11;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
-  var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
-  var STARTER_DECKS = [], DEVOTIONALS = [];
+  var S = { decks: [], progress: {}, sermons: SermonStudy ? SermonStudy.createState() : {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
+  var STARTER_DECKS = [], DEVOTIONALS = [], SERMONS = [], sermonDownloadControllers = {};
   var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
   var browserLocalStorage = null, browserIndexedDB = null;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
@@ -89,6 +89,21 @@
     }).catch(function () { return fallback; });
   }
 
+  function inlineSermonsData() {
+    var el = document.getElementById('sermons-fallback');
+    if (!el) return { schemaVersion: 1, sermons: [] };
+    try { return JSON.parse(el.textContent || '{"schemaVersion":1,"sermons":[]}'); } catch (e) { return { schemaVersion: 1, sermons: [] }; }
+  }
+  function loadSermons() {
+    var fallback = inlineSermonsData();
+    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(fallback.sermons || []);
+    return window.fetch('content/sermons.json').then(function (response) {
+      if (!response.ok) throw new Error('Could not load sermons');
+      return response.json();
+    }).then(function (data) { return data && data.schemaVersion === 1 && Array.isArray(data.sermons) ? data.sermons : (fallback.sermons || []); })
+      .catch(function () { return fallback.sermons || []; });
+  }
+
   /* ---------- storage ---------- */
   function loadSavedState(raw) {
     try {
@@ -114,11 +129,14 @@
         var best = old.best && Number.isFinite(+old.best.pct) && +old.best.pct >= 0 && +old.best.pct <= 100 ? old.best : null;
         S.progress[d.id] = { best: best, cards: cards };
       });
-      S.settings = Object.assign({ theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false }, o.settings && typeof o.settings === 'object' ? o.settings : {});
+      S.settings = Object.assign({ theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, o.settings && typeof o.settings === 'object' ? o.settings : {});
       if (['auto', 'light', 'dark'].indexOf(S.settings.theme) < 0) S.settings.theme = 'auto';
       S.settings.shuffle = !!S.settings.shuffle;
       S.settings.showStreak = S.settings.showStreak !== false;
       S.settings.showDraftDevotionals = !!S.settings.showDraftDevotionals;
+      S.settings.showDraftSermons = !!S.settings.showDraftSermons;
+      if (S.settings.experience !== 'sermons') S.settings.experience = 'discipleship';
+      S.sermons = SermonStudy.normalizeState(o.sermons);
       var hasPriorData = !!o.seeded || (Array.isArray(o.decks) && o.decks.length > 0);
       S.onboarding = MobileStudy.normalizeOnboarding(o.onboarding, hasPriorData);
       S.streak = MobileStudy.normalizeStreak(o.streak);
@@ -342,6 +360,11 @@
       }
       if (!S.completedToday || typeof S.completedToday !== 'object') S.completedToday = {};
       if (S.settings.showDraftDevotionals === undefined) S.settings.showDraftDevotionals = false;
+    } },
+    { version: 11, run: function () {
+      S.sermons = SermonStudy.normalizeState(S.sermons);
+      if (S.settings.showDraftSermons === undefined) S.settings.showDraftSermons = false;
+      if (S.settings.experience !== 'sermons') S.settings.experience = 'discipleship';
     } }
   ];
   function applyDataMigrations() {
@@ -425,7 +448,7 @@
   }
   function exportDeck(d) { download(slug(d.title) + '.txt', P.serializeDeck(d)); }
   function exportBackup() {
-    var payload = { format: 'cci-discipleship-quiz-backup', version: 1, exportedAt: new Date().toISOString(), data: { decks: S.decks, progress: S.progress, settings: S.settings, seeded: S.seeded, dataVersion: S.dataVersion, backupReminder: S.backupReminder, onboarding: S.onboarding, streak: S.streak, devotions: S.devotions } };
+    var payload = { format: 'cci-discipleship-quiz-backup', version: 1, exportedAt: new Date().toISOString(), data: { decks: S.decks, progress: S.progress, sermons: S.sermons, settings: S.settings, seeded: S.seeded, dataVersion: S.dataVersion, backupReminder: S.backupReminder, onboarding: S.onboarding, streak: S.streak, devotions: S.devotions } };
     download('cci-study-backup-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(payload, null, 2));
   }
   function resetBackupReminder() {
@@ -459,15 +482,17 @@
       var pct = old.best && Number(old.best.pct);
       progress[d.id] = { cards: cards, best: Number.isFinite(pct) && pct >= 0 && pct <= 100 ? { pct: pct } : null };
     });
-    var settings = Object.assign({ theme: 'auto', shuffle: false, showDraftDevotionals: false }, raw.data.settings && typeof raw.data.settings === 'object' ? raw.data.settings : {});
+    var settings = Object.assign({ theme: 'auto', shuffle: false, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, raw.data.settings && typeof raw.data.settings === 'object' ? raw.data.settings : {});
     if (['auto', 'light', 'dark'].indexOf(settings.theme) < 0) settings.theme = 'auto'; settings.shuffle = !!settings.shuffle;
     settings.showDraftDevotionals = !!settings.showDraftDevotionals;
+    settings.showDraftSermons = !!settings.showDraftSermons;
+    if (settings.experience !== 'sermons') settings.experience = 'discipleship';
     var devotions = (raw.data.devotions && typeof raw.data.devotions === 'object' && !Array.isArray(raw.data.devotions)) ? {
       read: (raw.data.devotions.read && typeof raw.data.devotions.read === 'object') ? raw.data.devotions.read : {},
       saved: (raw.data.devotions.saved && typeof raw.data.devotions.saved === 'object') ? raw.data.devotions.saved : {},
       carouselHiddenOn: typeof raw.data.devotions.carouselHiddenOn === 'string' ? raw.data.devotions.carouselHiddenOn : null
     } : { read: {}, saved: {}, carouselHiddenOn: null };
-    return { decks: decks, progress: progress, settings: settings, seeded: !!raw.data.seeded, dataVersion: dataVersion, backupReminder: StudyLogic.normalizeBackupReminder(raw.data.backupReminder), onboarding: MobileStudy.normalizeOnboarding(raw.data.onboarding, true), streak: MobileStudy.normalizeStreak(raw.data.streak), devotions: devotions };
+    return { decks: decks, progress: progress, sermons: SermonStudy.normalizeState(raw.data.sermons), settings: settings, seeded: !!raw.data.seeded, dataVersion: dataVersion, backupReminder: StudyLogic.normalizeBackupReminder(raw.data.backupReminder), onboarding: MobileStudy.normalizeOnboarding(raw.data.onboarding, true), streak: MobileStudy.normalizeStreak(raw.data.streak), devotions: devotions };
   }
 
   /* ---------- views ---------- */
@@ -537,6 +562,10 @@
         return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>';
       case 'settings':
         return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="3" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="3" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="3"/></svg>';
+      case 'library':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22z"/><path d="M4 4v18M8 6h8M8 10h8"/></svg>';
+      case 'downloads':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 18v3h16v-3"/></svg>';
       default:
         return '';
     }
@@ -558,16 +587,26 @@
   }
 
   function renderTabBar(currentTab) {
-    var tabs = [
+    var tabs = S.settings.experience === 'sermons' ? [
+      { id: 'sermons-home', label: 'Home', icon: 'home' },
+      { id: 'sermons-library', label: 'Library', icon: 'library' },
+      { id: 'sermons-downloads', label: 'Downloads', icon: 'downloads' },
+      { id: 'sermons-progress', label: 'Progress', icon: 'progress' },
+      { id: 'settings', label: 'Settings', icon: 'settings' }
+    ] : [
       { id: 'home', label: 'Home', icon: 'home' },
       { id: 'journey', label: 'Journey', icon: 'journey' },
       { id: 'practice', label: 'Practice', icon: 'practice' },
       { id: 'progress', label: 'Progress', icon: 'progress' },
       { id: 'settings', label: 'Settings', icon: 'settings' }
     ];
+    var activeTab = currentTab;
+    if (S.settings.experience === 'sermons' && currentTab.indexOf('sermons-') === 0) {
+      activeTab = currentTab === 'sermons-library' ? 'sermons-library' : currentTab === 'sermons-downloads' ? 'sermons-downloads' : currentTab === 'sermons-progress' ? 'sermons-progress' : 'sermons-home';
+    }
     return '<nav class="bottom-tab-bar" aria-label="Main Navigation">' +
       tabs.map(function (tab) {
-        var isActive = tab.id === currentTab;
+        var isActive = tab.id === activeTab;
         return '<button class="tab-btn' + (isActive ? ' active' : '') + '" data-act="nav-tab" data-tab="' + tab.id + '" aria-selected="' + (isActive ? 'true' : 'false') + '" aria-label="' + tab.label + ' tab">' +
           tabIconSvg(tab.icon) +
           '<span class="tab-label">' + tab.label + '</span>' +
@@ -577,7 +616,13 @@
   }
 
   function renderDesktopSidebar(currentTab) {
-    var tabs = [
+    var tabs = S.settings.experience === 'sermons' ? [
+      { id: 'sermons-home', label: 'Home', icon: 'home' },
+      { id: 'sermons-library', label: 'Library', icon: 'library' },
+      { id: 'sermons-downloads', label: 'Downloads', icon: 'downloads' },
+      { id: 'sermons-progress', label: 'Progress', icon: 'progress' },
+      { id: 'settings', label: 'Settings', icon: 'settings' }
+    ] : [
       { id: 'home', label: 'Home', icon: 'home' },
       { id: 'journey', label: 'Journey', icon: 'journey' },
       { id: 'practice', label: 'Practice', icon: 'practice' },
@@ -585,6 +630,9 @@
       { id: 'settings', label: 'Settings', icon: 'settings' }
     ];
     var activeTab = currentTab === 'chapter' ? 'journey' : currentTab;
+    if (S.settings.experience === 'sermons' && currentTab.indexOf('sermons-') === 0) {
+      activeTab = currentTab === 'sermons-library' ? 'sermons-library' : currentTab === 'sermons-downloads' ? 'sermons-downloads' : currentTab === 'sermons-progress' ? 'sermons-progress' : 'sermons-home';
+    }
     return '<aside class="desktop-sidebar">' +
       '<div class="desktop-logo">' +
         '<span class="desktop-logo-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><rect x="2" y="2" width="36" height="36" rx="13" fill="#4B35C5"/><circle cx="27" cy="13" r="4" fill="#FFE6A8"/><path d="M3 27c6-7 11-11 17-8 5 3 9 8 17 1v18H3V27Z" fill="#7A3FD0"/></svg></span>' +

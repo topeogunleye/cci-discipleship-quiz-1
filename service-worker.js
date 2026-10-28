@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v26';
+const CACHE_NAME = CACHE_PREFIX + 'v27';
 const CORE_FILES = [
   './',
   'offline.html',
@@ -16,9 +16,12 @@ const CORE_FILES = [
   'js/storage.js',
   'js/native-bridge.bundle.js',
   'js/mobile-study.js',
+  'js/sermons.js',
+  'js/sermons-ui.js',
   'js/app.js',
   'decks/manifest.json',
-  'content/devotionals.json'
+  'content/devotionals.json',
+  'content/sermons.json'
 ];
 
 function assetUrl(file) {

@@ -26,11 +26,14 @@ test('web app manifest declares standalone install metadata and valid icon asset
 test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
   const serviceWorker = read('service-worker.js');
   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v26'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v27'/);
   assert.match(serviceWorker, /decks\/manifest\.json/);
   assert.match(serviceWorker, /content\/devotionals\.json/);
+  assert.match(serviceWorker, /content\/sermons\.json/);
   assert.match(serviceWorker, /js\/native-bridge\.bundle\.js/);
   assert.match(serviceWorker, /js\/mobile-study\.js/);
+  assert.match(serviceWorker, /js\/sermons\.js/);
+  assert.match(serviceWorker, /js\/sermons-ui\.js/);
   assert.match(serviceWorker, /cache\.addAll\(deckFiles\.map/);
   assert.match(serviceWorker, /offline\.html/);
   assert.match(serviceWorker, /SKIP_WAITING/);
