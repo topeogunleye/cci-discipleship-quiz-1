@@ -55,7 +55,7 @@ Changes made:
 - `js/app.js`: partially adds `DATA_VERSION = 11`, `S.sermons` initialization/normalization, content loading, migration v11, backup export/restore normalization, Library/Downloads icons, and conditional Sermons nav arrays.
 - **Not yet added to `app.js`:** the segmented experience toggle; Sermons `MAIN_TABS`/route registrations/context; the settings-render call for Sermons settings; reminder banner injection; event handlers; actual actions/player/download/reminder/quiz flows; supporting CSS. `MAIN_TABS` remains the original list. A multi-hunk attempt to add routes/context/settings/render code was rejected as ambiguous and performed no replacements. Do not assume those pieces exist.
 - `tests/sermons.test.js` was added. `npm test` was run after these edits: **78 tests total, 65 passed, 11 failed, 2 TODO**. Failures include app VM tests missing the new `SermonStudy` dependency, a service-worker activation/cache assertion, and the new audio-download boundary test. The partial app does not yet fully initialize/render the feature. Do not treat this branch snapshot as passing.
-- No commit exists.
+- WIP commit `7b464da` (`WIP: scaffold Sermons experience`) has been pushed to `origin/feature/sermons-experience`. The local worktree was clean after that push.
 
 ## Next work
 
@@ -65,11 +65,11 @@ Changes made:
 4. Implement honest empty/offline/placeholder states. Production data remains empty until an approved source is supplied. Add tests using synthetic fixtures only within tests. Validate catalogue fields/URLs and avoid unsafe cross-origin downloads.
 5. Add/update tests for navigation separation, coaching completion only on Continue, persistence/backups, offline content, audio action/cache/quota/cancellation/removal, reminder due/permission-denied/once-per-day behavior, and progress separation.
 6. Run `npm test`, available lint/typecheck/build commands (inspect `package.json`), review generated `dist` changes, and visually inspect all screens at target viewports/themes if tooling exists. Report checks not performed honestly.
-7. Review the final diff, preserve all existing feature/state documents, leave everything uncommitted, and report limitations/backend dependencies.
+7. Review the final diff, preserve all existing feature/state documents, and report limitations/backend dependencies. The current WIP checkpoint is already committed and pushed; do not create further commits unless the user explicitly requests them.
 
 ## Continuation prompt files
 
 - [`prompts/sermons-continue.md`](prompts/sermons-continue.md) — implementation continuation prompt.
 - [`prompts/sermons-final-qa.md`](prompts/sermons-final-qa.md) — final verification/report prompt.
 
-Stop before committing, pushing, merging, publishing or deploying.
+The current WIP checkpoint is pushed. Do not merge, publish or deploy; do not add another commit/push unless explicitly requested.
