@@ -1,11 +1,11 @@
 # Final QA: CCI Sermons experience
 
-Run this prompt only after the implementation on `feature/sermons-experience` is believed complete. Work in `/home/ubuntu/cci-discipleship-quiz-1`.
+Run this prompt only after the implementation on `feature/sermons-experience-continuation` is believed complete. Work in `/home/ubuntu/cci-discipleship-quiz-1`.
 
 ## Non-negotiable constraints
 
 - Read `handover.md`, inspect `git status` and the full branch diff before any change. Do not discard user changes or reset the branch.
-- Keep working on `feature/sermons-experience`. Do not commit, push, merge, publish, deploy, or switch branches.
+- Keep working on `feature/sermons-experience-continuation`. Do not commit, push, merge, publish, deploy, or switch branches.
 - Do not alter design-reference images, feature/coverage lists, or states board. Do not add scope.
 - Do not invent sermon, Scripture, coaching, quiz or audio content. The production catalogue may remain empty; document what content/backend is required.
 
