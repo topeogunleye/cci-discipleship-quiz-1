@@ -1,6 +1,6 @@
 # Sermons Experience — Implementation Handover
 
-**Status:** Implemented as far as the repository and available content allow; currently uncommitted because production sermon/audio assets are absent. **Current branch:** `feature/sermons-experience-continuation`. **Created from:** `feature/sermons-experience` at `1d0fe27` (`Add handover file`). Do not merge, publish, deploy, reset, or rebase. The user now authorizes preparing handover, committing, and pushing this branch only when 20 credits remain. An MCP search did not find a credit-balance tool; do not guess or commit/push before the threshold is verifiable. If no meter becomes available, ask the user to confirm when it reaches 20.
+**Status:** The implementation and QA-document updates are on `feature/sermons-experience-continuation`, tracking `origin/feature/sermons-experience-continuation`. This QA continuation changes documentation only; no application source changes were made. The production catalogue remains empty pending approved sermon/audio assets. On 2026-10-29, the user directly authorized committing and pushing this feature branch. Do not merge or deploy. **Created from:** `feature/sermons-experience` at `1d0fe27` (`Add handover file`). Do not reset or rebase.
 
 ## Source of truth and scope
 
@@ -25,11 +25,11 @@
 
 ## Verification completed
 
-- `npm test`: **86 tests; 84 pass; 0 fail; 2 TODO diagnostics**. The TODOs are existing content-lint diagnostics for answer-letter distribution and the rate at which the longest option is correct; the test harness marks these TODOs, so they are not failures.
-- `npm run build`: passes; generated PWA distribution includes Sermons code and catalogue.
-- `node --check` and `git diff --check` passed for the edited app/helper/UI/service-worker/test files after the offline-audio changes.
+- `npm test`: **86 tests; 84 pass; 0 fail; 2 TODO diagnostics** on the current continuation QA rerun. The TODOs are content-lint diagnostics for answer-letter distribution and the rate at which the longest option is correct.
+- `npm run build`: passes after `npm ci`; generated PWA distribution includes Sermons code and the intentionally empty catalogue. The build produced no unexpected tracked artifact changes.
+- `node --check` passed for `js/app.js`, `js/sermons.js`, `js/sermons-ui.js`, `service-worker.js`, the three relevant test files, and `scripts/build.js`. `git diff --check` passed after updating the QA template.
 - Additional regression coverage verifies test-only coaching-to-quiz interaction without changing Discipleship progress, same-node playback while revisiting coaching, zero seek-position persistence, null/non-finite score and download normalization, streaming cancellation without partial cache entries, same-origin explicit download/removal, v28 offline media byte-range serving, and that streamed media is not implicitly copied into the shell cache. Hidden draft downloads remain visible/removable, and Home/Library sort dated sermons newest-first. Service-worker v28 preserves the separate user audio cache during activation.
-- Browser visual checks via local built preview: Sermons Home at 390px, 834px, and 1440px in both light and dark; Library empty state and shared Settings were opened at the standard desktop preview viewport. The page had no horizontal overflow at 390px; tablet/desktop shells rendered correctly. This was not a full pixel comparison against every reference.
+- Earlier browser visual checks (recorded before this continuation) covered Sermons Home at 390px, 834px, and 1440px in both light and dark; Library empty state and shared Settings were opened at the standard desktop preview viewport. In this continuation, the built app was reviewed at 1280px in light/dark across Home, Library empty state, Downloads, Progress, and shared Settings; the 1280px page had no horizontal overflow, and no runtime console errors were observed. Mobile/tablet sizes were not re-captured in this continuation, and no full pixel comparison against every reference was performed.
 - Not verified with real content: play/seek/speed against a real recording, actual Cache API download/cancel/removal over a production media URL, authored coaching completion flow, reader, quiz and flashcard sessions, or real reminder delivery with populated progress. These cannot be end-to-end validated while the catalogue is empty. Keyboard-only operation and formal WCAG contrast calculations were not fully audited.
 - There is no separate lint/typecheck script in `package.json`; tests and build were run.
 
