@@ -21,7 +21,7 @@
 - [x] Adopt a Fabulous-style coaching UI (interaction and layout patterns only; no Fabulous logo, mascot, illustrations, name, or wording): big rounded cards (20–24px), full-width pill buttons (999px), saturated color palette (crimson primary `#B5173A`, light background `#F5F6FB`, dark indigo `#12103A`), hero and per-deck gradients, system sans typography only (no serifs, parchment, or small-caps), and encouraging non-shaming progress language.
 - [x] Mandatory streaks and reminders stay off; optional streaks and low-pressure daily study plans are allowed.
 - [x] Document local iOS and Android build and test steps, and clearly state any device or release-build checks that cannot be completed in the available Linux environment.
-- [x] Do not publish, sign for store release, or submit to an app store. The user explicitly authorized a commit and push to `feature/mobile-app`; never push to `main`.
+- [x] Keep store signing and App Store submission separate; neither is authorized by this code-merge request. The user explicitly authorized PR #8 to merge into `main` after `feature/evangelism-deck-questions` was merged into its head branch. Never push directly to `main`; verify the live PR state before repeating any authorized merge action.
 
 ---
 

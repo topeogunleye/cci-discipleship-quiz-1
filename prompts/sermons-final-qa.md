@@ -1,36 +1,31 @@
-# Final QA: CCI Sermons experience
+# Final QA: CCI Sermons experience and PR #8
 
-Work in `/home/ubuntu/cci-discipleship-quiz-1`. Read the current handover, repository instructions, and matching templates/prompts. Inspect branch/upstream, `git status`, recent history, complete diff, and protected-file changes before editing. Stay on `feature/sermons-experience-continuation`; do not reset, rebase, or switch branches. Local `HEAD` and upstream were both `3423334` at the start of the 2026-10-29 continuation. Follow-up source/test/build/docs and generated `dist` files were prepared under direct authorization to commit and push to this branch; verify current state in Git.
+Work in the repository working copy for <https://github.com/topeogunleye/cci-discipleship-quiz-1>. Read `handover.md`, this prompt, the matching `templates/` and `prompts/` files, and repository-local instructions. Inspect current branch/upstream, `git status`, recent history, complete diff against `main`, unmerged paths, protected-file changes, and the live PR #8 state before acting.
 
-## Constraints
+## Scope and authorization
 
-Preserve existing work and scope. Do not alter design-reference images, feature/coverage lists, or the states board. Do not add unrelated features or invent production sermon, Scripture, coaching, quiz, transcript, flashcard, or audio content. `content/sermons.json` remains empty pending approved content and same-origin audio assets. The original brief was referenced at `/home/ubuntu/upload/pasted_content.txt` but was unavailable in the 2026-10-29 environment check; ask if any required detail is missing rather than guessing.
+Preserve existing work and the approved Sermons scope. Do not modify design-reference images, feature/coverage lists, or the states board. Do not add unrelated features or invent production sermon, Scripture, coaching, quiz, transcript, flashcard, or audio content. `content/sermons.json` remains empty pending approved content and same-origin audio assets. The Evangelism branch was explicitly merged into the Sermons PR head; its deck already exists in `main`.
 
-## Latest recorded verification — 2026-10-29
+The user explicitly authorized PR #8 from `feature/sermons-experience-continuation` to `main`, the merge of `feature/evangelism-deck-questions` into that PR's head, and the PR merge into `main`. Verify live GitHub state and checks to avoid repeating completed operations. This specific authorization does not include App Store signing, TestFlight upload, App Store submission, future merges, or direct pushes to `main`.
 
-- `npm test`: 88 tests, 86 pass, 0 fail, 2 existing `TODO` diagnostics (answer-letter distribution and longest-option-correct rate). The TODO assertions are known content-balance issues, not failed suite tests.
-- Focused `node --test tests/sermons.test.js tests/pwa.test.js`: 20/20 passed. `npm run build` passed and generated `dist/index.html` (1,372,611 bytes). `node --check` passed for changed app/build/service-worker/test JavaScript. The final staged diff passed `git diff --cached --check`.
-- Four behavioral/PWA defects were addressed: prototype-sensitive state IDs; contradictory Sermons Home empty state when published records exist; draft wording on missing published formats; and standalone `dist/` service-worker precache references to omitted CSS/JS files. The build now copies required assets, normalizes copied JS/CSS whitespace, uses worker cache v29, and tests check precache completeness and asset cleanliness.
-- Chromium installed the generated `/dist/` service worker: it activated and controlled the page, 19/19 core entries were cached, and no console errors were observed. A separate offline-reload probe was inconclusive in this environment (`ERR_INTERNET_DISCONNECTED`); do not claim end-to-end offline navigation from it.
-- Earlier headless Chromium checked Sermons Home, Library, Downloads, Progress, and Settings at 390px, 834px, and 1440px in light/dark, with no horizontal overflow, page error, or console error. Clean screenshots of Home (390px/1440px, light) and Library (834px/1440px, dark) were visually reviewed. Targeted keyboard testing at 390px and 1440px activated the experience switch, Library/Settings navigation, and a theme control with a visible 3px focus outline.
-- Real-media playback/download/cancel/remove, populated coaching/reader/quiz/flashcards/reminders, full keyboard coverage, formal WCAG contrast calculations, pixel-by-pixel reference comparison, and approved production content remain unverified.
+## Latest verified checks — 2026-10-29
+
+- `npm test`: 88 tests, 86 pass, 0 fail, 2 existing content-balance `TODO` diagnostics.
+- `npm run build` passed and produced `dist/index.html` (1,479,586 bytes). All 12 manifest-listed decks were verified byte-identical to their `dist/decks/` copies. The built service worker retains cache v29 and Sermons audio-cache behavior.
+- `node --check` passed for `js/app.js`, `js/sermons.js`, `js/sermons-ui.js`, `scripts/build.js`, `service-worker.js`, `tests/content-lint.test.js`, `tests/pwa.test.js`, and `tests/sermons.test.js`. No conflict markers remained in resolved source/tests/generated files; merge diff checks passed.
+- Earlier headless Chromium covered Sermons Home, Library, Downloads, Progress, and Settings at 390px, 834px, and 1440px in light/dark, with no horizontal overflow or page/console errors. This browser matrix was not repeated after integrating the Evangelism branch.
+- Earlier Chromium verified service-worker installation/activation and 19/19 core cache entries. The combined branch was not reinstalled in the browser. The offline-reload probe was inconclusive (`ERR_INTERNET_DISCONNECTED`); do not report it as a pass.
+- Real sermon media/content journeys, populated reminders, full keyboard/accessibility audit, and pixel-by-pixel reference comparison remain unverified.
 
 ## QA checklist
 
-1. Rerun `npm test`, `npm run build`, `node --check` for changed JavaScript, and `git diff --check`; report the two known TODOs accurately.
-2. Verify separate Discipleship/Sermons navigation and progress, shared Settings, storage migration/backup, and non-mutation of Discipleship state.
-3. Cover prototype-named sermon IDs in normalization, summaries, serialization/restore, and updates; verify published missing-format copy is neutral and draft-only labels remain status-specific.
-4. Review first-study coaching gates, completion timing, resume, quiz/flashcard flows, and accessible feedback using synthetic data only in test fixtures.
-5. Review explicit-only audio caching/removal, same-origin validation, cancellation/progress, cache persistence, byte accounting, player continuity, and offline/unavailable behavior. Do not claim production media verification without approved media.
-6. Review reminder settings, timing/dismissal semantics, notification disclosures, and absence of background-delivery promises.
-7. If browser tooling permits, inspect affected screens at 390/834/1440 in light/dark, plus keyboard focus, contrast, overflow, loading/error/offline and empty states. Record exact screens and viewports. Treat the previous Chromium offline-reload result as inconclusive and report any new failure honestly.
-8. Rebuild `dist`, verify every service-worker `CORE_FILES` path exists in the package, and test worker installation/activation. Review the source catalogue, backup/migration, complete diff, and protected files; confirm no secrets or unrelated artifacts changed.
-9. Update `handover.md` and keep this prompt plus `templates/continuation-prompt.md`, `prompts/sermons-final-qa.md`, and `prompts/sermons-continue.md` aligned with current verified facts. Keep `templates/handover.md` synchronized with `handover.md`.
-
-## Commit and push
-
-The user directly authorized commit and push of this exact follow-up change set to `feature/sermons-experience-continuation`. Inspect current branch and upstream before acting; if already pushed, report its exact SHA instead of repeating. Future change sets require fresh direct authorization. Never merge or deploy unless separately requested. If GitHub authentication is unavailable, preserve any local commit and report the blocker without requesting credentials in chat.
+1. Rerun `npm test`, `npm run build`, changed-file syntax checks, `git diff --check`, and staged-diff hygiene. Report the two TODO diagnostics accurately.
+2. Confirm branch `feature/sermons-experience-continuation` includes the Evangelism merge commit, its source deck exists in `main`, and generated `dist` matches the merged source manifest. Check cache v29, Sermons audio-cache behavior, and precache assets.
+3. Inspect the full PR diff and ensure there are no unresolved merge markers, secrets, unintended generated changes, protected reference edits, or unrelated files.
+4. Verify GitHub PR #8 checks, mergeability, head/base, and merged status. Because the user explicitly requested this specific PR merge, complete it once checks and mergeability permit; do not ask again or merge directly outside the PR.
+5. Preserve the independent uncommitted TestFlight workflow work on its own branch; do not include it in PR #8.
+6. Keep `handover.md` identical to `templates/handover.md`, the continuation template identical to its `prompts/` copy, and this final-QA template identical to `prompts/sermons-final-qa.md`.
 
 ## Final report
 
-Report branch/base, files changed, test/build/check output, exact visual and browser QA, content/media/backend dependencies, unverified cases, design-reference deviations, and staged/committed/pushed state. Do not hide failures or imply production content exists.
+Report PR #8 URL, branch and merge commits, checks, source/dist deck parity, test/build/syntax results, known content/media limitations, precise browser evidence and inconclusive checks, and whether the PR is merged. State that no App Store signing or upload occurred. Do not claim production Sermons content exists.
