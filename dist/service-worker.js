@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v28';
+const CACHE_NAME = CACHE_PREFIX + 'v29';
 const SERMON_AUDIO_CACHE = 'cci-sermon-downloads-v1';
 const CORE_FILES = [
   './',

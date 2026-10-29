@@ -20,6 +20,27 @@ test('Sermons state is separate and normalized without touching unrelated study 
   assert.equal(normalized.reminders.time, '19:30');
 });
 
+test('Sermons state maps safely preserve prototype-named IDs as own data keys', () => {
+  const ids = ['__proto__', 'constructor', 'toString'];
+  const source = JSON.parse('{"progress":{"__proto__":{"coaching":{"completedAt":1},"lastStudiedAt":1},"constructor":{"coaching":{"completedAt":2},"lastStudiedAt":2},"toString":{"coaching":{"completedAt":3},"lastStudiedAt":3}},"downloads":{"__proto__":{"audio":true,"bytes":4},"constructor":{"audio":true,"bytes":5},"toString":{"audio":true,"bytes":6}}}');
+  const state = Sermons.normalizeState(source);
+  assert.equal(Object.getPrototypeOf(state.progress), null);
+  assert.equal(Object.getPrototypeOf(state.downloads), null);
+  for (const id of ids) {
+    assert.equal(Object.hasOwn(state.progress, id), true);
+    assert.equal(Object.hasOwn(state.downloads, id), true);
+    assert.ok(state.progress[id].coaching.completedAt);
+    assert.equal(state.downloads[id].audio, true);
+  }
+  const summary = Sermons.summary(state, ids.map(id => ({ id, status: 'published' })));
+  assert.equal(summary.sermonsStudied, 3);
+  assert.equal(summary.coachingCompleted, 3);
+  const updated = Sermons.recordQuiz(state, '__proto__', 80, 200);
+  assert.equal(updated.progress['__proto__'].quizzesCompleted, 1);
+  assert.equal(Object.prototype.coaching, undefined);
+  assert.equal(Object.coaching, undefined);
+});
+
 test('an unscored started sermon stays unscored through normalization', () => {
   let state = Sermons.startMode(Sermons.createState(), 'sermon-1', 'read', 100);
   state = Sermons.normalizeState(state);
@@ -120,6 +141,35 @@ test('Sermons UI shows no invented catalogue entries and maps letter answers to 
   assert.match(hiddenDraftDownloads, /Draft audio/);
   assert.match(hiddenDraftDownloads, /Draft placeholder/);
   assert.match(hiddenDraftDownloads, /data-act="sermon-remove-download" data-kind="audio"/);
+});
+
+test('published sermons with missing formats use neutral unavailable copy, while drafts remain labeled', () => {
+  const published = { id: 'published-missing', status: 'published', title: 'Published sermon' };
+  const draft = { id: 'draft-missing', status: 'draft', title: 'Draft sermon' };
+  const context = item => ({
+    sermons: [item], state: Sermons.createState(), settings: { showDraftSermons: true },
+    summary: { sermonsStudied: 0, coachingCompleted: 0, quizzesCompleted: 0 },
+    view: { id: item.id }, online: true, audioDownloadsSupported: false, downloadsProgress: {}
+  });
+
+  const home = SermonsUI.render('sermons-home', context(published));
+  assert.match(home, /Published sermons are ready to explore/);
+  assert.doesNotMatch(home, /Your sermon library is ready|Sermon content has not been supplied yet/);
+
+  const coaching = SermonsUI.render('sermons-coaching', context(published));
+  assert.match(coaching, /This section is not available for this sermon yet/);
+  assert.match(coaching, /Coaching audio is not available for this sermon yet/);
+  assert.doesNotMatch(coaching, /Draft placeholder|for this draft/);
+  const player = SermonsUI.render('sermons-player', context(published));
+  assert.match(player, /A recording is not available for this sermon yet/);
+  assert.doesNotMatch(player, /This draft does not include a recording/);
+  const reader = SermonsUI.render('sermons-reader', context(published));
+  assert.match(reader, /Written content is not available for this sermon yet/);
+  assert.doesNotMatch(reader, /Draft placeholder/);
+
+  assert.match(SermonsUI.render('sermons-coaching', context(draft)), /Draft placeholder/);
+  assert.match(SermonsUI.render('sermons-player', context(draft)), /This draft does not include a recording/);
+  assert.match(SermonsUI.render('sermons-reader', context(draft)), /Draft placeholder/);
 });
 
 test('reminders respect enabled flags, chosen days/time, unfinished state and once-per-day dismissal', () => {

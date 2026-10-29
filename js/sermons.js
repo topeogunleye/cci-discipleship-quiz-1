@@ -8,7 +8,7 @@
   function object(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
   function nonNegativeInteger(value) { var number = Number(value); return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0; }
   function createState() {
-    return { progress: {}, downloads: {}, audio: { sermonId: null, currentTime: 0, playbackRate: 1, playing: false }, reminders: { regularEnabled: false, unfinishedEnabled: false, days: [], time: '19:00', lastShown: {} } };
+    return { progress: Object.create(null), downloads: Object.create(null), audio: { sermonId: null, currentTime: 0, playbackRate: 1, playing: false }, reminders: { regularEnabled: false, unfinishedEnabled: false, days: [], time: '19:00', lastShown: {} } };
   }
   function normalizeState(value) {
     var source = object(value), result = createState();

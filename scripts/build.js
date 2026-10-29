@@ -19,6 +19,19 @@ function replaceOnce(source, search, replacement) {
   return source.slice(0, index) + replacement + source.slice(index + search.length);
 }
 
+function normalizeTextFile(file) {
+  const content = fs.readFileSync(file, 'utf8').replace(/[ \t]+$/gm, '');
+  fs.writeFileSync(file, content);
+}
+
+function normalizeTextFiles(directory) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) normalizeTextFiles(file);
+    else if (/\.(?:m?js|css)$/i.test(entry.name)) normalizeTextFile(file);
+  }
+}
+
 html = replaceOnce(html, '<link rel="stylesheet" href="style.css">', `<style>\n${read('style.css')}\n</style>`);
 html = replaceOnce(html, '<script type="application/json" id="starter-fallback">""</script>', `<script type="application/json" id="starter-fallback">${inlineJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="devotionals-fallback">[]</script>', `<script type="application/json" id="devotionals-fallback">${devotionalsJson}</script>`);
@@ -34,10 +47,12 @@ html = replaceOnce(html, '<script src="js/app.js"></script>', `<script>\n${read(
 
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(path.join(outputDir, 'index.html'), html);
-for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html', 'favicon.ico']) {
+for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html', 'favicon.ico', 'style.css']) {
   fs.copyFileSync(path.join(root, file), path.join(outputDir, file));
 }
-for (const directory of ['decks', 'icons', 'content']) {
+for (const directory of ['decks', 'icons', 'content', 'js']) {
   fs.cpSync(path.join(root, directory), path.join(outputDir, directory), { recursive: true });
 }
+normalizeTextFile(path.join(outputDir, 'style.css'));
+normalizeTextFiles(path.join(outputDir, 'js'));
 console.log(`Built dist/index.html (${Buffer.byteLength(html)} bytes)`);
