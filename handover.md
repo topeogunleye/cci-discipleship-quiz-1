@@ -1,46 +1,39 @@
 # Sermons Experience — Implementation Handover
 
-**Status:** The implementation and QA-document updates are on `feature/sermons-experience-continuation`, tracking `origin/feature/sermons-experience-continuation`. This QA continuation changes documentation only; no application source changes were made. The production catalogue remains empty pending approved sermon/audio assets. On 2026-10-29, the user directly authorized committing and pushing this feature branch. Do not merge or deploy. **Created from:** `feature/sermons-experience` at `1d0fe27` (`Add handover file`). Do not reset or rebase.
+**Repository:** <https://github.com/topeogunleye/cci-discipleship-quiz-1>
+**Current branch/upstream:** `feature/sermons-experience-continuation` / `origin/feature/sermons-experience-continuation`
+**Base:** `feature/sermons-experience` at `1d0fe27` (`Add handover file`)
+**Last verified implementation/QA snapshot:** `0c09629` (`docs: update Sermons QA handover`), confirmed on the matching upstream branch. This refresh changes six repository documents only; no app source changes are intended. The user explicitly authorized committing and pushing these six documents to `feature/sermons-experience-continuation`. The installed skill package remains outside this repository and is excluded. Do not merge or deploy.
 
 ## Source of truth and scope
 
-- Repository: <https://github.com/topeogunleye/cci-discipleship-quiz-1>
-- Existing visual references: `design-reference/mobile`, `design-reference/desktop`, `design-reference/desktop-2x`. Do not edit these, the feature/coverage lists, or the states board.
-- Original Sermons brief: `/home/ubuntu/upload/pasted_content.txt`; preserve its constraints. Keep the catalogue empty until approved content is supplied.
+- Read this handover, the user brief if available, repository-local instructions, the files in `templates/`, and their project-specific counterparts in `prompts/` before continuing.
+- Do not edit `design-reference/mobile`, `design-reference/desktop`, `design-reference/desktop-2x`, feature/coverage lists, or the states board.
 - Do not add Notes, social features, devotionals, unrelated screens, or the unapproved charcoal quiz-show theme.
-- No production sermon, Scripture, coaching, quiz, transcript, or audio text may be invented. `content/sermons.json` intentionally remains empty (`schemaVersion: 1`). Use its empty/offline states until an approved content source is supplied.
+- Do not invent production sermon, Scripture, coaching, transcript, quiz, flashcard, or audio content. `content/sermons.json` intentionally remains empty until approved content and same-origin audio URLs are supplied.
+- The original brief was referenced at `/home/ubuntu/upload/pasted_content.txt`; verify it is available in the current environment. If it is absent and required details are unclear, ask for the missing requirement instead of inventing it.
 
 ## What is implemented
 
-- A separate accessible Discipleship/Sermons experience toggle, independent Sermons Home/Library/Downloads/Progress navigation, route-aware sidebar/tab navigation, and shared Settings.
-- Sermons routes/rendering and empty/draft/offline states for coaching, detail, player, reader, quiz, flashcards, completion, and progress. Coaching completion is recorded on Continue; first-study gates and unfinished-mode resume state are separate from Discipleship progress.
-- Separate Sermons state with schema-v11 migration and backup normalization; reader/quiz/flashcards render authored content only. Catalogue shape and same-origin HTTP(S) media URLs are checked before rendering.
-- Explicit user-initiated streaming audio caching/removal through a separate Cache API store, per-kind byte accounting and cancel controllers, progress feedback, playback position/speed persistence, and a persistent mini-player. Recording and coaching narration controls have explicit accessible names. Streaming avoids holding an extra full-file copy in memory where TransformStream is available; a canceled transfer rejects without publishing partial offline audio. The same audio element is retained across same-sermon rerenders so revisiting coaching does not interrupt playback; a fresh app launch restores the position paused rather than autoplaying stale state. Service-worker v28 serves cached audio offline with byte-range responses and does not duplicate streamed or explicitly downloaded media in the shell cache; activation preserves the dedicated user-managed audio cache.
-- Independent regular and unfinished reminders, day/time preferences, accessible in-app reminder actions/dismissal, notification permission/status disclosure, and `Show Draft Sermons` setting. Background notifications are not claimed or implemented.
-- Responsive Sermons shell/CSS with light/dark theme support. A malformed shell boundary found during QA was corrected and covered with a regression assertion.
+- Separate accessible Discipleship/Sermons toggle, independent Sermons Home/Library/Downloads/Progress, route-aware navigation, and shared Settings.
+- Separate Sermons state with schema-v11 migration/backup normalization; first-study coaching gate; Listen/Read/Quiz/Flashcards flows; player/mini-player; explicit-only Cache API audio download/cancel/remove; offline byte-range playback; independent reminder settings; responsive light/dark styling.
+- Catalogue/content validation and honest empty, draft, offline, and unavailable states. The production catalogue is still empty; do not fabricate content to fill it.
 
-## Files changed on this continuation branch
+## Files changed on the original implementation branch
 
-`js/app.js`, `js/sermons.js`, `js/sermons-ui.js`, `service-worker.js`, `style.css`, `tests/content-lint.test.js`, `tests/pwa.test.js`, `tests/sermons.test.js`, `handover.md`, both continuation prompts, generated `dist/index.html`, generated `dist/service-worker.js`, and generated/untracked `dist/content/sermons.json`. The source catalogue is `content/sermons.json` and remains empty. No reference/tracking files were changed. Dependencies were installed from the lockfile; no dependency manifest changes were intended.
+`js/app.js`, `js/sermons.js`, `js/sermons-ui.js`, `service-worker.js`, `style.css`, `tests/content-lint.test.js`, `tests/pwa.test.js`, `tests/sermons.test.js`, the handover/prompts, and generated distribution files. No design references/tracking files or dependency manifests were intentionally changed in that implementation. For this prompt/template refresh, inspect `git status` for the exact documentation-only paths and do not assume they have been committed.
 
-## Verification completed
+## Verification snapshot
 
-- `npm test`: **86 tests; 84 pass; 0 fail; 2 TODO diagnostics** on the current continuation QA rerun. The TODOs are content-lint diagnostics for answer-letter distribution and the rate at which the longest option is correct.
-- `npm run build`: passes after `npm ci`; generated PWA distribution includes Sermons code and the intentionally empty catalogue. The build produced no unexpected tracked artifact changes.
-- `node --check` passed for `js/app.js`, `js/sermons.js`, `js/sermons-ui.js`, `service-worker.js`, the three relevant test files, and `scripts/build.js`. `git diff --check` passed after updating the QA template.
-- Additional regression coverage verifies test-only coaching-to-quiz interaction without changing Discipleship progress, same-node playback while revisiting coaching, zero seek-position persistence, null/non-finite score and download normalization, streaming cancellation without partial cache entries, same-origin explicit download/removal, v28 offline media byte-range serving, and that streamed media is not implicitly copied into the shell cache. Hidden draft downloads remain visible/removable, and Home/Library sort dated sermons newest-first. Service-worker v28 preserves the separate user audio cache during activation.
-- Earlier browser visual checks (recorded before this continuation) covered Sermons Home at 390px, 834px, and 1440px in both light and dark; Library empty state and shared Settings were opened at the standard desktop preview viewport. In this continuation, the built app was reviewed at 1280px in light/dark across Home, Library empty state, Downloads, Progress, and shared Settings; the 1280px page had no horizontal overflow, and no runtime console errors were observed. Mobile/tablet sizes were not re-captured in this continuation, and no full pixel comparison against every reference was performed.
-- Not verified with real content: play/seek/speed against a real recording, actual Cache API download/cancel/removal over a production media URL, authored coaching completion flow, reader, quiz and flashcard sessions, or real reminder delivery with populated progress. These cannot be end-to-end validated while the catalogue is empty. Keyboard-only operation and formal WCAG contrast calculations were not fully audited.
-- There is no separate lint/typecheck script in `package.json`; tests and build were run.
+- `npm test`: 86 tests, 84 pass, 0 fail, 2 existing TODO diagnostics (answer-letter distribution and longest-option-correct rate). Rerun after code changes.
+- `npm run build`, relevant `node --check`, and `git diff --check` passed at the last recorded QA run. `package.json` has no separate lint/typecheck script.
+- Earlier browser checks recorded Sermons Home at 390/834/1440 in both themes. Latest continuation QA inspected Home, Library empty state, Downloads, Progress, and shared Settings at 1280px in light/dark; no horizontal overflow or runtime console errors were observed. Mobile/tablet sizes were not recaptured in that latest run, and no full pixel comparison/formal accessibility audit was completed.
+- Not verified with real content/media: production recording playback/seek/speed, real Cache API download/cancel/removal, populated coaching/reader/quiz/flashcards/reminders, keyboard-only operation, or formal WCAG contrast calculations. See `templates/final-qa-prompt.md` for the full checklist.
 
-## Content and integration dependencies / next steps
+## Content dependencies and next steps
 
-1. Obtain approved sermon metadata, same-origin audio URLs/files, five coaching section texts, reviewed transcript sections, quiz questions/options/answers/explanations, and flashcards. Populate `content/sermons.json` using its schema and do not fabricate placeholders as production content.
-2. With approved fixture content, run the complete first-study path and each mode; test audio playback, seek/rate, cache progress/cancel/remove, quota/offline failure, simultaneous recording/narration downloads, backup migration/restore, reminder timing/dismissal, and state separation. Add targeted tests for any newly found regressions.
-3. Inspect all routes at 390/834/1440 and both themes, compare against repository references, test keyboard focus/contrast, and review generated `dist`/service-worker changes.
-4. Recheck `git status`, full diff, tests and build. Keep the branch uncommitted/unpushed until the user explicitly directs otherwise.
-
-## Continuation prompts
-
-- [`prompts/sermons-continue.md`](prompts/sermons-continue.md) — safe implementation continuation prompt for another AI.
-- [`prompts/sermons-final-qa.md`](prompts/sermons-final-qa.md) — final QA/report prompt for another AI.
+1. Obtain approved sermon metadata, same-origin audio files/URLs, five coaching sections, reviewed transcript sections, quiz questions/options/answers/explanations, and flashcards before validating real-content flows.
+2. With approved content, test the complete first-study path and each mode; playback/seek/rate; explicit cache progress/cancel/remove, quota/offline failure; backup migration/restore; reminder timing/dismissal; and state isolation.
+3. Recheck affected routes at 390/834/1440 in both themes if tooling permits, compare with repository references, test keyboard/focus/contrast, and inspect generated `dist`/service-worker changes.
+4. Keep `templates/continuation-prompt.md` aligned with `prompts/sermons-continue.md`, and `templates/final-qa-prompt.md` aligned with `prompts/sermons-final-qa.md`. Update both pairs when verified facts, scope, branch state, or authorization changes; remove stale instructions instead of appending contradictory ones.
+5. Commit/push only when the user explicitly authorizes those exact actions and target branch. A direct instruction suffices; do not add an additional publication gate. Never merge or deploy unless separately requested.

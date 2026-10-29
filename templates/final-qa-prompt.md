@@ -1,51 +1,33 @@
-# `Final QA: CCI Sermons experience`
+# Final QA: CCI Sermons experience
 
-`Run this prompt only after the implementation on feature/sermons-experience-continuation is believed complete. Work in /home/ubuntu/cci-discipleship-quiz-1.`
+Work in `/home/ubuntu/cci-discipleship-quiz-1`. Read the current handover, repository instructions, and matching templates/prompts. Inspect branch/upstream, `git status`, recent history, complete diff, and protected-file changes before editing. Stay on `feature/sermons-experience-continuation`; do not reset, rebase, or switch branches.
 
-## `Non-negotiable constraints`
+## Constraints
 
-- `Read handover.md, inspect git status and the full branch diff before any change. Do not discard user changes or reset the branch.`
+Preserve existing work and scope. Do not alter design-reference images, feature/coverage lists, or the states board. Do not add unrelated features or invent production sermon, Scripture, coaching, quiz, transcript, flashcard, or audio content. `content/sermons.json` remains empty pending approved content and same-origin audio assets.
 
-- `Keep working on feature/sermons-experience-continuation. Do not commit, push, merge, publish, deploy, or switch branches.`
+## Latest recorded verification
 
-- `Do not alter design-reference images, feature/coverage lists, or states board. Do not add scope.`
+- Baseline: `npm test` reports 86 tests, 84 pass, 0 fail, and 2 existing TODO diagnostics (answer-letter distribution and longest-option-correct rate). Rerun after changes and distinguish TODOs from regressions.
+- `npm run build` passed; `node --check` passed for relevant JavaScript; `git diff --check` passed. `package.json` has no separate lint/typecheck script.
+- Earlier visual checks covered Sermons Home at 390px, 834px, and 1440px in light/dark. Latest recorded QA inspected Home, Library empty state, Downloads, Progress, and shared Settings at 1280px in light/dark, with no horizontal overflow or runtime console errors. Mobile/tablet checks were not repeated in that run. Recheck any route/theme/viewport needed; claim only actual checks.
+- Real-media playback/download/cancel/remove, populated coaching/reader/quiz/flashcards/reminders, keyboard-only operation, and formal WCAG contrast calculations remain unverified. See `handover.md` for exact limits.
 
-- `Do not invent sermon, Scripture, coaching, quiz or audio content. The production catalogue may remain empty; document what content/backend is required.`
+## QA checklist
 
-## `QA checklist`
+1. Rerun `npm test`, `npm run build`, and `node --check` for changed JavaScript. Compare results with the baseline; report the two known TODOs accurately.
+2. Verify separate Discipleship/Sermons navigation and progress, shared Settings, storage migration/backup, and non-mutation of Discipleship state.
+3. Review first-study coaching gates, completion timing, resume, quiz/flashcard flows, and accessible feedback using synthetic data only in test fixtures.
+4. Review explicit-only audio caching/removal, same-origin validation, cancellation/progress, cache persistence, byte accounting, player continuity, and offline/unavailable behavior. Do not claim production media verification without approved media.
+5. Review reminder settings, timing/dismissal semantics, notification disclosures, and absence of background-delivery promises.
+6. If browser tooling is available, inspect affected screens at 390/834/1440 in light/dark, plus keyboard focus, contrast, overflow, loading/error/offline and empty states. Record exact screens and viewports.
+7. Review generated `dist`, service-worker cache behavior, source catalogue, backup/migration, and complete diff. Confirm no protected/reference/tracking files or secrets changed.
+8. Update `handover.md` and keep this prompt plus `templates/continuation-prompt.md`, `prompts/sermons-final-qa.md`, and `prompts/sermons-continue.md` aligned with current verified facts.
 
-1. `Run all relevant repository tests, lint, type checks, and build commands; compare failures to the recorded baseline of 86 tests (84 pass; 2 TODO diagnostics) and explain regressions.`
+## Commit and push
 
-1. `Verify the segmented toggle and independent Home/navigation/Progress for Discipleship vs Sermons. Confirm shared Settings. Verify Sermon activity never mutates Discipleship progress/quizzes.`
+Do not commit or push merely because QA is complete. Commit/push only when the user explicitly authorizes those exact actions and target branch. The earlier instruction was completed by commit `0c09629`; it does not authorize future changes. A fresh direct instruction is sufficient—do not impose an additional threshold. Never merge or deploy unless separately requested. If GitHub authentication is unavailable, preserve any local commit and report the blocker without requesting credentials in chat.
 
-1. `Verify the first-study path: coaching precedes all modes; only Continue marks coaching complete; revisiting it does not interrupt playback. Verify Listen/Read/Quiz/Flashcards choice order after coaching.`
+## Final report
 
-1. `Verify explicit-only audio downloads, progress/cancel/remove/failure, cache persistence across app updates, and mini-player continuity. Verify unavailable/offline media states and no false promises about background reminders.`
-
-1. `Verify written content, coaching and quiz fallback offline; no phantom published content; visible Draft placeholder badge and [Scripture reference] where appropriate.`
-
-1. `Verify quiz progress, correct/incorrect text/icon semantics independent of color, completion, review, retry and return-to-sermon. Verify flashcards.`
-
-1. `Verify reminder toggles, separate unfinished reminders, day/time choices, once-per-day/dismiss behavior, permission rationale and denied/unsupported status.`
-
-1. `If browser visual tooling exists, inspect `**`all required screens`**` at mobile 390px, tablet 834px, desktop 1440px in both light and dark. Check responsive sidebar/tabbar patterns against the repository references; inspect keyboard focus, AA contrast, scrolling, clipping, error/loading/empty/offline/download-in-progress/completion states. Do not claim a viewport/theme was checked unless actually inspected.`
-
-1. `Review generated build output, service-worker cache version/precache list, backup migration, tests and git diff. Ensure no unintentional changes to source references/tracking files or bundled artifacts.`
-
-## `Final response must report`
-
-- `Branch and starting branch; confirm no commit/push/deploy.`
-
-- `Implemented screens and behavior; files changed.`
-
-- `Test/lint/typecheck/build results, including baseline comparisons.`
-
-- `Viewports/themes actually inspected and coverage gaps.`
-
-- `Content/audio/API/backend dependencies and anything not fully supported.`
-
-- `Any deviations from reference images/previews: exact filename, difference, and reason; list unverified values and decisions needed.`
-
-- `Local steps to preview/review the branch.`
-
-`Do not hide failures or claim completeness for unverified features.`
+Report branch/base, files changed, test/build/check output, exact visual QA, content/media/backend dependencies, unverified cases, design-reference deviations, and staged/committed/pushed state. Do not hide failures or imply production content exists.

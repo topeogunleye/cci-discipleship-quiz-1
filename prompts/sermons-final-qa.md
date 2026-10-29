@@ -1,28 +1,33 @@
 # Final QA: CCI Sermons experience
 
-Work in `/home/ubuntu/cci-discipleship-quiz-1`. Read `handover.md`, inspect `git status` and the full diff before changing anything. Continue on `feature/sermons-experience-continuation`, created from `feature/sermons-experience` at `1d0fe27`. Do not reset, rebase, switch branches, merge, publish, or deploy. The user authorizes a handover, commit and push only when 20 credits remain. No available balance tool has been found; verify the threshold rather than guessing, and ask the user to confirm if no meter is accessible.
+Work in `/home/ubuntu/cci-discipleship-quiz-1`. Read the current handover, repository instructions, and matching templates/prompts. Inspect branch/upstream, `git status`, recent history, complete diff, and protected-file changes before editing. Stay on `feature/sermons-experience-continuation`; do not reset, rebase, or switch branches.
 
 ## Constraints
 
-Preserve existing work and scope. Do not alter repository design-reference images, feature/coverage lists or the states board. Do not add unrelated features. Do not invent sermon, Scripture, coaching, quiz, transcript or audio content. `content/sermons.json` is intentionally empty pending an approved content source.
+Preserve existing work and scope. Do not alter design-reference images, feature/coverage lists, or the states board. Do not add unrelated features or invent production sermon, Scripture, coaching, quiz, transcript, flashcard, or audio content. `content/sermons.json` remains empty pending approved content and same-origin audio assets.
 
-## Verification already recorded in `handover.md`
+## Latest recorded verification
 
-- Latest recorded `npm test`: 86 tests, 84 pass, 0 fail, 2 pre-existing TODO diagnostics (answer-letter distribution and longest-option-correct rate); rerun after any changes.
-- Latest recorded `npm run build`: successful; Sermons assets are included in the generated PWA distribution.
-- Sermons Home visually inspected at 390px, 834px and 1440px in light and dark. Library empty state and shared Settings were opened at the standard desktop preview viewport. A malformed shell boundary found during visual QA was fixed and guarded by a regression test.
-- Test-only app interactions verify coaching gates, continuous playback while revisiting coaching, and quiz completion without changing Discipleship progress; synthetic tests also cover streamed cancellation without partial cache entries, explicit same-origin media download/removal, and service-worker v28 full/range playback from the dedicated audio cache. Real-media end-to-end playback/download/cancel/remove, populated coaching/reader/quiz/flashcards, keyboard-only behavior and formal WCAG contrast calculations remain unverified because no approved production content/media is available and those checks were not completed. Do not claim them as verified.
+- Baseline: `npm test` reports 86 tests, 84 pass, 0 fail, and 2 existing TODO diagnostics (answer-letter distribution and longest-option-correct rate). Rerun after changes and distinguish TODOs from regressions.
+- `npm run build` passed; `node --check` passed for relevant JavaScript; `git diff --check` passed. `package.json` has no separate lint/typecheck script.
+- Earlier visual checks covered Sermons Home at 390px, 834px, and 1440px in light/dark. Latest recorded QA inspected Home, Library empty state, Downloads, Progress, and shared Settings at 1280px in light/dark, with no horizontal overflow or runtime console errors. Mobile/tablet checks were not repeated in that run. Recheck any route/theme/viewport needed; claim only actual checks.
+- Real-media playback/download/cancel/remove, populated coaching/reader/quiz/flashcards/reminders, keyboard-only operation, and formal WCAG contrast calculations remain unverified. See `handover.md` for exact limits.
 
 ## QA checklist
 
-1. Re-run `npm test`, `npm run build`, and `node --check` for changed JavaScript after any edits. Compare results with the above record and explain any new failures. `package.json` has no separate lint/typecheck script.
-2. Review the experience toggle, route/sidebar/tab separation, shared Settings, state migration/backup and proof that Sermons progress remains separate from Discipleship.
-3. Review first-study gating, coaching completion timing, resume state, quiz feedback/review/retry/completion, flashcard behavior and all user actions. Use only test fixtures for synthetic content.
-4. Review explicit-only audio download behavior, same-origin validation, independent recording/narration cancellation, progress, cache persistence, byte accounting, removal, quota/offline failure handling, player continuity and unsupported capability messaging. Where real media is absent, report the limitation rather than claiming end-to-end verification.
-5. Review reminder toggles, days/time, once-per-day/dismiss behavior, notification permission/denied/unsupported disclosures, and ensure no background-delivery promise is made.
-6. If browser tooling is available, inspect affected routes at 390/834/1440 in light/dark, plus keyboard focus, contrast, overflow, error/loading/offline and empty states. State exactly which screens and themes were inspected.
-7. Review generated `dist` files, service-worker precache/cache behavior, source catalogue, backup/migration and complete `git diff`. Confirm no reference/tracking files changed.
+1. Rerun `npm test`, `npm run build`, and `node --check` for changed JavaScript. Compare results with the baseline; report the two known TODOs accurately.
+2. Verify separate Discipleship/Sermons navigation and progress, shared Settings, storage migration/backup, and non-mutation of Discipleship state.
+3. Review first-study coaching gates, completion timing, resume, quiz/flashcard flows, and accessible feedback using synthetic data only in test fixtures.
+4. Review explicit-only audio caching/removal, same-origin validation, cancellation/progress, cache persistence, byte accounting, player continuity, and offline/unavailable behavior. Do not claim production media verification without approved media.
+5. Review reminder settings, timing/dismissal semantics, notification disclosures, and absence of background-delivery promises.
+6. If browser tooling is available, inspect affected screens at 390/834/1440 in light/dark, plus keyboard focus, contrast, overflow, loading/error/offline and empty states. Record exact screens and viewports.
+7. Review generated `dist`, service-worker cache behavior, source catalogue, backup/migration, and complete diff. Confirm no protected/reference/tracking files or secrets changed.
+8. Update `handover.md` and keep this prompt plus `templates/continuation-prompt.md`, `prompts/sermons-final-qa.md`, and `prompts/sermons-continue.md` aligned with current verified facts.
+
+## Commit and push
+
+Do not commit or push merely because QA is complete. Commit/push only when the user explicitly authorizes those exact actions and target branch. The earlier instruction was completed by commit `0c09629`; it does not authorize future changes. A fresh direct instruction is sufficient—do not impose an additional threshold. Never merge or deploy unless separately requested. If GitHub authentication is unavailable, preserve any local commit and report the blocker without requesting credentials in chat.
 
 ## Final report
 
-Report the current branch and parent branch, files changed, test/build/check output (including the two TODOs), exact visual QA performed, content/media/backend dependencies, unverified cases, deviations from the design references, and local preview/review instructions. Commit and push only after the 20-credit threshold is verified; never merge/deploy. Do not hide failures or imply the empty catalogue contains production data.
+Report branch/base, files changed, test/build/check output, exact visual QA, content/media/backend dependencies, unverified cases, design-reference deviations, and staged/committed/pushed state. Do not hide failures or imply production content exists.
