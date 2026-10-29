@@ -1,53 +1,25 @@
 # Continue implementation: CCI Sermons experience
 
-You are continuing an incomplete implementation in this repository:
+Continue in `/home/ubuntu/cci-discipleship-quiz-1`. Read `handover.md`, inspect `git status` and the full diff before editing. The current branch is `feature/sermons-experience-continuation`, created from `feature/sermons-experience` at `1d0fe27`. **Stay on this branch**; do not reset, rebase, or switch branches. Preserve existing work. The user authorizes a handover, commit and push only when 20 credits remain. No credit-balance tool has been found, so do not guess or commit/push until the threshold is verified; ask the user to confirm if the meter is unavailable. Never merge, publish or deploy.
 
-`/home/ubuntu/cci-discipleship-quiz-1`
+## Non-negotiable scope
 
-## Safety and scope
+Follow the original brief at `/home/ubuntu/upload/pasted_content.txt` and the user’s branch/handover instructions. Do not modify design references (`design-reference/mobile`, `design-reference/desktop`, `design-reference/desktop-2x`), feature/coverage lists, or the states board. No Notes, social features, devotionals, unrelated screens, or the unapproved charcoal quiz-show theme.
 
-- Continue on the existing branch `feature/sermons-experience`; do not create/reset/rebase branches.
-- Inspect `git status`, `git diff`, repository instructions, `handover.md`, the original brief at `/home/ubuntu/upload/pasted_content.txt`, and implementation rules at `/home/ubuntu/upload/pasted_content_2.txt` before editing.
-- Preserve every existing change. Do not commit, push, merge, publish, deploy, or modify the original design references, feature list, coverage list, or states board.
-- Do not add Notes, social features, devotionals, unrelated screens, or the unapproved charcoal quiz-show theme.
-- The repository design references are source of truth: `design-reference/mobile`, `design-reference/desktop`, and `design-reference/desktop-2x`. Existing approved Sermons preview boards may be supplemental if available under `/home/ubuntu/cci-sermons-individual/` and `/home/ubuntu/cci-sermons-*.png`.
+Keep Discipleship and Sermons as separate top-level experiences with separate Home/navigation/Progress and shared Settings. Do not let Sermons activity mutate Discipleship progress or quiz state. Preserve the five-part coaching flow and mark coaching complete only on Continue. After coaching, Listen/Read/Quiz/Flashcards can be completed in any order. Audio downloads must be explicit, user-controlled, stored outside the main JSON study state, and removable. Use accessible text/icon feedback in addition to color. Explain that reminders are evaluated on app open; do not claim background notifications.
 
-## Product requirements
+**Do not invent production content.** `content/sermons.json` is intentionally empty because no approved sermons, Scriptures, coaching text, transcripts, quizzes, flashcards, or audio assets were found. Keep honest empty/offline/unavailable states. Production implementation of content-dependent routes and real media flows requires approved content and same-origin audio URLs.
 
-Build two separate top-level experiences, **Discipleship** and **Sermons**, selected by an accessible segmented toggle. Each gets its own Home, navigation and Progress; Settings are shared. Required Sermons screens: Home, Library, pre-study Coaching, Detail, Audio Player, Written Sermon Reader, Quiz, Flashcards, Completion, Downloads, Progress, shared reminder settings and in-app reminders.
+## Current state
 
-- Home: unfinished study, recently published sermons, Library/Downloads shortcuts and Sermon-only progress.
-- Library: title, speaker, date, `[Scripture reference]`, formats, download/progress indicators and empty/offline states.
-- Coaching must precede first study; five sections: Scripture Focus, Key Insight, Reflection Questions, Practical Application and Prayer; optional narration; explicit narration-download action; prominent Continue. Mark completion only when Continue is pressed. Revisiting coaching must not interrupt playback.
-- After coaching, Listen, Read, Quiz and Flashcards can be chosen in any order. Keep all Sermon quiz/progress separate from Discipleship. Reuse CCI interactions. Include accessible correct/incorrect feedback, quiz progress, result/review/retry/return paths.
-- Player: playback, seek, speed, persisted playback progress, persistent mini-player, explicit download/cancel/remove and unavailable/offline states. Never download audio automatically. Do not store audio bytes in the single JSON study state.
-- Reader: structured content, readable responsive width, offline availability, study navigation. No inherited oversized banner.
-- Downloads: separately show sermon recordings and coaching narration, storage info, progress, cancellation/removal, offline written content distinction.
-- Settings: independently enable regular and unfinished-sermon reminders; select days/time; explain notification permission and show status/denied state; Show Draft Sermons.
-- Reminders: evaluate on app/PWA open; accessible banner action opens Sermons Home or resumes unfinished coaching; accessible dismissal. Do not imply background notifications if the app cannot deliver them.
+The toggle, Sermons routes/nav, shared reminders/settings, separate state/migration/backups, coaching gate, quiz/progress flows, player/mini-player, explicit streaming Cache API download/cancel/remove, offline audio playback with byte ranges, library/reader/download/progress UIs, service-worker v28 handling, responsive CSS and regression tests are implemented. Same-sermon rerenders preserve the audio element while revisiting coaching; fresh launches restore playback position paused. The generated distribution is in `dist/`. See `handover.md` for the current changed-file list and verification details.
 
-## Content and design constraints
+A browser visual check was completed at 390px, 834px and 1440px in light and dark themes for Sermons Home; Library empty state and shared Settings were also inspected at the standard desktop preview viewport. A shell-markup bug found during preview was corrected and tested. Do not assume unvisited real-content states were end-to-end verified.
 
-No sermon, scripture, coaching, or quiz text may be invented. Use `[Scripture reference]` and a visible `Draft placeholder` badge where required. The existing catalogue was absent; `content/sermons.json` intentionally starts empty. Keep honest empty states, and describe real content/audio/back-end dependencies. Do not inject fake production data. Test fixtures may be synthetic but must stay in tests only.
+## Work only where justified
 
-Responsive viewports: 390px mobile, 834px tablet and 1440px desktop, light and dark. Match existing references and reuse tokens. Font: `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` only (no webfont); heading weight 700, body 400–500. Cards 20–24px, pill buttons, inputs 14px; primary `#B5173A`, info `#2F6FED`; light `#F5F6FB` with white surfaces; dark `#12103A` with cards `#1D1A55`; gradients `#3B2BB0 → #7A3FD0` and `#FF8A3D → #FF4F7A`. Maintain AA contrast and do not rely on color alone for correctness. Simple original inline illustrations only; never trace Fabulous artwork.
-
-## Current partial implementation
-
-Read `handover.md` first. Changes already exist in `index.html`, `js/app.js`, `scripts/build.js`, `service-worker.js`, `tests/pwa.test.js`, plus untracked `content/sermons.json`, `js/sermons.js`, `js/sermons-ui.js`, and `tests/sermons.test.js`. They are incomplete and untested. An ambiguous app.js integration patch failed without modifying the file, so do not assume all screens/actions are wired. Do not discard these changes; inspect/reconcile them.
-
-Audit finding: `js/app.js` owns persisted `S`, transient `V`, `views`, route function `go()` and delegated `data-act` clicks. Existing nav is separately generated by `renderTabBar()`/`renderDesktopSidebar()`. Storage uses a single JSON state record via IndexedDB; audio bytes need a separate user-managed cache. `scripts/build.js` inlines assets. Service worker cache was moved to v27 and precaches the Sermons files. Baseline before changes: 73 tests, 71 pass, 0 fail, 2 TODO diagnostics. No real sermon/audio assets exist.
-
-## Work plan
-
-1. Read and validate current diffs. Inspect `package.json`, storage, CSS, route/action handlers, backup restore, service worker, tests, and tracking boards.
-2. Finish route/render/navigation/action integration in app.js without changing existing Discipleship flows. Use small contextual edits. Add view context, experience switch, active tab mapping, shared settings integration, reminder checks, progress updates, state persistence/backup, and actions for each screen.
-3. Make every route navigable for empty data without claiming content exists. Show placeholder/draft badge only when that setting permits it. Quiz/reader/player should clearly explain unavailable data. Avoid misleading or broken disabled controls.
-4. Implement/complete interactive quiz/flashcards/results with a test-only fixture. Correctness needs visible words/icons, not color alone. Review, retry, and return actions should work.
-5. Implement audio controls around real audio URLs, only downloading on explicit click, with cancel/progress/removal, quota errors and persistent mini-player. Use a distinct audio Cache API store and do not evict it on service-worker app cache activation. State clearly if backend media/CORS prevents completion.
-6. Add responsive theme-aware CSS using existing variables; check overflow and keyboard/focus behavior at 390/834/1440, light/dark.
-7. Add tests for branch-level nav separation, coaching completion timing, separate progress, backup migration, reminders and notification permission states, content offline fallback, audio explicit action/cache errors/cancellation/removal, and build/SW assets.
-8. Run test suite, lint/typecheck/build commands from `package.json`, inspect generated `dist` changes, and visually inspect at target sizes/themes if tooling permits. Report anything not tested honestly.
-9. Leave work uncommitted and report files, tests, limitations, backend dependencies, deviations from the design references/previews, and local review instructions.
-
-No external side-effect actions. Stop before commit/push/merge/deploy.
+1. Review the existing full diff and run `npm test` and `npm run build` before any new work.
+2. Fix verified defects and add focused regression tests. Do not rewrite functioning flows or weaken unrelated tests.
+3. If the user supplies approved catalogue/media, test the complete first-study path, all study modes, playback and progress, offline download/cancel/remove/failure, reminder timing/dismissal, backup/restore, and state isolation. Keep synthetic data in tests only.
+4. Recheck responsive screens at 390/834/1440 in light/dark if tooling permits; compare with repository references, check keyboard/focus/overflow/contrast, inspect generated `dist` and the service worker.
+5. Finish by updating `handover.md` and these prompts if the state changes; clearly state any content/backend dependency. When the 20-credit condition is verifiably met, prepare the final handover, commit the branch and push it to its feature-branch remote. Until then, leave changes uncommitted/unpushed.

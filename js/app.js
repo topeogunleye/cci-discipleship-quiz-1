@@ -4,7 +4,7 @@
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
   var S = { decks: [], progress: {}, sermons: SermonStudy ? SermonStudy.createState() : {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
   var STARTER_DECKS = [], DEVOTIONALS = [], SERMONS = [], sermonDownloadControllers = {};
-  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
+  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null }, sermonAudioElement = null, sermonDownloadProgress = {}, lastAudioSaveBucket = -1;
   var browserLocalStorage = null, browserIndexedDB = null;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
   if (!browserLocalStorage) { try { if (typeof localStorage !== 'undefined') browserLocalStorage = localStorage; } catch (e) {} }
@@ -94,14 +94,70 @@
     if (!el) return { schemaVersion: 1, sermons: [] };
     try { return JSON.parse(el.textContent || '{"schemaVersion":1,"sermons":[]}'); } catch (e) { return { schemaVersion: 1, sermons: [] }; }
   }
+  function normalizeSermons(data) {
+    if (!data || data.schemaVersion !== 1 || !Array.isArray(data.sermons)) return [];
+    function mediaUrl(value) {
+      if (typeof value !== 'string' || !value.trim()) return '';
+      try {
+        var parsed = new URL(value, window.location && window.location.href || 'http://localhost/');
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+        if (window.location && window.location.origin && parsed.origin !== window.location.origin) return '';
+        return value;
+      } catch (e) { return ''; }
+    }
+    return data.sermons.filter(function (item) {
+      return item && /^[a-zA-Z0-9._-]{1,120}$/.test(item.id || '') && (item.status === 'published' || item.status === 'draft');
+    }).map(function (item) {
+      var quiz = Array.isArray(item.quiz) ? item.quiz.filter(function (q) { return q && typeof q.question === 'string' && Array.isArray(q.options) && q.options.length === 4 && q.options.every(function (option) { return typeof option === 'string'; }) && (typeof q.answer === 'string' ? 'ABCD'.indexOf(q.answer.toUpperCase()) >= 0 : Number.isInteger(q.answer) && q.answer >= 0 && q.answer < 4); }).map(function (q) { return { question: q.question, options: q.options.slice(), answer: q.answer, explanation: typeof q.explanation === 'string' ? q.explanation : '' }; }) : [];
+      var flashcards = Array.isArray(item.flashcards) ? item.flashcards.filter(function (card) { return card && typeof card.front === 'string' && typeof card.back === 'string'; }).map(function (card) { return { front: card.front, back: card.back }; }) : [];
+      return {
+        id: item.id, status: item.status, title: typeof item.title === 'string' ? item.title : '[Sermon title]',
+        speaker: typeof item.speaker === 'string' ? item.speaker : '[Speaker]', date: typeof item.date === 'string' ? item.date : '',
+        scripture: typeof item.scripture === 'string' ? item.scripture : '[Scripture reference]',
+        audioUrl: mediaUrl(item.audioUrl), coachingAudioUrl: mediaUrl(item.coachingAudioUrl),
+        coaching: Array.isArray(item.coaching) ? item.coaching.filter(function (section) { return section && typeof section.title === 'string' && typeof section.body === 'string'; }).map(function (section) { return { title: section.title, body: section.body }; }) : [],
+        sections: Array.isArray(item.sections) ? item.sections.filter(function (section) { return section && typeof section.title === 'string' && typeof section.body === 'string'; }).map(function (section) { return { title: section.title, body: section.body }; }) : [],
+        quiz: quiz, flashcards: flashcards
+      };
+    });
+  }
   function loadSermons() {
     var fallback = inlineSermonsData();
-    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(fallback.sermons || []);
+    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(normalizeSermons(fallback));
     return window.fetch('content/sermons.json').then(function (response) {
       if (!response.ok) throw new Error('Could not load sermons');
       return response.json();
-    }).then(function (data) { return data && data.schemaVersion === 1 && Array.isArray(data.sermons) ? data.sermons : (fallback.sermons || []); })
-      .catch(function () { return fallback.sermons || []; });
+    }).then(function (data) { var normalized = normalizeSermons(data); return normalized.length || (data && Array.isArray(data.sermons) && data.sermons.length === 0) ? normalized : normalizeSermons(fallback); })
+      .catch(function () { return normalizeSermons(fallback); });
+  }
+
+  function sermonState() { return SermonStudy.normalizeState(S.sermons); }
+  function sermonRecord(id) {
+    return (SERMONS || []).filter(function (item) { return item && item.id === id; })[0] || null;
+  }
+  function sermonContext() {
+    var state = sermonState();
+    return { sermons: SERMONS, state: state, settings: { showDraftSermons: !!S.settings.showDraftSermons, sermonReminders: state.reminders, notificationStatus: sermonNotificationStatus() }, summary: SermonStudy.summary(state, SERMONS), view: V, downloadsProgress: sermonDownloadProgress, audioDownloadsSupported: !!(window.fetch && window.caches), online: !window.navigator || window.navigator.onLine !== false };
+  }
+  function sermonNotificationStatus() {
+    if (!window.Notification) return 'Browser notifications are not supported. In-app reminders appear only when you open the app.';
+    if (window.Notification.permission === 'denied') return 'Notifications are blocked by browser settings. In-app reminders still appear when you open the app.';
+    if (window.Notification.permission === 'granted') return 'Permission granted. This app currently provides in-app reminders on open; it does not send background notifications.';
+    return 'In-app reminders appear on open. Browser permission is optional and does not enable background reminders.';
+  }
+  function isSermonRoute(name) { return typeof name === 'string' && name.indexOf('sermons-') === 0; }
+  function sermonRoute(name, id, extra) { return Object.assign({ name: name, id: id || V.id || null }, extra || {}); }
+  function checkSermonReminders() {
+    if (!SermonStudy) return;
+    var state = sermonState();
+    if (!state.reminders.regularEnabled && !state.reminders.unfinishedEnabled) return;
+    var unfinished = Object.keys(state.progress).some(function (id) { return !!state.progress[id].unfinished; });
+    var due = SermonStudy.dueReminders(state.reminders, new Date(), unfinished);
+    if (!due.length) return;
+    V.reminder = due[0];
+    var dateKey = SermonStudy.localDateKey(new Date());
+    S.sermons = SermonStudy.markReminderShown(S.sermons, due[0], dateKey);
+    save();
   }
 
   /* ---------- storage ---------- */
@@ -536,7 +592,23 @@
     return '<span class="deck-topic">' + esc(title) + '</span>';
   }
 
-  var MAIN_TABS = ['home', 'journey', 'chapter', 'practice', 'progress', 'settings'];
+  var DISCIPLESHIP_TABS = ['home', 'journey', 'chapter', 'practice', 'progress', 'settings'];
+  var SERMONS_TABS = ['sermons-home', 'sermons-library', 'sermons-downloads', 'sermons-progress', 'settings'];
+  var MAIN_TABS = DISCIPLESHIP_TABS;
+
+  function renderExperienceToggle() {
+    var sermonActive = S.settings.experience === 'sermons';
+    return '<div class="experience-switch" role="group" aria-label="Choose experience">' +
+      '<button type="button" data-act="experience-switch" data-experience="discipleship" aria-pressed="' + (!sermonActive) + '"' + (!sermonActive ? ' class="active"' : '') + '>Discipleship</button>' +
+      '<button type="button" data-act="experience-switch" data-experience="sermons" aria-pressed="' + sermonActive + '"' + (sermonActive ? ' class="active"' : '') + '>Sermons</button>' +
+      '</div>';
+  }
+
+  function renderSermonMiniPlayer() {
+    var audioState = sermonState().audio, item = sermonRecord(audioState.sermonId);
+    if (!item || !item.audioUrl || V.name === 'sermons-player') return '';
+    return '<aside class="sermon-mini-player" aria-label="Sermon audio player"><div><strong>' + esc(item.title) + '</strong><span class="sermon-mini-time">' + Math.floor(audioState.currentTime || 0) + ' sec</span></div><audio class="sermon-audio" controls preload="none" aria-label="Sermon audio: ' + esc(item.title) + '" src="' + esc(item.audioUrl) + '" data-id="' + esc(item.id) + '"></audio><button class="btn sm ghost" data-act="sermon-open-player" data-id="' + esc(item.id) + '">Open player</button></aside>';
+  }
 
   function getStudyTimestamps() {
     var timestamps = [];
@@ -1300,7 +1372,8 @@
       '<h2 class="settings-group-title">About</h2>' +
       '<p class="meta">CCI Discipleship Quiz &amp; Study App · Offline PWA</p>' +
       '<p class="meta">Storage engine: ' + esc(storageBackend) + '</p>' +
-    '</div>';
+    '</div>' +
+    (SermonUI ? SermonUI.renderSettingsSection(sermonContext().settings) : '');
   };
   function bar() {
     if (!SEL.size) return '';
@@ -2170,18 +2243,59 @@
 
   /* ---------- render ---------- */
   function render(keep) {
-    var isMainTab = MAIN_TABS.indexOf(V.name) >= 0;
+    MAIN_TABS = S.settings.experience === 'sermons' ? SERMONS_TABS : DISCIPLESHIP_TABS;
+    var isSermon = isSermonRoute(V.name);
+    var isMainTab = MAIN_TABS.indexOf(V.name) >= 0 || isSermon;
     var hasDesktopSidebar = isMainTab || V.name === 'devotional';
-    var view = V.name === 'exam' ? views.quiz : views[V.name];
+    var view = isSermon && SermonUI ? function () { return SermonUI.render(V.name, sermonContext()); } : (V.name === 'exam' ? views.quiz : views[V.name]);
     if (typeof view !== 'function') view = views.home;
     var tabBarHtml = isMainTab ? renderTabBar(V.name) : '';
-    var showRocket = V.name === 'home' || V.name === 'journey';
+    var showRocket = S.settings.experience !== 'sermons' && (V.name === 'home' || V.name === 'journey');
     var rocketHtml = showRocket ? renderRocketFab() : '';
+    var reminderHtml = V.reminder && SermonUI ? SermonUI.renderReminder(sermonContext(), V.reminder) : '';
+    var miniPlayerHtml = S.settings.experience === 'sermons' ? renderSermonMiniPlayer() : '';
+    var priorAudio = app.querySelector('.sermon-audio');
+    var priorWasPlaying = false;
+    if (priorAudio) {
+      var priorState = sermonState();
+      if (priorAudio.dataset && priorState.audio.sermonId === priorAudio.dataset.id) {
+        priorState.audio.currentTime = Number(priorAudio.currentTime) || 0;
+        priorWasPlaying = !priorAudio.paused;
+        priorState.audio.playing = priorWasPlaying;
+        priorState.audio.playbackRate = Number(priorAudio.playbackRate) || 1;
+        S.sermons = priorState;
+      }
+      if (priorAudio.parentNode) priorAudio.parentNode.removeChild(priorAudio);
+    }
     app.innerHTML = banner() +
-      '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + '">' +
+      '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + (isSermon || (S.settings.experience === 'sermons' && V.name === 'settings') ? ' desktop-shell-sermons' : '') + '">' +
         (hasDesktopSidebar ? renderDesktopSidebar(V.name === 'devotional' ? 'home' : V.name) : '') +
-        '<main class="desktop-main">' + view() + tabBarHtml + rocketHtml + '</main>' +
+        '<main class="desktop-main">' + renderExperienceToggle() + reminderHtml + view() + miniPlayerHtml + tabBarHtml + rocketHtml + '</main>' +
       '</div>';
+    var activeAudio = Array.prototype.slice.call(app.querySelectorAll('.sermon-audio'))[0];
+    if (priorAudio && activeAudio && priorAudio.dataset.id === activeAudio.dataset.id && activeAudio.parentNode) {
+      activeAudio.parentNode.replaceChild(priorAudio, activeAudio);
+      activeAudio = priorAudio;
+      if (priorWasPlaying && activeAudio.paused && typeof activeAudio.play === 'function') activeAudio.play().catch(function () {});
+    } else if (priorAudio && !priorAudio.paused && typeof priorAudio.pause === 'function') priorAudio.pause();
+    if (activeAudio) {
+      var audioState = sermonState().audio;
+      if (audioState.sermonId === activeAudio.dataset.id) {
+        activeAudio.playbackRate = Number(audioState.playbackRate) || 1;
+        activeAudio.addEventListener('loadedmetadata', function () { if (audioState.currentTime > 0 && Number.isFinite(activeAudio.duration)) activeAudio.currentTime = Math.min(audioState.currentTime, activeAudio.duration); }, { once: true });
+      }
+      if (activeAudio.dataset.sermonEventsBound !== 'true') {
+        activeAudio.dataset.sermonEventsBound = 'true';
+        activeAudio.addEventListener('timeupdate', function () {
+          var state = sermonState(); if (state.audio.sermonId && state.audio.sermonId !== activeAudio.dataset.id) return; state.audio.sermonId = activeAudio.dataset.id; state.audio.currentTime = Number(activeAudio.currentTime) || 0; state.audio.playbackRate = Number(activeAudio.playbackRate) || 1; S.sermons = state;
+          var miniTime = app.querySelector('.sermon-mini-time'); if (miniTime) miniTime.textContent = Math.floor(state.audio.currentTime) + ' sec';
+          var bucket = Math.floor(state.audio.currentTime / 10); if (bucket !== lastAudioSaveBucket) { lastAudioSaveBucket = bucket; save(); }
+        });
+        activeAudio.addEventListener('play', function () { var state = sermonState(); state.audio.sermonId = activeAudio.dataset.id; state.audio.playing = true; S.sermons = state; save(); });
+        activeAudio.addEventListener('pause', function () { var state = sermonState(); if (state.audio.sermonId !== activeAudio.dataset.id) return; state.audio.playing = false; var position = Number(activeAudio.currentTime); if (Number.isFinite(position) && position >= 0) state.audio.currentTime = position; S.sermons = state; save(); });
+        activeAudio.addEventListener('ended', function () { var state = sermonState(); if (state.audio.sermonId !== activeAudio.dataset.id) return; state.audio.playing = false; state.audio.currentTime = 0; S.sermons = SermonStudy.recordMode(state, activeAudio.dataset.id, 'listen', Date.now()); save(); });
+      }
+    }
     if (!keep) window.scrollTo(0, 0);
     if (V.name === 'flash') {
       var f = app.querySelector('.flip');
@@ -2411,12 +2525,152 @@
     res.warnings.forEach(function (e) { IMP.warnings.push({ message: pre + e.message }); });
   }
 
+  function openSermonMode(id, mode) {
+    var item = sermonRecord(id);
+    if (!item) { toast('That sermon is not available in the catalogue.'); return; }
+    var progress = sermonState().progress[id];
+    if (!progress || !progress.coaching.completedAt) {
+      S.sermons = SermonStudy.startCoaching(S.sermons, id, Date.now());
+      save(); go(sermonRoute('sermons-coaching', id)); return;
+    }
+    var names = { listen: 'sermons-player', read: 'sermons-reader', quiz: 'sermons-quiz', flashcards: 'sermons-flashcards' };
+    if (!names[mode]) return;
+    var dataExists = mode === 'listen' ? !!item.audioUrl : mode === 'read' ? (item.sections || []).some(function (s) { return s && s.body; }) : mode === 'quiz' ? !!(item.quiz || []).length : !!(item.flashcards || []).length;
+    var route = names[mode], extra = mode === 'quiz' ? { quiz: { index: 0, answers: [] } } : mode === 'flashcards' ? { flash: { index: 0, flipped: false } } : {};
+    if (!dataExists) { go(sermonRoute(route, id, extra)); return; }
+    S.sermons = SermonStudy.startMode(S.sermons, id, mode, Date.now());
+    if (mode === 'listen') { var state = sermonState(); if (state.audio.sermonId !== id) state.audio.currentTime = 0; state.audio.sermonId = id; state.audio.playing = false; S.sermons = state; }
+    save(); go(sermonRoute(route, id, extra));
+  }
+  function answerSermonQuiz(choice) {
+    var item = sermonRecord(V.id), questions = item && Array.isArray(item.quiz) ? item.quiz : [], session = V.quiz;
+    if (!session || session.answers[session.index] || !questions[session.index]) return;
+    var q = questions[session.index], answer = q.answer;
+    if (typeof answer === 'string') answer = 'ABCD'.indexOf(answer.toUpperCase());
+    session.answers[session.index] = { choice: choice, correct: Number(answer) === choice, feedback: q.explanation || '' };
+    render(true);
+  }
+  function finishSermonQuiz() {
+    var item = sermonRecord(V.id), questions = item && item.quiz || [], session = V.quiz || { answers: [] };
+    var correct = session.answers.filter(function (answer) { return answer && answer.correct; }).length;
+    var score = questions.length ? Math.round(100 * correct / questions.length) : 0;
+    S.sermons = SermonStudy.recordQuiz(S.sermons, V.id, score, Date.now()); save();
+    go(sermonRoute('sermons-complete', V.id, { result: { score: score, correct: correct, total: questions.length, answers: session.answers.slice(), questions: questions } }));
+  }
+  function downloadSermonAudio(id, kind) {
+    var item = sermonRecord(id), url = item && (kind === 'coaching' ? item.coachingAudioUrl : item.audioUrl), downloadKey = id + ':' + kind;
+    if (!url) { toast('This audio is not available to download.'); return; }
+    if (sermonDownloadControllers[downloadKey]) { toast('A download is already in progress.'); return; }
+    var controller = typeof AbortController === 'function' ? new AbortController() : null;
+    sermonDownloadControllers[downloadKey] = controller || { abort: function () {} };
+    sermonDownloadProgress[id + ':' + kind] = { received: 0, total: 0, percent: null }; render(true);
+    SermonStudy.downloadAudio(url, { controller: controller, onProgress: function (p) {
+      sermonDownloadProgress[id + ':' + kind] = p;
+      var playerProgress = app.querySelector('.sermon-download-progress');
+      if (playerProgress && playerProgress.firstChild) playerProgress.firstChild.nodeValue = 'Downloading audio' + (p.percent == null ? '' : ' · ' + p.percent + '%') + ' ';
+      var listProgress = app.querySelector('.sermon-download-row p[role="status"]');
+      if (listProgress) listProgress.textContent = 'Download in progress' + (p.percent == null ? '' : ' · ' + p.percent + '%');
+    } }).then(function (result) {
+      var state = sermonState(), row = state.downloads[id] || { audio: false, coachingAudio: false, bytes: 0, updatedAt: null };
+      var byteKey = kind === 'coaching' ? 'coachingBytes' : 'audioBytes';
+      row[kind === 'coaching' ? 'coachingAudio' : 'audio'] = true; row[byteKey] = result.bytes; row.bytes = (Number(row.audioBytes) || 0) + (Number(row.coachingBytes) || 0); row.updatedAt = Date.now(); state.downloads[id] = row; S.sermons = state;
+      toast('Audio saved for offline use.');
+    }).catch(function (error) { toast(error && error.name === 'AbortError' ? 'Audio download canceled.' : (error.message || 'Audio download failed. Check your connection and storage.')); })
+      .finally(function () { delete sermonDownloadControllers[downloadKey]; delete sermonDownloadProgress[downloadKey]; save(); render(true); });
+  }
   /* ---------- events ---------- */
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-act]'); if (!t) return;
     var a = t.dataset.act, d;
     switch (a) {
       case 'home': closeModal(); go({ name: 'home' }); break;
+      case 'experience-switch':
+        if (t.dataset.experience === 'sermons' || t.dataset.experience === 'discipleship') {
+          S.settings.experience = t.dataset.experience; V.reminder = null; save();
+          go({ name: t.dataset.experience === 'sermons' ? 'sermons-home' : 'home' });
+        }
+        break;
+      case 'sermon-nav': S.settings.experience = 'sermons'; save(); go(sermonRoute(t.dataset.tab, t.dataset.id)); break;
+      case 'sermon-open': S.settings.experience = 'sermons'; save(); go(sermonRoute('sermons-detail', t.dataset.id)); break;
+      case 'sermon-back':
+        if (V.name === 'sermons-detail') go({ name: 'sermons-library' });
+        else if (V.name === 'sermons-coaching') go(sermonRoute('sermons-detail', V.id));
+        else if (V.name === 'sermons-complete') go(sermonRoute('sermons-detail', V.id));
+        else go(sermonRoute('sermons-detail', V.id));
+        break;
+      case 'sermon-open-player': go(sermonRoute('sermons-player', t.dataset.id)); break;
+      case 'sermon-reader-complete': S.sermons = SermonStudy.recordMode(S.sermons, V.id, 'read', Date.now()); save(); go(sermonRoute('sermons-detail', V.id)); break;
+      case 'sermon-action': openSermonMode(t.dataset.id, t.dataset.mode); break;
+      case 'sermon-open-quiz': openSermonMode(t.dataset.id, 'quiz'); break;
+      case 'sermon-open-coaching':
+        S.settings.experience = 'sermons';
+        if (!sermonState().progress[t.dataset.id] || !sermonState().progress[t.dataset.id].coaching.completedAt) S.sermons = SermonStudy.startCoaching(S.sermons, t.dataset.id, Date.now());
+        save(); go(sermonRoute('sermons-coaching', t.dataset.id)); break;
+      case 'sermon-coaching-continue':
+        S.sermons = SermonStudy.completeCoaching(S.sermons, t.dataset.id, Date.now()); save(); go(sermonRoute('sermons-detail', t.dataset.id)); break;
+      case 'sermon-answer': answerSermonQuiz(+t.dataset.index); break;
+      case 'sermon-quiz-next':
+        if (V.quiz && V.quiz.index + 1 < ((sermonRecord(V.id) || {}).quiz || []).length) { V.quiz.index++; render(true); }
+        else finishSermonQuiz();
+        break;
+      case 'sermon-review':
+        var reviewResult = V.result || {}, reviewRows = (reviewResult.questions || []).map(function (q, i) {
+          var answer = (reviewResult.answers || [])[i], chosen = answer && q.options && q.options[answer.choice];
+          var answerIndex = typeof q.answer === 'string' ? 'ABCD'.indexOf(q.answer.toUpperCase()) : Number(q.answer);
+          return '<li><strong>' + esc(q.question || 'Question') + '</strong><p>Your answer: ' + esc(chosen || 'No answer') + (answer && answer.correct ? ' · Correct' : ' · Not correct') + '</p><p>Correct answer: ' + esc(q.options && q.options[answerIndex] || '') + '</p></li>';
+        }).join('');
+        openModal('<div class="scrim" data-act="close"></div><section class="sheet sermon-review-dialog" role="dialog" aria-modal="true" aria-labelledby="sermon-review-title"><h2 id="sermon-review-title">Review answers</h2><ol>' + reviewRows + '</ol><button class="btn primary" data-act="close">Done</button></section>'); break;
+      case 'sermon-retry': openSermonMode(V.id, 'quiz'); break;
+      case 'sermon-flip': if (V.flash) { V.flash.flipped = !V.flash.flipped; render(true); } break;
+      case 'sermon-flash-step':
+        var flashItem = sermonRecord(V.id), flashCards = flashItem && flashItem.flashcards || [];
+        if (V.flash && flashCards.length) {
+          var nextCard = V.flash.index + (+t.dataset.dir || 0);
+          if (nextCard >= flashCards.length) { S.sermons = SermonStudy.recordMode(S.sermons, V.id, 'flashcards', Date.now()); save(); go(sermonRoute('sermons-detail', V.id)); }
+          else if (nextCard >= 0) { V.flash.index = nextCard; V.flash.flipped = false; render(true); }
+        }
+        break;
+      case 'sermon-resume':
+        var resumeProgress = sermonState().progress[t.dataset.id];
+        if (resumeProgress && !resumeProgress.coaching.completedAt) { S.settings.experience = 'sermons'; S.sermons = SermonStudy.startCoaching(S.sermons, t.dataset.id, Date.now()); save(); go(sermonRoute('sermons-coaching', t.dataset.id)); }
+        else if (resumeProgress && resumeProgress.lastMode && (resumeProgress.modes || {})[resumeProgress.lastMode]) { S.settings.experience = 'sermons'; save(); openSermonMode(t.dataset.id, resumeProgress.lastMode); }
+        else { S.settings.experience = 'sermons'; go(sermonRoute('sermons-detail', t.dataset.id)); }
+        break;
+      case 'sermon-reminder-open':
+        V.reminder = null;
+        if (t.dataset.kind === 'unfinished') {
+          var unfinishedId = Object.keys(sermonState().progress).filter(function (id) { return sermonState().progress[id].unfinished; })[0];
+          if (unfinishedId) { var unfinishedProgress = sermonState().progress[unfinishedId]; S.settings.experience = 'sermons'; if (!unfinishedProgress.coaching.completedAt) go(sermonRoute('sermons-coaching', unfinishedId)); else if (unfinishedProgress.lastMode) openSermonMode(unfinishedId, unfinishedProgress.lastMode); else go(sermonRoute('sermons-detail', unfinishedId)); }
+          else { S.settings.experience = 'sermons'; go({ name: 'sermons-home' }); }
+        } else { S.settings.experience = 'sermons'; go({ name: 'sermons-home' }); }
+        save(); break;
+      case 'sermon-reminder-dismiss':
+        V.reminder = null; S.sermons = SermonStudy.markReminderShown(S.sermons, t.dataset.kind, SermonStudy.localDateKey(new Date())); save(); render(true); break;
+      case 'sermon-setting-toggle':
+        var remState = sermonState();
+        if (t.dataset.key === 'showDraftSermons') S.settings.showDraftSermons = !S.settings.showDraftSermons;
+        else if (t.dataset.key === 'regularEnabled' || t.dataset.key === 'unfinishedEnabled') remState.reminders[t.dataset.key] = !remState.reminders[t.dataset.key];
+        S.sermons = remState; save(); render(true); break;
+      case 'sermon-notification-enable':
+        if (!window.Notification) toast('Browser notifications are not supported here. In-app reminders appear on open.');
+        else if (window.Notification.permission === 'denied') toast('Notifications are blocked in browser settings. In-app reminders remain available.');
+        else window.Notification.requestPermission().then(function () { render(true); toast(sermonNotificationStatus()); }).catch(function () { toast('Notification permission could not be requested.'); });
+        break;
+      case 'sermon-download': downloadSermonAudio(t.dataset.id, t.dataset.kind || 'audio'); break;
+      case 'sermon-download-cancel': if (sermonDownloadControllers[t.dataset.id + ':' + (t.dataset.kind || 'audio')]) sermonDownloadControllers[t.dataset.id + ':' + (t.dataset.kind || 'audio')].abort(); break;
+      case 'sermon-remove-download':
+        var removeItem = sermonRecord(t.dataset.id), removeKind = t.dataset.kind || 'audio';
+        var removeUrl = removeItem && (removeKind === 'coaching' ? removeItem.coachingAudioUrl : removeItem.audioUrl);
+        SermonStudy.removeAudio(removeUrl).then(function () {
+          var removeState = sermonState(), downloadRow = removeState.downloads[t.dataset.id];
+          if (downloadRow) { var byteKey = removeKind === 'coaching' ? 'coachingBytes' : 'audioBytes'; downloadRow[removeKind === 'coaching' ? 'coachingAudio' : 'audio'] = false; downloadRow[byteKey] = 0; downloadRow.bytes = (Number(downloadRow.audioBytes) || 0) + (Number(downloadRow.coachingBytes) || 0); downloadRow.updatedAt = Date.now(); S.sermons = removeState; save(); }
+          render(true); toast('Offline audio removed.');
+        }).catch(function () { toast('The offline file could not be removed.'); });
+        break;
+      case 'sermon-storage-refresh':
+        if (navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(function (estimate) { toast('Storage in use: ' + Math.round((estimate.usage || 0) / 1048576) + ' MB'); }).catch(function () { toast('Storage estimate is unavailable.'); });
+        else toast('Storage estimates are not supported by this browser.');
+        break;
       case 'open-chapter': go({ name: 'chapter', id: t.dataset.id }); break;
       case 'lesson-detail-open': openLessonDetailSheet(t.dataset.id); break;
       case 'lesson-detail-study':
@@ -2745,12 +2999,23 @@
     else if ('selall' in t.dataset) { SEL = t.checked ? new Set(S.decks.map(function (d) { return d.id; })) : new Set(); render(true); }
     else if ('rename' in t.dataset) { var d = deck(V.id), v = t.value.trim(); if (v) { d.title = v; save(); toast('Renamed'); } else t.value = d.title; }
     else if (t.id === 'files' && t.files.length) { IMP.text = ''; readFiles(t.files); }
+    else if (t.dataset.actChange === 'sermon-days') {
+      var reminderState = sermonState(); reminderState.reminders.days = Array.prototype.map.call(t.selectedOptions, function (option) { return +option.value; }); S.sermons = reminderState; save();
+    } else if (t.dataset.actChange === 'sermon-time') {
+      var timeState = sermonState(); timeState.reminders.time = t.value; S.sermons = timeState; save();
+    } else if (t.dataset.actChange === 'sermon-speed') {
+      var audio = app.querySelector('.sermon-audio'); if (audio) audio.playbackRate = Number(t.value) || 1;
+      var speedState = sermonState(); speedState.audio.playbackRate = Number(t.value) || 1; S.sermons = speedState; save();
+    }
   });
   document.addEventListener('submit', function (e) { e.preventDefault(); });
   document.addEventListener('input', function (e) {
     if (e.target.id === 'filter') {
       V.filter = e.target.value; var f = V.filter.toLowerCase();
       app.querySelectorAll('.crow').forEach(function (r) { r.hidden = !!f && r.dataset.text.indexOf(f) < 0; });
+    } else if (e.target.id === 'sermon-search') {
+      var sermonQuery = e.target.value.trim().toLowerCase();
+      app.querySelectorAll('.sermon-card[data-search]').forEach(function (card) { card.hidden = !!sermonQuery && card.dataset.search.indexOf(sermonQuery) < 0; });
     } else if (e.target.id === 'deck-search') {
       homeFilter = e.target.value.trim(); var q = homeFilter.toLowerCase(), visible = 0;
       app.querySelectorAll('.chapter-card[data-deck-name], .deck[data-deck-name]').forEach(function (r) {
@@ -2837,15 +3102,18 @@
   }
 
   function boot() {
-    return Promise.all([load(), loadStarterText(), loadDevotionals()]).then(function (results) {
+    return Promise.all([load(), loadStarterText(), loadDevotionals(), loadSermons()]).then(function (results) {
       var text = results[1];
       DEVOTIONALS = results[2] || [];
+      SERMONS = results[3] || [];
       STARTER_DECKS = P.parseDecks(text).decks;
-      var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION;
+      var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION - 1;
       var isFirstRun = !S.seeded && (!S.onboarding || !S.onboarding.completed);
       seed();
       if (reconcileStarters && syncStarterDecks()) save();
       return applyDataMigrations().then(function () {
+        S.sermons = SermonStudy.normalizeState(S.sermons);
+        S.sermons.audio.playing = false;
         if (S.pausedSession) {
           var restoredSession = MobileStudy.restore(S.pausedSession, S.decks);
           S.pausedSession = restoredSession ? MobileStudy.snapshot(restoredSession) : null;
@@ -2853,7 +3121,8 @@
         applyTheme();
         if (isFirstRun) {
           V = { name: 'onboarding', step: 0, answers: MobileStudy.defaultOnboarding(false) };
-        }
+        } else if (S.settings.experience === 'sermons' && V.name === 'home') V = { name: 'sermons-home' };
+        checkSermonReminders();
         render();
         registerServiceWorker();
         registerNativeNavigation();
