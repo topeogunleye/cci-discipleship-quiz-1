@@ -285,7 +285,7 @@ test('stored progress survives starter duplicate removal and renumbering', async
   const bible1 = migrated.decks.find(deck => deck.id === section7);
   const bible = migrated.decks.find(deck => deck.id === section8);
   const churchHistory = migrated.decks.find(deck => deck.id === section12);
-  assert.equal(migrated.dataVersion, 11);
+  assert.equal(migrated.dataVersion, 12);
   assert.ok(Number.isFinite(migrated.backupReminder.anchorAt));
   assert.equal(migrated.backupReminder.cardsStudied, 0);
   assert.ok(storageKeys.length > 0 && storageKeys.every(key => key === 'flashdecks.v1'));
@@ -313,6 +313,42 @@ test('stored progress survives starter duplicate removal and renumbering', async
   assert.equal(churchHistory.cards.find(card => card.id === `${section12}.q1`).explanation, sourceChurchHistory.questions[0].explanation);
   assert.equal(churchHistory.cards.find(card => card.id === `${section12}.q1`).ref, sourceChurchHistory.questions[0].ref);
   assert.equal(migrated.progress[section12].cards[`${section12}.q19`].box, 2);
+});
+
+test('duplicate starter-topic decks collapse into the canonical deck and keep matching progress', async () => {
+  const source = parsed.decks.find(deck => deck.title.endsWith('Predestination & Trinity'));
+  const canonicalId = 'd-' + source.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+  const duplicateId = 'd-imported-predestination-and-trinity';
+  const question = source.questions[0];
+  let stored = JSON.stringify({
+    decks: [
+      { id: canonicalId, title: source.title, cards: [] },
+      { id: duplicateId, title: 'Predestination and Trinity', cards: [{ id: `${duplicateId}.q1`, question: question.question, options: question.options, answer: question.answer }] }
+    ],
+    progress: { [duplicateId]: { best: { pct: 90 }, cards: { [`${duplicateId}.q1`]: { box: 3, attempts: 4 } } } },
+    settings: { theme: 'auto', shuffle: false },
+    seeded: true,
+    dataVersion: 11
+  });
+  const elements = {
+    app: { innerHTML: '', querySelectorAll: () => [], querySelector: () => null },
+    modal: { innerHTML: '' },
+    toast: { textContent: '', className: '' },
+    'starter-fallback': { textContent: JSON.stringify(starter) }
+  };
+  const document = { getElementById: id => elements[id], addEventListener: () => {}, documentElement: { removeAttribute: () => {}, setAttribute: () => {} } };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, SermonStudy, SermonUI, location: { protocol: 'file:' }, scrollTo: () => {} };
+  const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
+  vm.runInNewContext(testAppSource, { window, document, localStorage: { getItem: () => stored, setItem: (_, value) => { stored = value; } } });
+  await window.testAppReady;
+
+  const migrated = JSON.parse(stored);
+  const topicDecks = migrated.decks.filter(deck => /predestination and trinity/i.test(deck.title.replace(/&/g, 'and')));
+  assert.equal(topicDecks.length, 1);
+  assert.equal(topicDecks[0].id, canonicalId);
+  assert.deepEqual(migrated.progress[canonicalId].cards[`${canonicalId}.${question.id}`], { box: 3, attempts: 4 });
+  assert.equal(migrated.progress[canonicalId].best.pct, 90);
+  assert.equal(migrated.progress[duplicateId], undefined);
 });
 
 test('HTTP loads split decks with fetch and file URLs use the embedded fallback', async () => {
