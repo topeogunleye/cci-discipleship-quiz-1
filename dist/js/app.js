@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 11;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 12;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
   var S = { decks: [], progress: {}, sermons: SermonStudy ? SermonStudy.createState() : {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
   var STARTER_DECKS = [], DEVOTIONALS = [], SERMONS = [], sermonDownloadControllers = {};
@@ -421,6 +421,44 @@
       S.sermons = SermonStudy.normalizeState(S.sermons);
       if (S.settings.showDraftSermons === undefined) S.settings.showDraftSermons = false;
       if (S.settings.experience !== 'sermons') S.settings.experience = 'discipleship';
+    } },
+    { version: 12, run: function () {
+      function titleKey(title) {
+        var topic = MobileStudy.parseChapterTitle(title).topic;
+        return String(topic || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+      }
+      STARTER_DECKS.forEach(function (source) {
+        if (!source.questions.length) return;
+        var key = titleKey(source.title), canonicalId = 'd-' + slug(source.title), canonical = deck(canonicalId);
+        if (!canonical) {
+          addParsed(source, true);
+          canonical = deck(canonicalId);
+        }
+        if (!canonical) return;
+
+        var cardByQuestion = Object.create(null);
+        canonical.cards.forEach(function (card) {
+          cardByQuestion[String(card.question || '').toLowerCase().replace(/\s+/g, ' ').trim()] = card.id;
+        });
+        S.decks.slice().forEach(function (duplicate) {
+          if (duplicate.id === canonicalId || titleKey(duplicate.title) !== key) return;
+          var duplicateProgress = S.progress[duplicate.id], canonicalProgress = prog(canonicalId);
+          if (duplicateProgress && duplicateProgress.cards) {
+            duplicate.cards.forEach(function (card) {
+              var targetId = cardByQuestion[String(card.question || '').toLowerCase().replace(/\s+/g, ' ').trim()];
+              var record = duplicateProgress.cards[card.id];
+              if (targetId && record && !canonicalProgress.cards[targetId]) canonicalProgress.cards[targetId] = record;
+            });
+            var duplicatePct = duplicateProgress.best && Number(duplicateProgress.best.pct);
+            var canonicalPct = canonicalProgress.best && Number(canonicalProgress.best.pct);
+            if (Number.isFinite(duplicatePct) && (!Number.isFinite(canonicalPct) || duplicatePct > canonicalPct)) {
+              canonicalProgress.best = duplicateProgress.best;
+            }
+          }
+          S.decks = S.decks.filter(function (item) { return item.id !== duplicate.id; });
+          delete S.progress[duplicate.id];
+        });
+      });
     } }
   ];
   function applyDataMigrations() {
