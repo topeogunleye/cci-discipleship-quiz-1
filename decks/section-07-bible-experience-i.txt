@@ -8,7 +8,7 @@ D. Eloquence
 ANSWER: C
 EXPLANATION: The lesson prioritizes faithfulness in preserving doctrine and handing it on.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION III — [11:56]–[14:32] (approximate range)
-BIBLE: Also cited in lesson segment: 2 Timothy 2; Deuteronomy 4; Galatians 1
+BIBLE: Also cited in lesson segment: 2 Timothy 2:2–3; Deuteronomy 4; Galatians 1:8
 
 Q2. Final authority of Scripture means that the Word of God has:
 A. The last word on all matters of faith, doctrine and practice
@@ -64,7 +64,7 @@ D. The content of Scripture ultimately reflects God's intention through human au
 ANSWER: C
 EXPLANATION: The lesson explicitly says inspiration establishes God as the source of Scripture.
 REF: HAVING A BIBLICAL WORLDVIEW I — [09:00]–[10:11] (approximate range)
-BIBLE: Also cited in lesson segment: 2 Timothy 3:16, 17
+BIBLE: Confirmed in lesson and deck: 2 Timothy 3:16–17
 
 Q8. According to the lesson on Having a Biblical Worldview, what should happen when a believer discovers that an ideology they hold is wrong?
 A. The Word should straighten the ideology rather than the believer searching for a church that reinforces it.
@@ -151,7 +151,6 @@ D. The knowledge drives the believer toward worship and greater response to God
 ANSWER: D
 EXPLANATION: The lesson says correctly interpreted knowledge should lead to worship and a greater response to God.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION III — [16:44]–[20:09] (approximate range)
-BIBLE: Also cited in lesson segment: Ephesians 2:7
 
 Q17. What does "where the Spirit of the Lord is, there is liberty" mean in its immediate interpretive context?
 A. Freedom to express oneself physically during church services
@@ -161,7 +160,7 @@ D. Freedom from the authority of the Old Testament because the Spirit has replac
 ANSWER: B
 EXPLANATION: In context, liberty means the veil is removed so the writings’ meaning and God’s glory can be seen.
 REF: HERMENEUTICS (PART 2) I — [17:45]–[18:32] (approximate range)
-BIBLE: Also cited in lesson segment: 2 Corinthians 4
+BIBLE: Also cited in lesson segment: 2 Corinthians 3:14–18
 
 Q18. The lesson on hermeneutics uses the description of Christ as "the express image of his person" to emphasize that:
 A. Christ's teachings are more practical than those of the prophets
@@ -171,7 +170,7 @@ D. In Christ, we understand exactly who God is
 ANSWER: D
 EXPLANATION: The lesson says Christ reveals exactly who God is.
 REF: HERMENEUTICS (PART 1) II — [01:13]–[02:57] (approximate range)
-BIBLE: Also cited in lesson segment: 2 Corinthians 3; Hebrews 1
+BIBLE: Also cited in lesson segment: Hebrews 1:3
 
 Q19. Which pair correctly matches the biblical statement with the figure of speech identified in the hermeneutics lesson?
 A. "I am the door" - simile
@@ -191,7 +190,6 @@ D. Old Testament - Aramaic and Latin; New Testament - Hebrew and Koine Greek
 ANSWER: A
 EXPLANATION: The lesson identifies Hebrew and Aramaic for the Old Testament and Koine Greek for the New Testament.
 REF: HERMENEUTICS (PART 1) I — [05:26]–[06:27] (approximate range)
-BIBLE: Also cited in lesson segment: 2 Corinthians 1:13
 
 Q21. Stephen's description of his Jewish audience as "uncircumcised in the heart" is used in the lesson on hermeneutics to establish what distinction?
 A. Physical circumcision could exist without the spiritual reality it was intended to signify
@@ -201,7 +199,7 @@ D. Circumcision of the heart was exclusively a New Testament doctrine with no Ol
 ANSWER: A
 EXPLANATION: The lesson distinguishes physical circumcision from the spiritual reality of circumcision of the heart.
 REF: HERMENEUTICS (PART 2) II — [14:44]–[16:44] (approximate range)
-BIBLE: Also cited in lesson segment: Ephesians 2:11; Philippians 3:2; Acts 7:51; Hebrews 10:1; Hebrews 1:1, 1–3
+BIBLE: Also cited in lesson segment: Acts 7:51; Ephesians 2:11; Philippians 3:2
 
 Q22. Which interpretation does the lesson on Hermeneutics explicitly reject concerning the statement "the letter kills"?
 A. That "the letter" specifically refers to the law written on stones
@@ -221,7 +219,7 @@ D. Sundry times refers to Old Testament communication, while diverse manners ref
 ANSWER: C
 EXPLANATION: The lesson distinguishes communication given in many parts from communication delivered through different modes.
 REF: HERMENEUTICS (PART 1) II — [02:57]–[03:55]; HERMENEUTICS (PART 2) I — [01:46]–[02:44] (approximate ranges)
-BIBLE: Also cited in lesson segment: Matthew 1:20; John 3
+BIBLE: Also cited in lesson segment: Hebrews 1:1
 
 Q24. The instruction to read "per book, per chapter" is specifically intended to prevent the interpreter from:
 A. Relying on individual verses instead of the full counsel of Scripture
@@ -270,7 +268,7 @@ D. Scripture gives believers sufficient wisdom to make decisions without externa
 ANSWER: B
 EXPLANATION: The lesson uses the verse to describe Scripture as a guide for navigating life and ordering one’s steps.
 REF: HAVING A BIBLICAL WORLDVIEW I — [06:51]–[07:50] (approximate range)
-BIBLE: Also cited in lesson segment: 2 Timothy 3:16, 17
+BIBLE: Added from online research: Psalm 119:105 (https://www.esv.org/verses/Psalm%2B119%3A105/)
 
 Q29. Which combination best reflects the progression identified in Isaiah 53 within the lesson on hermeneutics?
 A. Christ's incarnation -> earthly ministry -> ascension -> enthronement
@@ -336,7 +334,6 @@ D. So they can decide which church traditions deserve equal weight with Scriptur
 ANSWER: A
 EXPLANATION: The speaker says to understand church history so that we will not set back the progress people made, since they died for the liberty believers have in Christ.
 REF: HAVING A BIBLICAL WORLDVIEW I — [03:38; 04:35]
-BIBLE: Also cited in lesson segment: John 4
 
 Q36. According to the lesson on the final authority of Scripture, what must be judged by the authority of the Scriptures?
 A. Only church traditions, since experiences are guided by the Holy Spirit
@@ -346,7 +343,6 @@ D. Doctrine and practice, but not claims of dreams and visions
 ANSWER: B
 EXPLANATION: The speaker states that every experience must be judged by the authority of Scripture, and that church traditions must be judged by it no matter how long they have been practiced.
 REF: HAVING A BIBLICAL WORLDVIEW I — [04:35]
-BIBLE: Also cited in lesson segment: John 4
 
 Q37. What point does the speaker make with the Samaritan woman's words, 'Our fathers worshipped on this mountain'?
 A. Jesus approved worship that had been handed down over centuries
@@ -469,7 +465,6 @@ D. Rebuke, in the sense of a sharp spoken warning
 ANSWER: B
 EXPLANATION: Using the lexicon, the speaker says people assume reproof means correction, but the Greek word actually means conviction and should be translated proof.
 REF: HAVING A BIBLICAL WORLDVIEW II — [05:30; 06:02]
-BIBLE: Added from online research: 2 Timothy 3:16 (https://www.blueletterbible.org/lexicon/g1882)
 
 Q50. When explaining God to atheists, which does the speaker call the ultimate evidence?
 A. The Bible
@@ -498,7 +493,6 @@ D. To straighten what is bent
 ANSWER: D
 EXPLANATION: The speaker says the Greek word used for correction means to straighten what is bent, illustrating it with setting a broken bone.
 REF: HAVING A BIBLICAL WORLDVIEW II — [08:18]
-BIBLE: Added from online research: 2 Timothy 3:16 (https://www.blueletterbible.org/lexicon/g1882)
 
 Q53. What does the speaker say is missing if the voice of the Holy Spirit is only ever 'pampering' you?
 A. Greater emphasis on the believer's feelings
@@ -602,7 +596,6 @@ D. The Bible ran the state, was in a rare language, and only priests could read 
 ANSWER: D
 EXPLANATION: The speaker explains that the Bible ran the state, was written in rare Latin, and only the priests could read it, making the priest very powerful.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION I — [09:26]
-BIBLE: Also cited in lesson segment: John 3:16; Galatians 3:11
 
 Q64. According to the speaker, what did paying money after a confession supposedly do?
 A. Secure a place in the priesthood
@@ -658,7 +651,6 @@ D. Everyone could interpret for themselves, so denominations kept multiplying
 ANSWER: D
 EXPLANATION: The speaker says religious freedom had blessings, but with everyone having Bibles everyone can have their own interpretation, so the movement kept splitting.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION I — [14:42]
-BIBLE: Also cited in lesson segment: 1 Peter 2:9
 
 Q70. What does the speaker's story of the man who read 1 Timothy 3:13 illustrate?
 A. A verse about deacons was correctly applied to a believer's schooling
@@ -678,7 +670,6 @@ D. Speaking in tongues should be limited to those in church leadership
 ANSWER: B
 EXPLANATION: The speaker uses the church example to show that even among people who believe in tongues there are different understandings, so Bible interpretation is important.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION I — [17:15]
-BIBLE: Also cited in lesson segment: 1 Timothy 3:13
 
 Q72. How does the speaker summarize the nature of the Scriptures as the first reason the Bible must be interpreted?
 A. The Bible is the word of God given without any human medium
@@ -761,7 +752,6 @@ D. It is the only version in which prayer is effective before God
 ANSWER: B
 EXPLANATION: The speaker says the KJV is simply how they talked at the time; there is nothing special about it, and praying that way does not make you more special.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION II — [10:39]
-BIBLE: Also cited in lesson segment: John 3:16
 
 Q81. How many Bible texts does the speaker say give the instruction to greet one another with a holy kiss?
 A. Four
@@ -771,7 +761,7 @@ D. Five
 ANSWER: A
 EXPLANATION: The speaker says the word of God says it four times and lists Romans 16:16, 1 Corinthians 16:20, 2 Corinthians 13:12 and 1 Thessalonians 5:26.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION II — [12:08]
-BIBLE: Confirmed in lesson and deck: Romans 16:16; 1 Corinthians 16:20; 2 Corinthians 13:12; 1 Thessalonians 5:26 | Also cited in lesson segment: 1 Corinthians 16:12
+BIBLE: Confirmed in lesson and deck: Romans 16:16; 1 Corinthians 16:20; 2 Corinthians 13:12; 1 Thessalonians 5:26
 
 Q82. What does the speaker say is the real interpretation of the instruction to greet with a holy kiss?
 A. To signal forgiveness between believers who had quarreled
@@ -781,7 +771,7 @@ D. To mark church members as belonging to one spiritual family
 ANSWER: B
 EXPLANATION: The speaker says the real interpretation is for you to be cordial; this was the way they showed cordiality in their day.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION II — [13:14]
-BIBLE: Also cited in lesson segment: Romans 16:16; 1 Corinthians 16:20; 2 Corinthians 13:12; 1 Thessalonians 5:26; 1 Corinthians 16:12
+BIBLE: Added from online research: Romans 16:16 (https://www.biblegateway.com/passage/?search=Romans%2016:16&version=ESV); 1 Corinthians 16:20 (https://www.biblegateway.com/passage/?search=1%20Corinthians%2016:20&version=ESV); 2 Corinthians 13:12 (https://www.biblegateway.com/passage/?search=2%20Corinthians%2013:12&version=ESV); 1 Thessalonians 5:26 (https://www.biblegateway.com/passage/?search=1%20Thessalonians%205:26&version=ESV)
 
 Q83. What does the speaker say Paul is doing when he says 'Judge in yourselves' in 1 Corinthians 11:13?
 A. Leaving the matter to each believer's private conscience before God
@@ -820,7 +810,6 @@ D. Dressing modestly for worship
 ANSWER: C
 EXPLANATION: The speaker says he believes the veil is a little akin to what rings are today.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION III — [00:17]
-BIBLE: Added from online research: 1 Corinthians 11:5 (https://www.esv.org/verses/1+Corinthians+11:5/)
 
 Q87. What does the speaker conclude about the veil from the question, 'What if she is single?'
 A. The veil applied only to married women in the Corinthian church
@@ -839,7 +828,7 @@ D. The church, not her husband
 ANSWER: A
 EXPLANATION: The speaker says the dishonor in verse 5 is between her and her head, not her and God, and was something customary at the time.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION III — [04:50]
-BIBLE: Added from online research: 1 Corinthians 11:5 (https://www.esv.org/verses/1+Corinthians+11:5/)
+BIBLE: Added from online research: 1 Corinthians 11:5 (https://www.esv.org/verses/1+Corinthians+11%3A5/)
 
 Q89. What do historians say, according to the speaker, about women who did not cover their hair in that day?
 A. They were foreigners living in the city
@@ -869,7 +858,6 @@ D. A matter of private conscience that the Spirit settles for each person
 ANSWER: C
 EXPLANATION: The speaker says this is not one of the core doctrines of Christianity, so it is not something to fight over.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION III — [08:31]
-BIBLE: Also cited in lesson segment: 2 Timothy 2:15
 
 Q92. What does the speaker say about the absence of a marking scheme for preaching?
 A. No human marking scheme exists, but God has a minimum standard
@@ -879,7 +867,6 @@ D. God leaves the standard of preaching to each church's own culture
 ANSWER: A
 EXPLANATION: The speaker says nobody may have the nerve to grade a sermon and there is no marking scheme that we know of, but God has one.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION III — [09:48]
-BIBLE: Also cited in lesson segment: 2 Timothy 2:15
 
 Q93. What does the speaker say the Greek word translated 'workman' in 2 Timothy 2:15 implies?
 A. The preacher should be formally recognized by the church
@@ -957,7 +944,6 @@ D. The method of preaching from a single verse
 ANSWER: C
 EXPLANATION: The speaker says hermeneutics is simply the act or the art of Bible interpretation.
 REF: HERMENEUTICS (PART 1) I — [00:17]
-BIBLE: Also cited in lesson segment: Ephesians 3:1
 
 Q101. How does the speaker explain the word 'dispensation' in Ephesians 3:2?
 A. Think of a treasury, something by which wealth is kept
@@ -1005,7 +991,6 @@ D. Figures of speech, language, culture
 ANSWER: B
 EXPLANATION: The speaker says number one is language, the second thing is that the Bible is replete with figures of speech, and the third barrier is culture.
 REF: HERMENEUTICS (PART 1) I — [05:26; 08:32; 12:45]
-BIBLE: Also cited in lesson segment: 2 Corinthians 1:13; John 15:5; John 12; John 21:25; Romans 16:16
 
 Q106. What does the speaker say can easily and cheaply correct language barriers?
 A. Reading only the King James Version
@@ -1024,7 +1009,7 @@ D. Instruction
 ANSWER: A
 EXPLANATION: The speaker says the text simply meant association, because that was how communication was understood in that day.
 REF: HERMENEUTICS (PART 1) I — [08:32]
-BIBLE: Added from online research: Joshua 10:12–14 (https://www.biblegateway.com/passage/?search=Joshua%2010:12-14&version=ESV)
+BIBLE: Added from online research: 1 Corinthians 15:33 (https://www.esv.org/1+Corinthians+15%3A33/)
 
 Q108. What does the speaker say Jesus means by 'I am the door' in John 10:9?
 A. Jesus is the guardian who watches over the sheepfold
@@ -1034,7 +1019,7 @@ D. He is the way of access to eternal life and salvation
 ANSWER: D
 EXPLANATION: The speaker calls it a metaphor and says there is no revelation about a wooden door; it means that by Him you have access to eternal life and salvation.
 REF: HERMENEUTICS (PART 1) I — [10:36]
-BIBLE: Confirmed in lesson and deck: John 10:9 | Also cited in lesson segment: 2 Corinthians 11:16; Matthew 10:16
+BIBLE: Confirmed in lesson and deck: John 10:9
 
 Q109. How does the speaker explain Jesus's saying about hating father and mother as hyperbole?
 A. Jesus meant that relatives who oppose the gospel must be avoided
@@ -1044,7 +1029,7 @@ D. You must love the Lord so much that other love looks like hatred by compariso
 ANSWER: D
 EXPLANATION: The speaker defines hyperbole as extravagant words to drive home a point and says love for others should seem like hatred compared with love for the Lord.
 REF: HERMENEUTICS (PART 1) I — [11:33]
-BIBLE: Also cited in lesson segment: John 10:9; John 15:5; John 12; John 21:25
+BIBLE: Added from online research: Luke 14:26 (https://www.esv.org/Luke+14%3A26/)
 
 Q110. What point does the speaker make with the example of a husband traveling without his wedding ring?
 A. A ring can express biblical love and accountability, though it is not commanded
@@ -1054,7 +1039,6 @@ D. A husband who does not wear a ring should be disciplined by the church
 ANSWER: A
 EXPLANATION: The speaker says the Bible did not tell husbands and wives to wear rings, but love and accountability can be expressed using a ring in our culture.
 REF: HERMENEUTICS (PART 1) I — [14:52; 15:57]
-BIBLE: Also cited in lesson segment: Romans 16:16; 1 Corinthians 16:21; 1 Corinthians 2
 
 Q111. What does the speaker's Christmas presents analogy picture?
 A. Old Testament blessings were given only to the children of Israel
@@ -1084,7 +1068,7 @@ D. It teaches that speaking in tongues is the primary sign of the Spirit
 ANSWER: A
 EXPLANATION: The speaker says Peter pointed the crowd to Joel's prophecy, which is how New Testament teaching brings to light things foreordained in the Old Testament.
 REF: HERMENEUTICS (PART 1) I — [19:44; 20:41]
-BIBLE: Also cited in lesson segment: Ephesians 3
+BIBLE: Added from online research: Acts 2:16–21 (https://www.esv.org/verses/Acts%2B2%3A16%E2%80%9321/)
 
 Q114. What does the speaker conclude from 'God, who at sundry times and in divers manners spoke... by the prophets' about Old Testament communication?
 A. It was incomplete in doctrine
@@ -1094,7 +1078,6 @@ D. It was addressed only to the prophets
 ANSWER: C
 EXPLANATION: The speaker says the phrase means the communication of God in the Old Testament was veiled, while in Christ we understand exactly who God is.
 REF: HERMENEUTICS (PART 1) II — [01:13]
-BIBLE: Also cited in lesson segment: 2 Corinthians 3; Hebrews 1
 
 Q115. Which Greek word does the speaker give for 'sundry times', meaning 'in many different parts'?
 A. Apocalypsis
@@ -1133,7 +1116,7 @@ D. Hosea and Malachi
 ANSWER: A
 EXPLANATION: The speaker traces 'out of Egypt I have called my son' to Hosea 11:1 and the weeping of Rachel to Jeremiah 31:15.
 REF: HERMENEUTICS (PART 1) II — [09:08; 10:02]
-BIBLE: Confirmed in lesson and deck: Matthew 2:13; Hosea 11:1; Jeremiah 31:15 | Also cited in lesson segment: Micah 5:2; Isaiah 7:14
+BIBLE: Confirmed in lesson and deck: Matthew 2:13; Hosea 11:1; Matthew 2:17–18; Jeremiah 31:15
 
 Q119. According to the speaker, what was the book of Matthew written for?
 A. To record the events of Jesus's life for the very first time
@@ -1172,7 +1155,7 @@ D. Zechariah 9:9
 ANSWER: D
 EXPLANATION: In his list of prophecies, the speaker gives Zechariah 9:9 for riding into Jerusalem on a donkey.
 REF: HERMENEUTICS (PART 1) II — [15:07]
-BIBLE: Confirmed in lesson and deck: Zechariah 9:9 | Also cited in lesson segment: Malachi 3:1; Isaiah 43; Isaiah 35:5, 6; Psalm 41:9
+BIBLE: Confirmed in lesson and deck: Zechariah 9:9
 
 Q123. Which reference does the speaker give for the betraying friend who will be paid 30 pieces of silver?
 A. Zechariah 9:9
@@ -1182,7 +1165,7 @@ D. Psalm 22:16
 ANSWER: B
 EXPLANATION: The speaker lists the betraying friend paying 30 pieces of silver at Zechariah 11:12-13.
 REF: HERMENEUTICS (PART 1) II — [16:30]
-BIBLE: Confirmed in lesson and deck: Zechariah 11:12–13 | Also cited in lesson segment: Malachi 3:1; Isaiah 43; Isaiah 35:5, 6; Zechariah 9:9; Psalm 41:9; Isaiah 50:6; Isaiah 56; Psalm 28:19; Isaiah 53:7; Psalm 22:16
+BIBLE: Confirmed in lesson and deck: Zechariah 11:12–13
 
 Q124. Why does the speaker call the prophecy of crucifixion phenomenal?
 A. Crucifixion did not yet exist as a form of execution at that time
@@ -1192,7 +1175,6 @@ D. It was fulfilled at the very place where it had been spoken
 ANSWER: A
 EXPLANATION: The speaker says it was phenomenal because at the time it was prophesied, crucifixion did not even exist as a mode of execution.
 REF: HERMENEUTICS (PART 1) II — [16:30]
-BIBLE: Also cited in lesson segment: Malachi 3:1; Isaiah 43; Isaiah 35:5, 6; Zechariah 9:9; Psalm 41:9; Zechariah 11; Isaiah 50:6; Isaiah 56; Psalm 28:19; Isaiah 53:7; Psalm 22:16
 
 Q125. Which prophecy does the speaker connect with the two thieves crucified beside Jesus?
 A. He will not defend himself (Isaiah 53:7)
@@ -1202,7 +1184,7 @@ D. He will be crucified with sinners (Isaiah 53:12)
 ANSWER: D
 EXPLANATION: The speaker says 'crucified with sinners' is how the two thieves came to be by His side, citing Isaiah 53:12.
 REF: HERMENEUTICS (PART 1) II — [18:09]
-BIBLE: Confirmed in lesson and deck: Isaiah 53:12 | Also cited in lesson segment: Zechariah 11; Isaiah 50:6; Isaiah 56; Psalm 28:19; Isaiah 53:7; Psalm 22:16; Psalm 34:20; Psalm 22:11; Isaiah 53:8; Isaiah 53:9; Psalm 16:10; Psalm 68:18; Psalm 110:1
+BIBLE: Confirmed in lesson and deck: Isaiah 53:12
 
 Q126. Which sequence correctly pairs the references the speaker gives for the resurrection, the ascension and sitting at the right hand of God?
 A. Psalm 110:1; Psalm 68:18; Psalm 16:10
@@ -1212,7 +1194,7 @@ D. Psalm 68:18; Psalm 16:10; Psalm 110:1
 ANSWER: B
 EXPLANATION: The speaker gives Psalm 16:10 for the resurrection, Psalm 68:18 for the ascension, and Psalm 110:1 for sitting at the right hand of God.
 REF: HERMENEUTICS (PART 1) II — [18:09]
-BIBLE: Confirmed in lesson and deck: Psalm 16:10; Psalm 68:18; Psalm 110:1 | Also cited in lesson segment: Zechariah 11; Isaiah 50:6; Isaiah 56; Psalm 28:19; Isaiah 53:7; Psalm 22:16; Isaiah 53:12; Psalm 34:20; Psalm 22:11; Isaiah 53:8; Isaiah 53:9
+BIBLE: Confirmed in lesson and deck: Psalm 16:10; Psalm 68:18; Psalm 110:1
 
 Q127. What does the speaker say about the Old Testament's communication not being 'exact' in Christ's comparison?
 A. It means it was meant only for a past generation
@@ -1261,7 +1243,7 @@ D. Poetic passages that carry no doctrinal meaning at all
 ANSWER: C
 EXPLANATION: The speaker says the New Testament unpacks what theologians call types and shadows, symbolisms in the Old Testament.
 REF: HERMENEUTICS (PART 2) I — [05:36]
-BIBLE: Also cited in lesson segment: John 3; 2 Corinthians 3
+BIBLE: Also cited in lesson segment: John 3; 2 Corinthians 3 | Added from online research: Hebrews 10:1 (https://www.esv.org/verses/Hebrews%2B10%3A1/)
 
 Q132. What did the fading of the glory on Moses's face symbolize, according to the speaker?
 A. That Moses had failed to remain faithful to God's commands
@@ -1271,7 +1253,6 @@ D. That the Old Testament's glory would be done away for something better
 ANSWER: D
 EXPLANATION: The speaker says the glory on Moses's face diminished, symbolizing that the Old Testament's glory would be done away and something better was coming.
 REF: HERMENEUTICS (PART 2) I — [08:04]
-BIBLE: Also cited in lesson segment: John 6
 
 Q133. What does the speaker infer from Paul's words, 'we use plainness of speech, not as Moses'?
 A. Moses was unable to speak clearly in front of the people
@@ -1479,7 +1460,7 @@ D. The rebuilding of the temple after the long exile in Babylon
 ANSWER: A
 EXPLANATION: The speaker cites Ezekiel 36:26 for the real circumcision, where God takes away the stony heart and puts His Spirit in us, so sinful propensity is removed by His Spirit.
 REF: HERMENEUTICS (PART 2) II — [12:41; 13:38]
-BIBLE: Confirmed in lesson and deck: Ezekiel 36:26 | Also cited in lesson segment: Colossians 2:11; Ephesians 2:11
+BIBLE: Confirmed in lesson and deck: Ezekiel 36:26; Colossians 2:11
 
 Q154. Whom does the speaker say Paul warns against in Philippians 3:2 with 'beware of the concision'?
 A. Teachers who deny the bodily resurrection of Christ
@@ -1489,7 +1470,7 @@ D. Those who still want to cut the flesh after the real circumcision
 ANSWER: D
 EXPLANATION: The speaker reads 'beware of the concision' as beware of people who still want to slit your flesh when the real circumcision is available by faith in Christ.
 REF: HERMENEUTICS (PART 2) II — [14:44]
-BIBLE: Confirmed in lesson and deck: Philippians 3:2 | Also cited in lesson segment: Ephesians 2:11; Acts 7:51
+BIBLE: Confirmed in lesson and deck: Philippians 3:2
 
 Q155. What does the speaker say proves that Old Testament sacrifices were a type and shadow (Hebrews 10:1)?
 A. They were eventually replaced by regular temple services and feasts
@@ -1499,7 +1480,7 @@ D. They were offered only by the priests of Israel at the temple
 ANSWER: B
 EXPLANATION: The speaker says the proof that they were a type and shadow was that they had to do it every year; if it was efficacious enough, one would be enough.
 REF: HERMENEUTICS (PART 2) II — [16:44]
-BIBLE: Confirmed in lesson and deck: Hebrews 10:1 | Also cited in lesson segment: Acts 7; Hebrews 1:1, 1–3
+BIBLE: Confirmed in lesson and deck: Hebrews 10:1
 
 Q156. What criterion does the speaker give for identifying a type in the Old Testament?
 A. It must resemble the life and ministry of Christ closely
@@ -1509,4 +1490,3 @@ D. It must have been explained as a type by the later prophets
 ANSWER: C
 EXPLANATION: In the assignment, the speaker says you are not making it up; it must have been clearly identified as a type in the New Testament.
 REF: HERMENEUTICS (PART 2) II — [18:31]
-BIBLE: Also cited in lesson segment: John 1:29
