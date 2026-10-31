@@ -13,7 +13,8 @@
     "android:open": "cap open android",
     "ios:open": "cap open ios",
     "test": "node --test",
-    "dev": "npm run build:bridge && python3 -m http.server 8000"
+    "dev": "npm run build:bridge && python3 -m http.server 8000",
+    "validate:sermons": "node scripts/validate-sermons.js"
   },
   "dependencies": {
     "@capacitor/android": "8.4.3",
