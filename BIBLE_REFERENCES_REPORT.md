@@ -2,11 +2,11 @@
 
 ## Scope and result
 
-Reviewed all **1,426 Q-numbered entries** in the 12 canonical study decks listed in `decks/manifest.json`. This includes 1,420 complete question cards and six placeholder records (Section 12 Q35–Q40) whose question content and transcripts are missing. For each question, the review considered its wording, correct answer, explanation, `REF:` timestamp, corresponding available transcript passage, and any existing `BIBLE:` field. Existing references were checked for direct relevance, not just whether the passage happened to be mentioned nearby.
+Reviewed every question in the 12 canonical study decks listed in `decks/manifest.json`: **1,420 complete question cards**. For each question, the review considered its wording, correct answer, explanation, `REF:` timestamp, corresponding available transcript passage, and any existing `BIBLE:` field. Existing references were checked for direct relevance, not just whether the passage happened to be mentioned nearby.
 
-The review retained **791** `BIBLE:` fields and left **635** entries without one: 629 complete questions plus the six transcript-dependent placeholders. The fields currently comprise 322 marked `Confirmed in lesson and deck`, 210 marked `Also cited in lesson segment`, and 259 marked `Added from online research`. Each researched field includes at least one source URL.
+The review retained **791** `BIBLE:` fields and left **629** questions unresolved without one. The fields currently comprise 322 marked `Confirmed in lesson and deck`, 210 marked `Also cited in lesson segment`, and 259 marked `Added from online research`. Each researched field includes at least one source URL.
 
-Compared with the PR branch’s starting point, the review added 5 fields to previously blank questions, removed 178 fields whose references did not directly support the specific answer, and revised 216 existing fields. Question IDs, question and answer wording, explanations, and `REF:` fields are unchanged.
+Compared with the PR branch’s starting point, the review added 5 fields to previously blank questions, removed 178 fields whose references did not directly support the specific answer, and revised 216 existing fields. All remaining question IDs, wording, answer choices, correct answers, explanations, and `REF:` fields are unchanged. The six placeholder records Q35–Q40 in Section 12 were removed because their source transcripts are missing.
 
 ## Review method
 
@@ -24,7 +24,7 @@ Compared with the PR branch’s starting point, the review added 5 fields to pre
 
 ## Current coverage
 
-| Canonical deck | Q-numbered entries | Confirmed in lesson and deck | Also cited in lesson segment | Researched | Without BIBLE |
+| Canonical deck | Questions | Confirmed in lesson and deck | Also cited in lesson segment | Researched | Without BIBLE |
 |---|---:|---:|---:|---:|
 | section-01-soteriology.txt | 91 | 24 | 21 | 25 | 21 |
 | section-02-soteriology-ii.txt | 93 | 29 | 30 | 24 | 10 |
@@ -37,8 +37,8 @@ Compared with the PR branch’s starting point, the review added 5 fields to pre
 | section-09-evangelism.txt | 241 | 18 | 15 | 50 | 158 |
 | section-10-apologetics.txt | 90 | 23 | 14 | 6 | 47 |
 | section-11-believers-authority-charisma.txt | 100 | 21 | 17 | 4 | 58 |
-| section-12-church-history.txt | 100 | 20 | 1 | 6 | 73 |
-| **Total** | **1426** | **322** | **210** | **259** | **635** |
+| section-12-church-history.txt | 94 | 20 | 1 | 6 | 67 |
+| **Total** | **1420** | **322** | **210** | **259** | **629** |
 
 ## References removed as unsupported or indirect
 
@@ -377,14 +377,13 @@ The list below is generated from the current canonical decks. Every ID with no `
 | section-11-believers-authority-charisma.txt | Q14, Q20, Q25, Q40, Q43, Q46, Q52, Q53, Q55, Q56, Q62, Q71, Q75 | The prior field recorded a passage mentioned in the timestamp window, but question-level review found it incidental or insufficient to directly support this answer; the field was removed. |
 | section-11-believers-authority-charisma.txt | Q33 | The claim that believers’ presence prevents total demonic destruction of the earth is a speculative theological application; no directly supporting passage was verified. |
 | section-12-church-history.txt | Q1, Q8, Q10, Q12, Q13, Q14, Q15, Q22, Q23, Q24, Q26, Q27, Q29, Q33, Q34, Q41, Q42, Q43, Q45, Q46, Q47, Q48, Q50, Q51, Q53, Q55, Q56, Q58, Q60, Q64, Q68, Q69, Q70, Q74, Q75, Q76, Q77, Q78, Q80, Q81, Q82, Q83, Q84, Q85, Q86, Q88, Q89, Q95, Q96, Q97, Q98, Q100 | These are historical or denominational claims, or theological interpretations not settled by one direct passage; no sufficiently direct verse was verified. |
-| section-12-church-history.txt | Q35, Q36, Q37, Q38, Q39, Q40 | These are placeholders for questions whose source transcripts are missing; there is no question claim or transcript passage to verify, so no Bible reference can be assigned. |
 | section-12-church-history.txt | Q2, Q4, Q9, Q17, Q20, Q25 | These questions have no usable REF or matching lesson transcript. They ask historical/doctrinal descriptions, and no direct passage is provided in the question text. |
 | section-12-church-history.txt | Q5, Q6, Q21, Q49, Q59, Q62, Q65, Q72, Q79 | The prior field recorded a passage mentioned in the timestamp window, but question-level review found it incidental or insufficient to directly support this answer; the field was removed. |
 
 ## Verification
 
-- Every manifest-listed question was matched to its PR-baseline ID and metadata. A normalized comparison found **no changes** to question wording, answer choices, correct answers, explanations, IDs, or `REF:` fields.
-- Current counts were derived directly from the canonical deck files: **1,426 Q-numbered entries; 1,420 complete cards (791 with `BIBLE:`, 629 without) and six placeholders without question content or transcripts**.
+- Every remaining question was matched to its PR-baseline ID and metadata. The six placeholder IDs Q35–Q40 in Section 12 were intentionally deleted; no other question ID or metadata was changed.
+- Current counts were derived directly from the canonical deck files: **1,420 questions; 791 with `BIBLE:` and 629 without**.
 - `npm run build` completed, rebuilding the offline web bundle and all 12 generated deck copies under `dist/decks`.
 - `npm test` completed: **88 passed, 0 failed, 2 pre-existing TODO checks**. The TODO checks are answer-letter distribution and longest-option answer bias; neither is related to Bible-reference fields.
 - The deck parser tests passed, including starter-deck parsing, export/import round-trip, and `BIBLE:` format/source-link validation.
