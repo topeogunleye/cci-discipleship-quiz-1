@@ -10,6 +10,8 @@ const parser = require(path.join(root, 'js', 'parser.js'));
 const StudyLogic = require(path.join(root, 'js', 'study.js'));
 const StudyStorage = require(path.join(root, 'js', 'storage.js'));
 const MobileStudy = require(path.join(root, 'js', 'mobile-study.js'));
+const SermonStudy = require(path.join(root, 'js', 'sermons.js'));
+const SermonUI = require(path.join(root, 'js', 'sermons-ui.js'));
 const appSource = fs.readFileSync(path.join(root, 'js', 'app.js'), 'utf8');
 const deckFiles = JSON.parse(fs.readFileSync(path.join(root, 'decks', 'manifest.json'), 'utf8'));
 const starter = deckFiles.map(file => fs.readFileSync(path.join(root, 'decks', file), 'utf8')).join('\n\n');
@@ -255,7 +257,7 @@ test('stored progress survives starter duplicate removal and renumbering', async
   let stored = JSON.stringify(saved);
   const storageKeys = [];
   const elements = {
-    app: { innerHTML: '', querySelectorAll: () => [] },
+    app: { innerHTML: '', querySelectorAll: () => [], querySelector: () => null },
     modal: { innerHTML: '' },
     toast: { textContent: '', className: '' },
     'starter-fallback': { textContent: JSON.stringify(starter) }
@@ -265,7 +267,7 @@ test('stored progress survives starter duplicate removal and renumbering', async
     addEventListener: () => {},
     documentElement: { removeAttribute: () => {}, setAttribute: () => {} }
   };
-  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, location: { protocol: 'file:' }, scrollTo: () => {} };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, SermonStudy, SermonUI, location: { protocol: 'file:' }, scrollTo: () => {} };
   const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
   vm.runInNewContext(testAppSource, {
     window,
@@ -283,7 +285,7 @@ test('stored progress survives starter duplicate removal and renumbering', async
   const bible1 = migrated.decks.find(deck => deck.id === section7);
   const bible = migrated.decks.find(deck => deck.id === section8);
   const churchHistory = migrated.decks.find(deck => deck.id === section12);
-  assert.equal(migrated.dataVersion, 10);
+  assert.equal(migrated.dataVersion, 11);
   assert.ok(Number.isFinite(migrated.backupReminder.anchorAt));
   assert.equal(migrated.backupReminder.cardsStudied, 0);
   assert.ok(storageKeys.length > 0 && storageKeys.every(key => key === 'flashdecks.v1'));
@@ -318,7 +320,7 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
     let stored = initialRaw;
     const registrations = [];
     const elements = {
-      app: { innerHTML: '', querySelectorAll: () => [] },
+      app: { innerHTML: '', querySelectorAll: () => [], querySelector: () => null },
       modal: { innerHTML: '' },
       toast: { textContent: '', className: '' },
       'starter-fallback': { textContent: JSON.stringify(fallbackText) }
@@ -330,7 +332,7 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
     };
     const registration = { waiting: null, installing: null, addEventListener: () => {} };
     const serviceWorker = { controller: null, register: file => { registrations.push(file); return Promise.resolve(registration); }, addEventListener: () => {} };
-    const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, navigator: { serviceWorker }, location: { protocol }, fetch, scrollTo: () => {} };
+    const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, SermonStudy, SermonUI, navigator: { serviceWorker }, location: { protocol }, fetch, scrollTo: () => {} };
     const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
     vm.runInNewContext(testAppSource, {
       window,
@@ -345,11 +347,12 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
   const httpResult = await boot('http:', url => {
     fetched.push(url);
     if (url === 'decks/manifest.json') return Promise.resolve({ ok: true, json: () => Promise.resolve(deckFiles) });
+    if (url === 'content/sermons.json') return Promise.resolve({ ok: true, json: () => Promise.resolve({ schemaVersion: 1, sermons: [] }) });
     return Promise.resolve({ ok: true, text: () => Promise.resolve(fs.readFileSync(path.join(root, url), 'utf8')) });
   }, '');
   const httpState = httpResult.state;
   assert.deepEqual(httpResult.registrations, ['service-worker.js']);
-  assert.deepEqual(fetched, ['decks/manifest.json', ...deckFiles.map(file => `decks/${file}`)]);
+  assert.deepEqual(fetched, ['decks/manifest.json', 'content/sermons.json', ...deckFiles.map(file => `decks/${file}`)]);
   const expectedDeckCount = parsed.decks.length;
   const expectedCardCount = parsed.decks.reduce((count, deck) => count + deck.questions.length, 0);
   assert.equal(httpState.decks.length, expectedDeckCount);
@@ -384,13 +387,15 @@ test('main tabs and Devotion keep desktop navigation while study sessions use th
     StudyLogic,
     StudyStorage,
     MobileStudy,
+    SermonStudy,
+    SermonUI,
     location: { protocol: 'file:' },
     scrollTo: () => {},
     addEventListener: () => {}
   };
   const testAppSource = appSource.replace(
     '  boot();',
-    '  window.shellTestApi = { render: render, setView: function (view) { V = view; } }; window.testAppReady = boot();'
+    '  window.shellTestApi = { render: render, setView: function (view) { V = view; }, setExperience: function (experience) { S.settings.experience = experience; } }; window.testAppReady = boot();'
   );
   vm.runInNewContext(testAppSource, {
     window,
@@ -419,6 +424,18 @@ test('main tabs and Devotion keep desktop navigation while study sessions use th
       assert.match(elements.app.innerHTML, /Authority &amp; Charisma/, 'Practice uses the concise Lesson 11 label from the desktop reference');
     }
   }
+  window.shellTestApi.setExperience('sermons');
+  window.shellTestApi.setView({ name: 'sermons-home' });
+  window.shellTestApi.render();
+  assert.match(elements.app.innerHTML, /data-experience="sermons" aria-pressed="true"/);
+  assert.match(elements.app.innerHTML, /data-tab="sermons-library"/);
+  assert.doesNotMatch(elements.app.innerHTML, /data-tab="journey"/);
+  assert.match(elements.app.innerHTML, /<div class="desktop-shell[^"]*"><aside class="desktop-sidebar">/);
+  assert.match(elements.app.innerHTML, /No published sermons yet/);
+  window.shellTestApi.setView({ name: 'settings' });
+  window.shellTestApi.render();
+  assert.match(elements.app.innerHTML, /Sermon Reminders/);
+  window.shellTestApi.setExperience('discipleship');
 
   window.shellTestApi.setView({
     name: 'quiz',
@@ -451,6 +468,103 @@ test('main tabs and Devotion keep desktop navigation while study sessions use th
   assert.doesNotMatch(elements.app.innerHTML, /<nav class="bottom-tab-bar"/);
 });
 
+test('Sermons app flow gates the first study on coaching and keeps quiz progress separate', async () => {
+  const syntheticSermon = {
+    id: 'synthetic-flow-test', status: 'published', title: 'Test-only sermon', speaker: 'Test fixture', date: '2026-01-01', scripture: 'Test 1:1',
+    coaching: ['Scripture Focus', 'Key Insight', 'Reflection Questions', 'Practical Application', 'Prayer'].map(title => ({ title, body: 'Synthetic test content.' })),
+    sections: [{ title: 'Test section', body: 'Synthetic reading content.' }],
+    quiz: [{ question: 'Choose the correct test answer.', options: ['No', 'Yes', 'Maybe', 'Skip'], answer: 'B', explanation: 'Test-only explanation.' }],
+    flashcards: [{ front: 'Test prompt', back: 'Test answer' }], audioUrl: '/media/test-only.mp3'
+  };
+  function fakeAudio(id) {
+    return { dataset: { id }, currentTime: 0, duration: 90, playbackRate: 1, paused: true, listeners: {},
+      addEventListener(name, handler) { this.listeners[name] = handler; },
+      play() { this.paused = false; return Promise.resolve(); }, pause() { this.paused = true; } };
+  }
+  const app = { audio: null, querySelector(selector) { return selector === '.sermon-audio' ? this.audio : null; }, querySelectorAll(selector) { return selector === '.sermon-audio' && this.audio ? [this.audio] : []; } };
+  let appHtml = '';
+  Object.defineProperty(app, 'innerHTML', {
+    get() { return appHtml; },
+    set(html) {
+      appHtml = html;
+      const match = html.match(/<audio[^>]*class="[^"]*\bsermon-audio\b[^"]*"[^>]*data-id="([^"]+)"/);
+      if (!match) { this.audio = null; return; }
+      const owner = this, node = fakeAudio(match[1]);
+      node.parentNode = {
+        removeChild(child) { if (owner.audio === child) owner.audio = null; child.parentNode = null; },
+        replaceChild(replacement, oldNode) { if (owner.audio === oldNode) owner.audio = replacement; oldNode.parentNode = null; replacement.parentNode = this; }
+      };
+      this.audio = node;
+    }
+  });
+  const elements = {
+    app,
+    modal: { innerHTML: '' }, toast: { textContent: '', className: '' },
+    'starter-fallback': { textContent: JSON.stringify(starter) },
+    'devotionals-fallback': { textContent: '[]' },
+    'sermons-fallback': { textContent: JSON.stringify({ schemaVersion: 1, sermons: [syntheticSermon] }) }
+  };
+  const listeners = {};
+  const document = {
+    getElementById: id => elements[id],
+    addEventListener: (name, handler) => { listeners[name] = handler; },
+    documentElement: { removeAttribute: () => {}, setAttribute: () => {} },
+    activeElement: null
+  };
+  const window = {
+    DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, SermonStudy, SermonUI,
+    location: { protocol: 'file:', href: 'https://example.test/app/', origin: 'https://example.test' },
+    scrollTo: () => {}, addEventListener: () => {}
+  };
+  const testAppSource = appSource.replace(
+    '  boot();',
+    '  window.sermonFlowTestApi = { render: render, setExperience: function () { S.settings.experience = "sermons"; }, setView: function (view) { V = view; }, view: function () { return V; }, state: function () { return S; } }; window.testAppReady = boot();'
+  );
+  vm.runInNewContext(testAppSource, { window, document, URL, localStorage: { getItem: () => null, setItem: () => {} } });
+  await window.testAppReady;
+  window.sermonFlowTestApi.setExperience();
+  window.sermonFlowTestApi.setView({ name: 'sermons-detail', id: syntheticSermon.id });
+  window.sermonFlowTestApi.render();
+
+  function click(dataset) {
+    listeners.click({ target: { closest: selector => selector === '[data-act]' ? { dataset } : null } });
+  }
+  const discipleshipProgress = JSON.stringify(window.sermonFlowTestApi.state().progress);
+  click({ act: 'sermon-action', mode: 'listen', id: syntheticSermon.id });
+  assert.equal(window.sermonFlowTestApi.view().name, 'sermons-coaching');
+  assert.equal(window.sermonFlowTestApi.state().sermons.progress[syntheticSermon.id].coaching.completedAt, null);
+  assert.equal(window.sermonFlowTestApi.state().sermons.progress[syntheticSermon.id].unfinished, true);
+
+  click({ act: 'sermon-coaching-continue', id: syntheticSermon.id });
+  assert.equal(window.sermonFlowTestApi.view().name, 'sermons-detail');
+  assert.ok(window.sermonFlowTestApi.state().sermons.progress[syntheticSermon.id].coaching.completedAt);
+  click({ act: 'sermon-action', mode: 'listen', id: syntheticSermon.id });
+  const playingAudio = elements.app.audio;
+  assert.ok(playingAudio);
+  playingAudio.currentTime = 13;
+  playingAudio.paused = false;
+  click({ act: 'sermon-open-coaching', id: syntheticSermon.id });
+  assert.equal(window.sermonFlowTestApi.view().name, 'sermons-coaching');
+  assert.match(elements.app.innerHTML, /aria-label="Sermon audio: Test-only sermon"/);
+  assert.equal(elements.app.audio, playingAudio, 'the same audio element should survive the coaching rerender');
+  assert.equal(elements.app.audio.paused, false, 'revisiting coaching must not pause audio');
+  assert.equal(window.sermonFlowTestApi.state().sermons.audio.currentTime, 13);
+  playingAudio.currentTime = 0;
+  playingAudio.paused = true;
+  playingAudio.listeners.pause();
+  assert.equal(window.sermonFlowTestApi.state().sermons.audio.currentTime, 0);
+  click({ act: 'sermon-coaching-continue', id: syntheticSermon.id });
+  click({ act: 'sermon-action', mode: 'quiz', id: syntheticSermon.id });
+  assert.equal(window.sermonFlowTestApi.view().name, 'sermons-quiz');
+  click({ act: 'sermon-answer', index: '1' });
+  click({ act: 'sermon-quiz-next' });
+  assert.equal(window.sermonFlowTestApi.view().name, 'sermons-complete');
+  assert.equal(window.sermonFlowTestApi.view().result.score, 100);
+  assert.equal(window.sermonFlowTestApi.state().sermons.progress[syntheticSermon.id].quizzesCompleted, 1);
+  assert.equal(window.sermonFlowTestApi.state().sermons.progress[syntheticSermon.id].unfinished, false);
+  assert.equal(JSON.stringify(window.sermonFlowTestApi.state().progress), discipleshipProgress);
+});
+
 test('saved starter decks refresh from source while custom cards and matching progress survive', async () => {
   const source = parsed.decks[0];
   const deckId = 'd-' + source.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
@@ -475,13 +589,13 @@ test('saved starter decks refresh from source while custom cards and matching pr
   const result = await (async () => {
     let stored = raw;
     const elements = {
-      app: { innerHTML: '', querySelectorAll: () => [] },
+      app: { innerHTML: '', querySelectorAll: () => [], querySelector: () => null },
       modal: { innerHTML: '' },
       toast: { textContent: '', className: '' },
       'starter-fallback': { textContent: JSON.stringify(starter) }
     };
     const document = { getElementById: id => elements[id], addEventListener: () => {}, documentElement: { removeAttribute: () => {}, setAttribute: () => {} } };
-    const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, location: { protocol: 'file:' }, scrollTo: () => {} };
+    const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, SermonStudy, SermonUI, location: { protocol: 'file:' }, scrollTo: () => {} };
     const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
     vm.runInNewContext(testAppSource, { window, document, localStorage: { getItem: () => stored, setItem: (_, value) => { stored = value; } } });
     await window.testAppReady;
@@ -528,7 +642,7 @@ test('quiz and exam keyboard answers store stats and defer exam feedback until r
     addEventListener: (name, handler) => { listeners[name] = handler; },
     documentElement: { removeAttribute: () => {}, setAttribute: () => {} }
   };
-  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, location: { protocol: 'file:' }, scrollTo: () => {} };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, SermonStudy, SermonUI, location: { protocol: 'file:' }, scrollTo: () => {} };
   const testAppSource = appSource.replace(
     '  boot();',
     '  window.studyTestApi = { setSession: function (session) { V = session; }, pick: pick, begin: begin, finishExam: finishExam, flash: views.flash, quiz: views.quiz, flush: function () { return saveQueue; } };\n  window.testAppReady = boot();'
@@ -627,7 +741,7 @@ test('home shows the backup reminder and dismissing it resets stored thresholds'
   });
   const listeners = {};
   const elements = {
-    app: { innerHTML: '', querySelectorAll: () => [] },
+    app: { innerHTML: '', querySelectorAll: () => [], querySelector: () => null },
     modal: { innerHTML: '' },
     toast: { textContent: '', className: '' },
     'starter-fallback': { textContent: JSON.stringify(starter) }
@@ -637,7 +751,7 @@ test('home shows the backup reminder and dismissing it resets stored thresholds'
     addEventListener: (name, handler) => { listeners[name] = handler; },
     documentElement: { removeAttribute: () => {}, setAttribute: () => {} }
   };
-  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, location: { protocol: 'file:' }, scrollTo: () => {} };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, SermonStudy, SermonUI, location: { protocol: 'file:' }, scrollTo: () => {} };
   const testAppSource = appSource.replace(
     '  boot();',
     '  window.reminderTestApi = { flush: function () { return saveQueue; } };\n  window.testAppReady = boot();'
@@ -660,7 +774,7 @@ test('home shows the backup reminder and dismissing it resets stored thresholds'
 
 test('storage failures appear as an accessible alert in the app', async () => {
   const elements = {
-    app: { innerHTML: '', querySelectorAll: () => [] },
+    app: { innerHTML: '', querySelectorAll: () => [], querySelector: () => null },
     modal: { innerHTML: '' },
     toast: { textContent: '', className: '' },
     'starter-fallback': { textContent: JSON.stringify(starter) }
@@ -670,7 +784,7 @@ test('storage failures appear as an accessible alert in the app', async () => {
     addEventListener: () => {},
     documentElement: { removeAttribute: () => {}, setAttribute: () => {} }
   };
-  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, location: { protocol: 'file:' }, scrollTo: () => {} };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, SermonStudy, SermonUI, location: { protocol: 'file:' }, scrollTo: () => {} };
   const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
   vm.runInNewContext(testAppSource, { window, document });
   await window.testAppReady;
@@ -685,7 +799,7 @@ test('a waiting service worker shows an update prompt and receives SKIP_WAITING'
   const registration = { waiting: waitingWorker, installing: null, addEventListener: () => {} };
   const serviceWorker = { controller: {}, register: () => Promise.resolve(registration), addEventListener: () => {} };
   const elements = {
-    app: { innerHTML: '', querySelectorAll: () => [] },
+    app: { innerHTML: '', querySelectorAll: () => [], querySelector: () => null },
     modal: { innerHTML: '' },
     toast: { textContent: '', className: '' },
     'starter-fallback': { textContent: JSON.stringify(starter) }
@@ -695,7 +809,7 @@ test('a waiting service worker shows an update prompt and receives SKIP_WAITING'
     addEventListener: (name, handler) => { listeners[name] = handler; },
     documentElement: { removeAttribute: () => {}, setAttribute: () => {} }
   };
-  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, navigator: { serviceWorker }, location: { protocol: 'https:', reload: () => {} }, scrollTo: () => {} };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, SermonStudy, SermonUI, navigator: { serviceWorker }, location: { protocol: 'https:', reload: () => {} }, scrollTo: () => {} };
   const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
   vm.runInNewContext(testAppSource, {
     window,
@@ -716,7 +830,7 @@ test('legacy and current JSON backups preserve optional metadata', async () => {
   );
   assert.notEqual(exposedAppSource, appSource, 'Backup validator test hook can be installed.');
   const elements = {
-    app: { innerHTML: '', querySelectorAll: () => [] },
+    app: { innerHTML: '', querySelectorAll: () => [], querySelector: () => null },
     modal: { innerHTML: '' },
     toast: { textContent: '', className: '' },
     'starter-fallback': { textContent: JSON.stringify(starter) }
@@ -726,7 +840,7 @@ test('legacy and current JSON backups preserve optional metadata', async () => {
     addEventListener: () => {},
     documentElement: { removeAttribute: () => {}, setAttribute: () => {} }
   };
-  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, location: { protocol: 'file:' }, scrollTo: () => {} };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, SermonStudy, SermonUI, location: { protocol: 'file:' }, scrollTo: () => {} };
   vm.runInNewContext(exposedAppSource, {
     window,
     document,

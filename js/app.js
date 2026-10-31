@@ -1,10 +1,10 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 10;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 11;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
-  var S = { decks: [], progress: {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, sermons: { positions: {}, played: {}, speed: 1 }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
-  var STARTER_DECKS = [], DEVOTIONALS = [], SERMONS = [], SERMON_DECKS = [];
-  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
+  var S = { decks: [], progress: {}, sermons: SermonStudy ? SermonStudy.createState() : {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
+  var STARTER_DECKS = [], DEVOTIONALS = [], SERMONS = [], sermonDownloadControllers = {};
+  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null }, sermonAudioElement = null, sermonDownloadProgress = {}, lastAudioSaveBucket = -1;
   var browserLocalStorage = null, browserIndexedDB = null;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
   if (!browserLocalStorage) { try { if (typeof localStorage !== 'undefined') browserLocalStorage = localStorage; } catch (e) {} }
@@ -17,7 +17,7 @@
   var uid = function () { return Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4); };
   var slug = function (t) { return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'deck'; };
   var shuffle = function (a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
-  var deck = function (id) { return S.decks.filter(function (d) { return d.id === id; })[0] || SERMON_DECKS.filter(function (d) { return d.id === id; })[0]; };
+  var deck = function (id) { return S.decks.filter(function (d) { return d.id === id; })[0]; };
   var prog = function (id) {
     var p = S.progress[id];
     if (!p || typeof p !== 'object' || Array.isArray(p) || !p.cards || typeof p.cards !== 'object' || Array.isArray(p.cards)) p = S.progress[id] = { best: null, cards: {} };
@@ -89,6 +89,77 @@
     }).catch(function () { return fallback; });
   }
 
+  function inlineSermonsData() {
+    var el = document.getElementById('sermons-fallback');
+    if (!el) return { schemaVersion: 1, sermons: [] };
+    try { return JSON.parse(el.textContent || '{"schemaVersion":1,"sermons":[]}'); } catch (e) { return { schemaVersion: 1, sermons: [] }; }
+  }
+  function normalizeSermons(data) {
+    if (!data || data.schemaVersion !== 1 || !Array.isArray(data.sermons)) return [];
+    function mediaUrl(value) {
+      if (typeof value !== 'string' || !value.trim()) return '';
+      try {
+        var parsed = new URL(value, window.location && window.location.href || 'http://localhost/');
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+        if (window.location && window.location.origin && parsed.origin !== window.location.origin) return '';
+        return value;
+      } catch (e) { return ''; }
+    }
+    return data.sermons.filter(function (item) {
+      return item && /^[a-zA-Z0-9._-]{1,120}$/.test(item.id || '') && (item.status === 'published' || item.status === 'draft');
+    }).map(function (item) {
+      var quiz = Array.isArray(item.quiz) ? item.quiz.filter(function (q) { return q && typeof q.question === 'string' && Array.isArray(q.options) && q.options.length === 4 && q.options.every(function (option) { return typeof option === 'string'; }) && (typeof q.answer === 'string' ? 'ABCD'.indexOf(q.answer.toUpperCase()) >= 0 : Number.isInteger(q.answer) && q.answer >= 0 && q.answer < 4); }).map(function (q) { return { question: q.question, options: q.options.slice(), answer: q.answer, explanation: typeof q.explanation === 'string' ? q.explanation : '' }; }) : [];
+      var flashcards = Array.isArray(item.flashcards) ? item.flashcards.filter(function (card) { return card && typeof card.front === 'string' && typeof card.back === 'string'; }).map(function (card) { return { front: card.front, back: card.back }; }) : [];
+      return {
+        id: item.id, status: item.status, title: typeof item.title === 'string' ? item.title : '[Sermon title]',
+        speaker: typeof item.speaker === 'string' ? item.speaker : '[Speaker]', date: typeof item.date === 'string' ? item.date : '',
+        scripture: typeof item.scripture === 'string' ? item.scripture : '[Scripture reference]',
+        audioUrl: mediaUrl(item.audioUrl), coachingAudioUrl: mediaUrl(item.coachingAudioUrl),
+        coaching: Array.isArray(item.coaching) ? item.coaching.filter(function (section) { return section && typeof section.title === 'string' && typeof section.body === 'string'; }).map(function (section) { return { title: section.title, body: section.body }; }) : [],
+        sections: Array.isArray(item.sections) ? item.sections.filter(function (section) { return section && typeof section.title === 'string' && typeof section.body === 'string'; }).map(function (section) { return { title: section.title, body: section.body }; }) : [],
+        quiz: quiz, flashcards: flashcards
+      };
+    });
+  }
+  function loadSermons() {
+    var fallback = inlineSermonsData();
+    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(normalizeSermons(fallback));
+    return window.fetch('content/sermons.json').then(function (response) {
+      if (!response.ok) throw new Error('Could not load sermons');
+      return response.json();
+    }).then(function (data) { var normalized = normalizeSermons(data); return normalized.length || (data && Array.isArray(data.sermons) && data.sermons.length === 0) ? normalized : normalizeSermons(fallback); })
+      .catch(function () { return normalizeSermons(fallback); });
+  }
+
+  function sermonState() { return SermonStudy.normalizeState(S.sermons); }
+  function sermonRecord(id) {
+    return (SERMONS || []).filter(function (item) { return item && item.id === id; })[0] || null;
+  }
+  function sermonContext() {
+    var state = sermonState();
+    return { sermons: SERMONS, state: state, settings: { showDraftSermons: !!S.settings.showDraftSermons, sermonReminders: state.reminders, notificationStatus: sermonNotificationStatus() }, summary: SermonStudy.summary(state, SERMONS), view: V, downloadsProgress: sermonDownloadProgress, audioDownloadsSupported: !!(window.fetch && window.caches), online: !window.navigator || window.navigator.onLine !== false };
+  }
+  function sermonNotificationStatus() {
+    if (!window.Notification) return 'Browser notifications are not supported. In-app reminders appear only when you open the app.';
+    if (window.Notification.permission === 'denied') return 'Notifications are blocked by browser settings. In-app reminders still appear when you open the app.';
+    if (window.Notification.permission === 'granted') return 'Permission granted. This app currently provides in-app reminders on open; it does not send background notifications.';
+    return 'In-app reminders appear on open. Browser permission is optional and does not enable background reminders.';
+  }
+  function isSermonRoute(name) { return typeof name === 'string' && name.indexOf('sermons-') === 0; }
+  function sermonRoute(name, id, extra) { return Object.assign({ name: name, id: id || V.id || null }, extra || {}); }
+  function checkSermonReminders() {
+    if (!SermonStudy) return;
+    var state = sermonState();
+    if (!state.reminders.regularEnabled && !state.reminders.unfinishedEnabled) return;
+    var unfinished = Object.keys(state.progress).some(function (id) { return !!state.progress[id].unfinished; });
+    var due = SermonStudy.dueReminders(state.reminders, new Date(), unfinished);
+    if (!due.length) return;
+    V.reminder = due[0];
+    var dateKey = SermonStudy.localDateKey(new Date());
+    S.sermons = SermonStudy.markReminderShown(S.sermons, due[0], dateKey);
+    save();
+  }
+
   /* ---------- storage ---------- */
   function loadSavedState(raw) {
     try {
@@ -114,11 +185,14 @@
         var best = old.best && Number.isFinite(+old.best.pct) && +old.best.pct >= 0 && +old.best.pct <= 100 ? old.best : null;
         S.progress[d.id] = { best: best, cards: cards };
       });
-      S.settings = Object.assign({ theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false }, o.settings && typeof o.settings === 'object' ? o.settings : {});
+      S.settings = Object.assign({ theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, o.settings && typeof o.settings === 'object' ? o.settings : {});
       if (['auto', 'light', 'dark'].indexOf(S.settings.theme) < 0) S.settings.theme = 'auto';
       S.settings.shuffle = !!S.settings.shuffle;
       S.settings.showStreak = S.settings.showStreak !== false;
       S.settings.showDraftDevotionals = !!S.settings.showDraftDevotionals;
+      S.settings.showDraftSermons = !!S.settings.showDraftSermons;
+      if (S.settings.experience !== 'sermons') S.settings.experience = 'discipleship';
+      S.sermons = SermonStudy.normalizeState(o.sermons);
       var hasPriorData = !!o.seeded || (Array.isArray(o.decks) && o.decks.length > 0);
       S.onboarding = MobileStudy.normalizeOnboarding(o.onboarding, hasPriorData);
       S.streak = MobileStudy.normalizeStreak(o.streak);
@@ -127,7 +201,6 @@
         saved: (o.devotions.saved && typeof o.devotions.saved === 'object' && !Array.isArray(o.devotions.saved)) ? o.devotions.saved : {},
         carouselHiddenOn: typeof o.devotions.carouselHiddenOn === 'string' ? o.devotions.carouselHiddenOn : null
       } : { read: {}, saved: {}, carouselHiddenOn: null };
-      S.sermons = window.SermonLogic ? window.SermonLogic.normalizeSermonState(o.sermons) : { positions: {}, played: {}, speed: 1 };
       S.completedToday = (o.completedToday && typeof o.completedToday === 'object' && !Array.isArray(o.completedToday)) ? o.completedToday : {};
       S.seeded = !!o.seeded;
       S.dataVersion = Number.isInteger(o.dataVersion) && o.dataVersion >= 0 ? o.dataVersion : 0;
@@ -182,7 +255,7 @@
     toast('Study paused. Your progress is saved.');
   }
   function resumeStudySession() {
-    var session = MobileStudy.restore(S.pausedSession, S.decks.concat(SERMON_DECKS));
+    var session = MobileStudy.restore(S.pausedSession, S.decks);
     if (!session) { S.pausedSession = null; save(); render(true); toast('That saved session is no longer available.'); return; }
     go(session);
     if (session.name === 'exam') startExamTimer();
@@ -343,6 +416,11 @@
       }
       if (!S.completedToday || typeof S.completedToday !== 'object') S.completedToday = {};
       if (S.settings.showDraftDevotionals === undefined) S.settings.showDraftDevotionals = false;
+    } },
+    { version: 11, run: function () {
+      S.sermons = SermonStudy.normalizeState(S.sermons);
+      if (S.settings.showDraftSermons === undefined) S.settings.showDraftSermons = false;
+      if (S.settings.experience !== 'sermons') S.settings.experience = 'discipleship';
     } }
   ];
   function applyDataMigrations() {
@@ -426,7 +504,7 @@
   }
   function exportDeck(d) { download(slug(d.title) + '.txt', P.serializeDeck(d)); }
   function exportBackup() {
-    var payload = { format: 'cci-discipleship-quiz-backup', version: 1, exportedAt: new Date().toISOString(), data: { decks: S.decks, progress: S.progress, settings: S.settings, seeded: S.seeded, dataVersion: S.dataVersion, backupReminder: S.backupReminder, onboarding: S.onboarding, streak: S.streak, devotions: S.devotions, sermons: S.sermons } };
+    var payload = { format: 'cci-discipleship-quiz-backup', version: 1, exportedAt: new Date().toISOString(), data: { decks: S.decks, progress: S.progress, sermons: S.sermons, settings: S.settings, seeded: S.seeded, dataVersion: S.dataVersion, backupReminder: S.backupReminder, onboarding: S.onboarding, streak: S.streak, devotions: S.devotions } };
     download('cci-study-backup-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(payload, null, 2));
   }
   function resetBackupReminder() {
@@ -460,15 +538,17 @@
       var pct = old.best && Number(old.best.pct);
       progress[d.id] = { cards: cards, best: Number.isFinite(pct) && pct >= 0 && pct <= 100 ? { pct: pct } : null };
     });
-    var settings = Object.assign({ theme: 'auto', shuffle: false, showDraftDevotionals: false }, raw.data.settings && typeof raw.data.settings === 'object' ? raw.data.settings : {});
+    var settings = Object.assign({ theme: 'auto', shuffle: false, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, raw.data.settings && typeof raw.data.settings === 'object' ? raw.data.settings : {});
     if (['auto', 'light', 'dark'].indexOf(settings.theme) < 0) settings.theme = 'auto'; settings.shuffle = !!settings.shuffle;
     settings.showDraftDevotionals = !!settings.showDraftDevotionals;
+    settings.showDraftSermons = !!settings.showDraftSermons;
+    if (settings.experience !== 'sermons') settings.experience = 'discipleship';
     var devotions = (raw.data.devotions && typeof raw.data.devotions === 'object' && !Array.isArray(raw.data.devotions)) ? {
       read: (raw.data.devotions.read && typeof raw.data.devotions.read === 'object') ? raw.data.devotions.read : {},
       saved: (raw.data.devotions.saved && typeof raw.data.devotions.saved === 'object') ? raw.data.devotions.saved : {},
       carouselHiddenOn: typeof raw.data.devotions.carouselHiddenOn === 'string' ? raw.data.devotions.carouselHiddenOn : null
     } : { read: {}, saved: {}, carouselHiddenOn: null };
-    return { decks: decks, progress: progress, settings: settings, seeded: !!raw.data.seeded, dataVersion: dataVersion, backupReminder: StudyLogic.normalizeBackupReminder(raw.data.backupReminder), onboarding: MobileStudy.normalizeOnboarding(raw.data.onboarding, true), streak: MobileStudy.normalizeStreak(raw.data.streak), devotions: devotions, sermons: window.SermonLogic ? window.SermonLogic.normalizeSermonState(raw.data.sermons) : { positions: {}, played: {}, speed: 1 } };
+    return { decks: decks, progress: progress, sermons: SermonStudy.normalizeState(raw.data.sermons), settings: settings, seeded: !!raw.data.seeded, dataVersion: dataVersion, backupReminder: StudyLogic.normalizeBackupReminder(raw.data.backupReminder), onboarding: MobileStudy.normalizeOnboarding(raw.data.onboarding, true), streak: MobileStudy.normalizeStreak(raw.data.streak), devotions: devotions };
   }
 
   /* ---------- views ---------- */
@@ -512,7 +592,23 @@
     return '<span class="deck-topic">' + esc(title) + '</span>';
   }
 
-  var MAIN_TABS = ['home', 'journey', 'chapter', 'sermons', 'practice', 'progress', 'settings'];
+  var DISCIPLESHIP_TABS = ['home', 'journey', 'chapter', 'practice', 'progress', 'settings'];
+  var SERMONS_TABS = ['sermons-home', 'sermons-library', 'sermons-downloads', 'sermons-progress', 'settings'];
+  var MAIN_TABS = DISCIPLESHIP_TABS;
+
+  function renderExperienceToggle() {
+    var sermonActive = S.settings.experience === 'sermons';
+    return '<div class="experience-switch" role="group" aria-label="Choose experience">' +
+      '<button type="button" data-act="experience-switch" data-experience="discipleship" aria-pressed="' + (!sermonActive) + '"' + (!sermonActive ? ' class="active"' : '') + '>Discipleship</button>' +
+      '<button type="button" data-act="experience-switch" data-experience="sermons" aria-pressed="' + sermonActive + '"' + (sermonActive ? ' class="active"' : '') + '>Sermons</button>' +
+      '</div>';
+  }
+
+  function renderSermonMiniPlayer() {
+    var audioState = sermonState().audio, item = sermonRecord(audioState.sermonId);
+    if (!item || !item.audioUrl || V.name === 'sermons-player') return '';
+    return '<aside class="sermon-mini-player" aria-label="Sermon audio player"><div><strong>' + esc(item.title) + '</strong><span class="sermon-mini-time">' + Math.floor(audioState.currentTime || 0) + ' sec</span></div><audio class="sermon-audio" controls preload="none" aria-label="Sermon audio: ' + esc(item.title) + '" src="' + esc(item.audioUrl) + '" data-id="' + esc(item.id) + '"></audio><button class="btn sm ghost" data-act="sermon-open-player" data-id="' + esc(item.id) + '">Open player</button></aside>';
+  }
 
   function getStudyTimestamps() {
     var timestamps = [];
@@ -536,10 +632,12 @@
         return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 4.5 13h6L9 22l10.5-13H13z"/></svg>';
       case 'progress':
         return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>';
-      case 'sermons':
-        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 14v-2a9 9 0 0 1 18 0v2"/><path d="M21 15.5a2 2 0 0 1-2 2h-1a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h3z"/><path d="M3 15.5a2 2 0 0 0 2 2h1a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1H3z"/></svg>';
       case 'settings':
         return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="3" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="3" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="3"/></svg>';
+      case 'library':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22z"/><path d="M4 4v18M8 6h8M8 10h8"/></svg>';
+      case 'downloads':
+        return '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 18v3h16v-3"/></svg>';
       default:
         return '';
     }
@@ -561,17 +659,26 @@
   }
 
   function renderTabBar(currentTab) {
-    var tabs = [
+    var tabs = S.settings.experience === 'sermons' ? [
+      { id: 'sermons-home', label: 'Home', icon: 'home' },
+      { id: 'sermons-library', label: 'Library', icon: 'library' },
+      { id: 'sermons-downloads', label: 'Downloads', icon: 'downloads' },
+      { id: 'sermons-progress', label: 'Progress', icon: 'progress' },
+      { id: 'settings', label: 'Settings', icon: 'settings' }
+    ] : [
       { id: 'home', label: 'Home', icon: 'home' },
       { id: 'journey', label: 'Journey', icon: 'journey' },
-      { id: 'sermons', label: 'Sermons', icon: 'sermons' },
       { id: 'practice', label: 'Practice', icon: 'practice' },
       { id: 'progress', label: 'Progress', icon: 'progress' },
       { id: 'settings', label: 'Settings', icon: 'settings' }
     ];
+    var activeTab = currentTab;
+    if (S.settings.experience === 'sermons' && currentTab.indexOf('sermons-') === 0) {
+      activeTab = currentTab === 'sermons-library' ? 'sermons-library' : currentTab === 'sermons-downloads' ? 'sermons-downloads' : currentTab === 'sermons-progress' ? 'sermons-progress' : 'sermons-home';
+    }
     return '<nav class="bottom-tab-bar" aria-label="Main Navigation">' +
       tabs.map(function (tab) {
-        var isActive = tab.id === currentTab;
+        var isActive = tab.id === activeTab;
         return '<button class="tab-btn' + (isActive ? ' active' : '') + '" data-act="nav-tab" data-tab="' + tab.id + '" aria-selected="' + (isActive ? 'true' : 'false') + '" aria-label="' + tab.label + ' tab">' +
           tabIconSvg(tab.icon) +
           '<span class="tab-label">' + tab.label + '</span>' +
@@ -581,15 +688,23 @@
   }
 
   function renderDesktopSidebar(currentTab) {
-    var tabs = [
+    var tabs = S.settings.experience === 'sermons' ? [
+      { id: 'sermons-home', label: 'Home', icon: 'home' },
+      { id: 'sermons-library', label: 'Library', icon: 'library' },
+      { id: 'sermons-downloads', label: 'Downloads', icon: 'downloads' },
+      { id: 'sermons-progress', label: 'Progress', icon: 'progress' },
+      { id: 'settings', label: 'Settings', icon: 'settings' }
+    ] : [
       { id: 'home', label: 'Home', icon: 'home' },
       { id: 'journey', label: 'Journey', icon: 'journey' },
-      { id: 'sermons', label: 'Sermons', icon: 'sermons' },
       { id: 'practice', label: 'Practice', icon: 'practice' },
       { id: 'progress', label: 'Progress', icon: 'progress' },
       { id: 'settings', label: 'Settings', icon: 'settings' }
     ];
     var activeTab = currentTab === 'chapter' ? 'journey' : currentTab;
+    if (S.settings.experience === 'sermons' && currentTab.indexOf('sermons-') === 0) {
+      activeTab = currentTab === 'sermons-library' ? 'sermons-library' : currentTab === 'sermons-downloads' ? 'sermons-downloads' : currentTab === 'sermons-progress' ? 'sermons-progress' : 'sermons-home';
+    }
     return '<aside class="desktop-sidebar">' +
       '<div class="desktop-logo">' +
         '<span class="desktop-logo-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><rect x="2" y="2" width="36" height="36" rx="13" fill="#4B35C5"/><circle cx="27" cy="13" r="4" fill="#FFE6A8"/><path d="M3 27c6-7 11-11 17-8 5 3 9 8 17 1v18H3V27Z" fill="#7A3FD0"/></svg></span>' +
@@ -1234,7 +1349,7 @@
     '<div class="settings-group">' +
       '<h2 class="settings-group-title">Content</h2>' +
       '<div class="settings-row">' +
-        '<div><strong>Show Draft Devotionals</strong><p class="meta">Preview devotional articles and sermons before leader review</p></div>' +
+        '<div><strong>Show Draft Devotionals</strong><p class="meta">Preview devotional articles before leader review</p></div>' +
         '<button class="btn sm' + (S.settings.showDraftDevotionals ? ' primary' : '') + '" data-act="toggle-draft-devotionals">' + (S.settings.showDraftDevotionals ? 'Enabled' : 'Off') + '</button>' +
       '</div>' +
     '</div>' +
@@ -1257,7 +1372,8 @@
       '<h2 class="settings-group-title">About</h2>' +
       '<p class="meta">CCI Discipleship Quiz &amp; Study App · Offline PWA</p>' +
       '<p class="meta">Storage engine: ' + esc(storageBackend) + '</p>' +
-    '</div>';
+    '</div>' +
+    (SermonUI ? SermonUI.renderSettingsSection(sermonContext().settings) : '');
   };
   function bar() {
     if (!SEL.size) return '';
@@ -1754,7 +1870,7 @@
             '</svg>' +
           '</div>' +
         '</div>' +
-        '<h1 class="onboarding-title">Discipleship</h1>' +
+        '<h1 class="onboarding-title">CCI Discipleship</h1>' +
         '<p class="onboarding-lead">A steady, thoughtful rhythm for spiritual growth and doctrinal mastery.</p>' +
         '<div class="onboarding-bottom-bar">' +
           '<button class="btn primary full btn-continue" data-act="onboarding-next">Get Started</button>' +
@@ -2046,7 +2162,7 @@
         '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
       '</button>' +
       '<div class="study-heading">' +
-        '<span class="eyebrow">' + (isSermonSession() ? 'CCI · SERMON' : 'CCI · DISCIPLESHIP') + '</span>' +
+        '<span class="eyebrow">CCI · DISCIPLESHIP</span>' +
         '<h1>' + esc(t) + '</h1>' +
       '</div>' +
       '<div class="session-status' + (isExam ? ' is-timer' : '') + '">' + right + '</div>' +
@@ -2125,454 +2241,62 @@
       '</div>';
   }
 
-  /* ---------- sermons ---------- */
-  var SL = window.SermonLogic || null, SAudio = window.SermonAudio || null;
-  var player = { id: null, el: null, playing: false, loading: false, current: 0, duration: 0, local: false, error: '', pendingSeek: 0, lastSave: 0 };
-  var downloads = {}, audioStore = null, miniEl = null;
-
-  function sermonList() { return SL ? SL.visibleSermons(SERMONS, !!S.settings.showDraftDevotionals) : []; }
-  function sermonById(id) { return SERMONS.filter(function (item) { return item.id === id; })[0] || null; }
-  function sermonStore() {
-    if (audioStore || !SAudio) return audioStore;
-    var win = window;
-    audioStore = SAudio.createAudioStore({
-      caches: win.caches || null,
-      fetch: typeof win.fetch === 'function' ? win.fetch.bind(win) : null,
-      native: win.CciNative || null,
-      URL: win.URL || null,
-      storage: win.navigator && win.navigator.storage || null
-    });
-    return audioStore;
-  }
-  function loadSermons() {
-    var el = document.getElementById('sermons-fallback');
-    var empty = { sermons: [], decks: {} };
-    if (!el) return Promise.resolve(empty);
-    var fallback = empty;
-    try {
-      var data = JSON.parse(el.textContent || '{}');
-      if (data && Array.isArray(data.sermons)) fallback = { sermons: data.sermons, decks: data.decks && typeof data.decks === 'object' ? data.decks : {} };
-    } catch (e) {}
-    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(fallback);
-    return window.fetch('content/sermons.json').then(function (response) {
-      if (!response.ok) throw new Error('Could not load sermons');
-      return response.json();
-    }).then(function (list) {
-      if (!Array.isArray(list)) throw new Error('Invalid sermons');
-      var files = list.map(function (item) { return item && item.deckFile; }).filter(function (file) { return typeof file === 'string' && file.indexOf('/') < 0 && file.indexOf('..') < 0; });
-      return Promise.all(files.map(function (file) {
-        return window.fetch('content/sermons/' + file).then(function (response) {
-          if (!response.ok) throw new Error('Could not load ' + file);
-          return response.text().then(function (text) { return [file, text]; });
-        });
-      })).then(function (pairs) {
-        var decks = {};
-        pairs.forEach(function (pair) { decks[pair[0]] = pair[1]; });
-        return { sermons: list, decks: decks };
-      });
-    }).catch(function () { return fallback; });
-  }
-  function applySermons(loaded) {
-    SERMONS = loaded && Array.isArray(loaded.sermons) ? loaded.sermons : [];
-    SERMON_DECKS = [];
-    if (!SL) return;
-    SERMONS.forEach(function (sermon) {
-      if (SL.validateSermon(sermon).length || !sermon.deckFile) return;
-      var text = loaded.decks && loaded.decks[sermon.deckFile];
-      if (typeof text !== 'string') return;
-      var parsed = P.parseDecks(text).decks[0];
-      var built = SL.buildSermonDeck(sermon, parsed);
-      if (built) SERMON_DECKS.push(built);
-    });
-  }
-  function isSermonSession() { return !!(V && V.ids && V.ids.length === 1 && /^d-sermon-/.test(V.ids[0])); }
-
-  /* --- playback --- */
-  function ensureAudio() {
-    if (player.el) return player.el;
-    if (typeof document.createElement !== 'function' || !document.body) return null;
-    var el = document.createElement('audio');
-    el.id = 'sermon-audio';
-    el.preload = 'none';
-    el.addEventListener('loadedmetadata', function () {
-      if (Number.isFinite(el.duration) && el.duration > 0) player.duration = el.duration;
-      if (player.pendingSeek > 0) { try { el.currentTime = player.pendingSeek; } catch (e) {} player.pendingSeek = 0; }
-      player.loading = false; syncPlayerUI();
-    });
-    el.addEventListener('timeupdate', function () {
-      player.current = el.currentTime || 0;
-      var now = Date.now();
-      if (now - player.lastSave > 5000) { player.lastSave = now; rememberPosition(); }
-      updateTimeUI();
-    });
-    el.addEventListener('play', function () { player.playing = true; player.error = ''; setMediaState('playing'); syncPlayerUI(); });
-    el.addEventListener('playing', function () { player.loading = false; syncPlayerUI(); });
-    el.addEventListener('waiting', function () { player.loading = true; syncPlayerUI(); });
-    el.addEventListener('pause', function () { player.playing = false; rememberPosition(); setMediaState('paused'); syncPlayerUI(); });
-    el.addEventListener('ended', function () {
-      player.playing = false;
-      if (player.id) { S.sermons.played[player.id] = true; delete S.sermons.positions[player.id]; save(); }
-      player.current = 0; setMediaState('paused'); syncPlayerUI();
-    });
-    el.addEventListener('error', function () {
-      if (!player.id) return;
-      player.playing = false; player.loading = false;
-      player.error = player.local ? 'This downloaded recording could not be played. Remove it and download it again.' : 'This recording could not be played. Check your connection, or download it while online to listen offline.';
-      syncPlayerUI();
-    });
-    document.body.appendChild(el);
-    player.el = el;
-    miniEl = document.createElement('div');
-    miniEl.id = 'mini-player';
-    miniEl.hidden = true;
-    document.body.appendChild(miniEl);
-    return el;
-  }
-  function rememberPosition() {
-    if (!player.id || !SL) return;
-    var pos = SL.resumePosition(player.current, player.duration);
-    if (pos > 0) S.sermons.positions[player.id] = pos; else delete S.sermons.positions[player.id];
-    save();
-  }
-  function setMediaState(state) {
-    try { if (window.navigator && window.navigator.mediaSession) window.navigator.mediaSession.playbackState = state; } catch (e) {}
-  }
-  function setupMediaSession(sermon) {
-    try {
-      var ms = window.navigator && window.navigator.mediaSession;
-      if (!ms || typeof window.MediaMetadata !== 'function') return;
-      ms.metadata = new window.MediaMetadata({ title: sermon.title, artist: sermon.speaker, album: sermon.series || 'CCI Sermons' });
-      var handlers = {
-        play: function () { if (player.el) player.el.play(); },
-        pause: function () { if (player.el) player.el.pause(); },
-        seekbackward: function () { skipPlayer(-SL.SKIP_SECONDS); },
-        seekforward: function () { skipPlayer(SL.SKIP_SECONDS); },
-        seekto: function (details) { if (details && Number.isFinite(details.seekTime)) seekPlayer(details.seekTime); }
-      };
-      Object.keys(handlers).forEach(function (name) { try { ms.setActionHandler(name, handlers[name]); } catch (e) {} });
-    } catch (e) {}
-  }
-  function loadSermon(sermon, autoplay) {
-    var el = ensureAudio();
-    if (!el || !sermon || !sermon.audio) return Promise.resolve(false);
-    if (player.id === sermon.id && el.getAttribute('src')) {
-      if (autoplay) { var again = el.play(); if (again && again.catch) again.catch(function () {}); }
-      return Promise.resolve(true);
-    }
-    rememberPosition();
-    player.id = sermon.id; player.error = ''; player.loading = true; player.playing = false;
-    player.duration = sermon.audio.durationSec;
-    player.pendingSeek = SL.resumePosition(S.sermons.positions[sermon.id] || 0, sermon.audio.durationSec);
-    player.current = player.pendingSeek;
-    syncPlayerUI();
-    return sermonStore().playable(sermon.audio.url).then(function (result) {
-      if (player.id !== sermon.id) return false;
-      player.local = result.local;
-      el.src = result.src;
-      el.playbackRate = S.sermons.speed;
-      setupMediaSession(sermon);
-      if (autoplay) {
-        var started = el.play();
-        if (started && started.catch) started.catch(function () { player.loading = false; player.error = 'Press play to start the recording.'; syncPlayerUI(); });
-      } else { el.load(); }
-      return true;
-    });
-  }
-  function togglePlayer(id) {
-    var sermon = sermonById(id || player.id);
-    if (!sermon) return;
-    if (player.id !== sermon.id || !player.el || !player.el.getAttribute('src')) { loadSermon(sermon, true); return; }
-    if (player.el.paused) { var p = player.el.play(); if (p && p.catch) p.catch(function () {}); } else player.el.pause();
-  }
-  function skipPlayer(delta) { if (player.el && player.id) seekPlayer((player.el.currentTime || 0) + delta); }
-  function seekPlayer(seconds) {
-    if (!player.el || !player.id) return;
-    var target = SL.clampSeek(seconds, player.duration);
-    try { player.el.currentTime = target; } catch (e) {}
-    player.current = target; updateTimeUI();
-  }
-  function cycleSpeed() {
-    S.sermons.speed = SL.nextSpeed(S.sermons.speed);
-    if (player.el) player.el.playbackRate = S.sermons.speed;
-    save(); syncPlayerUI();
-  }
-  function closePlayer() {
-    if (player.el) { player.el.pause(); player.el.removeAttribute('src'); player.el.load(); }
-    rememberPosition();
-    player.id = null; player.playing = false; player.error = ''; player.loading = false; player.current = 0;
-    syncPlayerUI();
-  }
-
-  /* --- offline downloads --- */
-  function downloadState(id) { return downloads[id] || (downloads[id] = { state: 'unknown', progress: 0, error: '', controller: null }); }
-  function refreshDownloadState(id) {
-    var store = SL && sermonStore(), sermon = sermonById(id), info = downloadState(id);
-    if (!store || !store.supported() || !sermon || !sermon.audio || info.state === 'downloading') return;
-    store.isDownloaded(sermon.audio.url).then(function (yes) {
-      var next = yes ? 'done' : 'idle';
-      if (info.state !== next) { info.state = next; if (V.name === 'sermon' && V.id === id) render(true); }
-    });
-  }
-  function startDownload(id) {
-    var sermon = sermonById(id), store = sermonStore(), info = downloadState(id);
-    if (!sermon || !sermon.audio || !store || !store.supported() || info.state === 'downloading') return;
-    info.state = 'downloading'; info.progress = 0; info.error = '';
-    info.controller = typeof window.AbortController === 'function' ? new window.AbortController() : null;
-    render(true); focusAfterRender('[data-act="sermon-download-cancel"]');
-    store.download(sermon.audio.url, {
-      signal: info.controller ? info.controller.signal : undefined,
-      expectedBytes: sermon.audio.sizeBytes,
-      onProgress: function (fraction) { info.progress = fraction; updateDownloadUI(id); }
-    }).then(function () {
-      info.state = 'done'; info.controller = null; render(true); focusAfterRender('[data-act="sermon-download-remove"]'); toast('Saved for offline listening');
-    }).catch(function (error) {
-      info.controller = null;
-      if (error && error.name === 'AbortError') { info.state = 'idle'; info.error = ''; }
-      else { info.state = 'idle'; info.error = error && error.message ? error.message : 'Download failed.'; }
-      render(true); focusAfterRender('[data-act="sermon-download"]');
-    });
-  }
-  function cancelDownload(id) { var info = downloadState(id); if (info.controller) info.controller.abort(); }
-  function removeDownload(id) {
-    var sermon = sermonById(id), store = sermonStore(), info = downloadState(id);
-    if (!sermon || !sermon.audio || !store) return;
-    store.remove(sermon.audio.url).then(function () { info.state = 'idle'; info.error = ''; render(true); focusAfterRender('[data-act="sermon-download"]'); toast('Removed the offline copy'); });
-  }
-  function focusAfterRender(selector) {
-    var el = app.querySelector(selector);
-    if (el && typeof el.focus === 'function') el.focus({ preventScroll: true });
-  }
-  function updateDownloadUI(id) {
-    var info = downloadState(id), pct = Math.round(info.progress * 100);
-    var label = app.querySelector('[data-download-pct]'), bar = app.querySelector('[data-download-fill]');
-    if (label) label.textContent = pct + '%';
-    if (bar) bar.style.width = pct + '%';
-  }
-
-  /* --- player UI --- */
-  function playIcon(playing) {
-    return playing
-      ? '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>'
-      : '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.86l11-6.8a1 1 0 0 0 0-1.72l-11-6.8A1 1 0 0 0 8 5.2z"/></svg>';
-  }
-  function timeText() { return SL.formatClock(player.current) + ' / ' + SL.formatClock(player.duration); }
-  function updateTimeUI() {
-    if (!player.id) return;
-    var pct = player.duration ? Math.min(100, 100 * player.current / player.duration) : 0;
-    var nodes = document.querySelectorAll('[data-player-time]');
-    for (var i = 0; i < nodes.length; i++) nodes[i].textContent = timeText();
-    var fills = document.querySelectorAll('[data-player-fill]');
-    for (var j = 0; j < fills.length; j++) fills[j].style.width = pct + '%';
-    var seek = document.getElementById('sermon-seek');
-    if (seek && document.activeElement !== seek) { seek.max = String(Math.max(1, Math.round(player.duration))); seek.value = String(Math.round(player.current)); seek.setAttribute('aria-valuetext', timeText()); }
-  }
-  function miniPlayerHtml() {
-    var sermon = sermonById(player.id);
-    if (!sermon) return '';
-    return '<div class="mini-player" role="region" aria-label="Sermon player">' +
-      '<button type="button" class="mini-player-main" data-act="open-sermon" data-id="' + esc(sermon.id) + '" aria-label="Open sermon: ' + esc(sermon.title) + '">' +
-        '<span class="mini-player-title">' + esc(sermon.title) + '</span>' +
-        '<span class="mini-player-time" data-player-time>' + timeText() + '</span>' +
-      '</button>' +
-      '<button type="button" class="mini-player-btn" data-act="sermon-back" aria-label="Back ' + SL.SKIP_SECONDS + ' seconds">−' + SL.SKIP_SECONDS + '</button>' +
-      '<button type="button" class="mini-player-btn mini-player-play" data-act="sermon-toggle" data-id="' + esc(sermon.id) + '" aria-label="' + (player.playing ? 'Pause' : 'Play') + '">' + playIcon(player.playing) + '</button>' +
-      '<button type="button" class="mini-player-btn" data-act="sermon-fwd" aria-label="Forward ' + SL.SKIP_SECONDS + ' seconds">+' + SL.SKIP_SECONDS + '</button>' +
-      '<button type="button" class="mini-player-btn mini-player-close" data-act="sermon-close" aria-label="Close player">✕</button>' +
-      '<span class="mini-player-bar" aria-hidden="true"><span data-player-fill style="width:' + (player.duration ? Math.min(100, 100 * player.current / player.duration) : 0) + '%"></span></span>' +
-    '</div>';
-  }
-  function syncMini(rebuild) {
-    if (!SL || !miniEl) return;
-    var inReader = V.name === 'sermon' && V.id === player.id;
-    var show = !!player.id && !inReader && !isStudySession(V.name) && V.name !== 'onboarding';
-    miniEl.hidden = !show;
-    document.body.classList.toggle('has-mini-player', show);
-    if (show && rebuild) miniEl.innerHTML = miniPlayerHtml();
-  }
-  function statusHtml() {
-    if (!player.id) return '';
-    if (player.error) return '<p class="sermon-player-status is-error">' + esc(player.error) + '</p>';
-    if (player.loading) return '<p class="sermon-player-status">Loading…</p>';
-    return '';
-  }
-  /** Update players in place (no re-render) so keyboard focus is never lost. */
-  function syncPlayerUI() {
-    if (!SL) return;
-    syncMini(true);
-    var buttons = document.querySelectorAll('[data-act="sermon-toggle"]');
-    for (var i = 0; i < buttons.length; i++) {
-      var btn = buttons[i], mine = btn.dataset.id === player.id || (!btn.dataset.id && !!player.id);
-      var playing = mine && player.playing;
-      btn.innerHTML = playIcon(playing);
-      var label = btn.getAttribute('aria-label') || '';
-      btn.setAttribute('aria-label', label.replace(/^(Play|Pause)/, playing ? 'Pause' : 'Play'));
-      btn.classList.toggle('is-playing', playing);
-    }
-    var speed = document.querySelector('.sermon-speed');
-    if (speed) { speed.textContent = S.sermons.speed + '×'; speed.setAttribute('aria-label', 'Playback speed ' + S.sermons.speed + '×. Press to change.'); }
-    var slot = document.getElementById('sermon-status');
-    if (slot && V.name === 'sermon' && V.id === player.id) slot.innerHTML = statusHtml();
-    updateTimeUI();
-  }
-  function sermonPlayerHtml(sermon) {
-    if (!sermon.audio) return '';
-    var active = player.id === sermon.id;
-    var playing = active && player.playing;
-    var duration = active ? player.duration : sermon.audio.durationSec;
-    var current = active ? player.current : (S.sermons.positions[sermon.id] || 0);
-    var info = downloadState(sermon.id), store = SL && sermonStore();
-    var canDownload = !!(store && store.supported());
-    var speedLabel = S.sermons.speed + '×';
-    var status = '<div id="sermon-status" aria-live="polite">' + (active ? statusHtml() : '') + '</div>';
-    var download = '';
-    if (canDownload) {
-      var size = SL.formatSize(sermon.audio.sizeBytes);
-      if (info.state === 'downloading') {
-        var pct = Math.round(info.progress * 100);
-        download = '<div class="sermon-download is-busy"><div class="sermon-download-row"><span>Downloading… <strong data-download-pct>' + pct + '%</strong></span>' +
-          '<button type="button" class="btn sm" data-act="sermon-download-cancel" data-id="' + esc(sermon.id) + '">Cancel</button></div>' +
-          '<span class="sermon-download-bar" aria-hidden="true"><span data-download-fill style="width:' + pct + '%"></span></span></div>';
-      } else if (info.state === 'done') {
-        download = '<div class="sermon-download is-done"><div class="sermon-download-row"><span><span class="sermon-check" aria-hidden="true">✓</span> Available offline' + (size ? ' · ' + size : '') + '</span>' +
-          '<button type="button" class="btn sm" data-act="sermon-download-remove" data-id="' + esc(sermon.id) + '">Remove</button></div></div>';
-      } else {
-        download = '<div class="sermon-download"><div class="sermon-download-row"><span>Listen without internet</span>' +
-          '<button type="button" class="btn sm" data-act="sermon-download" data-id="' + esc(sermon.id) + '">Download' + (size ? ' · ' + size : '') + '</button></div>' +
-          (info.error ? '<p class="sermon-player-status is-error" role="alert">' + esc(info.error) + '</p>' : '') + '</div>';
-      }
-    }
-    return '<section class="sermon-player-card" aria-label="Sermon recording">' +
-      '<div class="sermon-player-controls">' +
-        '<button type="button" class="sermon-skip" data-act="sermon-back" data-id="' + esc(sermon.id) + '" aria-label="Back ' + SL.SKIP_SECONDS + ' seconds">−' + SL.SKIP_SECONDS + '</button>' +
-        '<button type="button" class="sermon-play" data-act="sermon-toggle" data-id="' + esc(sermon.id) + '" aria-label="' + (playing ? 'Pause' : 'Play') + ' recording">' + playIcon(playing) + '</button>' +
-        '<button type="button" class="sermon-skip" data-act="sermon-fwd" data-id="' + esc(sermon.id) + '" aria-label="Forward ' + SL.SKIP_SECONDS + ' seconds">+' + SL.SKIP_SECONDS + '</button>' +
-        '<button type="button" class="sermon-speed" data-act="sermon-speed" aria-label="Playback speed ' + speedLabel + '. Press to change.">' + speedLabel + '</button>' +
-      '</div>' +
-      '<div class="sermon-seek-row">' +
-        '<label class="sr-only" for="sermon-seek">Seek position</label>' +
-        '<input id="sermon-seek" class="sermon-seek" type="range" min="0" max="' + Math.max(1, Math.round(duration)) + '" step="1" value="' + Math.round(current) + '" data-sermon-id="' + esc(sermon.id) + '" aria-valuetext="' + SL.formatClock(current) + ' of ' + SL.formatClock(duration) + '">' +
-        '<span class="sermon-time" data-player-time>' + SL.formatClock(current) + ' / ' + SL.formatClock(duration) + '</span>' +
-      '</div>' +
-      status + download +
-    '</section>';
-  }
-
-  /* --- views --- */
-  function sermonMeta(sermon) {
-    var date = new Date(sermon.date + 'T00:00:00');
-    var when = isNaN(date.getTime()) ? sermon.date : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-    return esc(sermon.speaker) + ' · ' + esc(when);
-  }
-  views.sermons = function () {
-    var list = sermonList();
-    var cards = list.map(function (sermon) {
-      var heard = !!S.sermons.played[sermon.id];
-      var resume = S.sermons.positions[sermon.id] > 0;
-      var hasDeck = SERMON_DECKS.some(function (d) { return d.sermonId === sermon.id; });
-      var active = player.id === sermon.id;
-      return '<article class="sermon-card ' + esc(sermon.gradient || 'deck-grad-1') + '" aria-label="' + esc(sermon.title) + '">' +
-        '<button type="button" class="sermon-card-hit" data-act="open-sermon" data-id="' + esc(sermon.id) + '" aria-label="Open sermon: ' + esc(sermon.title) + '">' +
-          '<span class="sermon-card-eyebrow">' + (sermon.series ? esc(sermon.series) + ' · ' : '') + esc(sermon.scripture) + '</span>' +
-          '<h2 class="sermon-card-title">' + esc(sermon.title) + '</h2>' +
-          '<span class="sermon-card-meta">' + sermonMeta(sermon) + '</span>' +
-        '</button>' +
-        '<div class="sermon-card-foot">' +
-          '<span class="sermon-chips">' +
-            (sermon.audio ? '<span class="sermon-chip">Audio ' + esc(SL.formatMinutes(sermon.audio.durationSec)) + '</span>' : '') +
-            '<span class="sermon-chip">Read ' + esc(sermon.readMinutes) + ' min</span>' +
-            (hasDeck ? '<span class="sermon-chip">Quiz</span>' : '') +
-            (sermon.status === 'draft' ? '<span class="sermon-chip is-draft">Draft</span>' : '') +
-            (heard ? '<span class="sermon-chip is-heard"><span aria-hidden="true">✓</span> Heard</span>' : (resume ? '<span class="sermon-chip">In progress</span>' : '')) +
-          '</span>' +
-          (sermon.audio ? '<button type="button" class="sermon-card-play" data-act="sermon-toggle" data-id="' + esc(sermon.id) + '" aria-label="' + (active && player.playing ? 'Pause ' : 'Play ') + esc(sermon.title) + '">' + playIcon(active && player.playing) + '</button>' : '') +
-        '</div>' +
-      '</article>';
-    }).join('');
-    return '<section class="sermons-view" aria-labelledby="sermons-title">' +
-      '<header class="sermons-header"><h1 id="sermons-title">Sermons</h1><p class="meta">Listen, read and study the Sunday message.</p></header>' +
-      (cards ? '<div class="sermon-grid">' + cards + '</div>'
-        : '<div class="empty sermons-empty"><h2>No sermons yet</h2><p>New Sunday sermons will appear here with the recording, a written version and a quiz.</p></div>') +
-    '</section>';
-  };
-  views.sermon = function () {
-    var sermon = sermonById(V.id);
-    if (!sermon || !SL) return '<div class="empty"><h2>Sermon not found</h2><button class="btn primary sm" data-act="close-sermon">Back to Sermons</button></div>';
-    if (V.id && downloadState(V.id).state === 'unknown') { downloadState(V.id).state = 'checking'; refreshDownloadState(V.id); }
-    var gradClass = sermon.gradient || 'deck-grad-1';
-    var deckForSermon = SERMON_DECKS.filter(function (d) { return d.sermonId === sermon.id; })[0];
-    var more = sermonList().filter(function (item) { return item.id !== sermon.id; }).slice(0, 4);
-    var study = deckForSermon
-      ? '<section class="sermon-study-card" aria-labelledby="sermon-study-title"><h2 id="sermon-study-title">Study this sermon</h2><p>' + deckForSermon.cards.length + ' questions from this message.</p>' +
-          '<div class="sermon-study-actions"><button type="button" class="btn primary" data-act="sermon-study" data-mode="quiz" data-id="' + esc(deckForSermon.id) + '">Start quiz</button>' +
-          '<button type="button" class="btn" data-act="sermon-study" data-mode="flash" data-id="' + esc(deckForSermon.id) + '">Flashcards</button></div></section>'
-      : '';
-    return '<article class="devotional-view-shell sermon-view-shell" aria-labelledby="sermon-title">' +
-      '<header class="devotional-header ' + gradClass + '"><div class="devotional-nav-row">' +
-        '<button class="devotional-back-btn" data-act="close-sermon" aria-label="Back to Sermons"><span class="devotional-back-mobile">‹ Sermons</span><span class="devotional-back-desktop" aria-hidden="true">←</span></button>' +
-      '</div></header>' +
-      '<div class="devotional-reader-layout">' +
-        '<div class="devotional-content-body">' +
-          '<header class="devotional-reader-heading">' +
-            '<h1 id="sermon-title" class="devotional-title">' + esc(sermon.title) + '</h1>' +
-            (sermon.subtitle ? '<p class="devotional-sub">' + esc(sermon.subtitle) + '</p>' : '') +
-            '<span class="devotional-reader-meta">' + sermonMeta(sermon) + ' · ' + esc(sermon.scripture) + ' · ' + esc(sermon.readMinutes) + ' min read</span>' +
-          '</header>' +
-          sermonPlayerHtml(sermon) +
-          '<section class="devotional-reading-card" aria-label="Written sermon">' +
-            (sermon.scriptureText ? '<blockquote class="devotional-scripture-quote"><span class="devotional-scripture-link">' + esc(sermon.scripture) + '</span><p>' + esc(sermon.scriptureText) + '</p></blockquote>' : '') +
-            '<div class="devotional-paragraphs">' + sermon.body.map(function (p) { return '<p class="devotional-p">' + esc(p) + '</p>'; }).join('') + '</div>' +
-          '</section>' +
-          (sermon.reflection ? '<div class="devotional-callout reflection-box"><div class="callout-head"><span class="callout-icon" aria-hidden="true">💭</span><h2 class="callout-title">Reflection</h2></div><p class="callout-text">' + esc(sermon.reflection) + '</p></div>' : '') +
-          (sermon.step ? '<div class="devotional-callout step-box"><div class="callout-head"><span class="callout-icon" aria-hidden="true">👣</span><h2 class="callout-title">This week’s step</h2></div><p class="callout-text">' + esc(sermon.step) + '</p></div>' : '') +
-          study +
-        '</div>' +
-        '<aside class="devotional-reader-rail" aria-label="More sermons">' +
-          '<section class="devotional-more-card" aria-labelledby="more-sermons-title"><h2 id="more-sermons-title">More sermons</h2>' +
-            (more.length ? '<div class="devotional-more-list">' + more.map(function (item) {
-              return '<button class="devotional-more-item ' + esc(item.gradient || 'deck-grad-1') + '" data-act="open-sermon" data-id="' + esc(item.id) + '"><span>' + esc(item.title) + '</span><span class="devotional-more-readtime">' + esc(item.readMinutes) + ' min</span></button>';
-            }).join('') + '</div>' : '<p class="devotional-more-empty">More sermons will appear here.</p>') +
-            '<button class="devotional-view-all" data-act="close-sermon">All sermons</button>' +
-          '</section>' +
-        '</aside>' +
-      '</div>' +
-    '</article>';
-  };
-
-  function handleSermonAction(a, t) {
-    switch (a) {
-      case 'open-sermon': if (t.dataset.id) go({ name: 'sermon', id: t.dataset.id }); return true;
-      case 'close-sermon': go({ name: 'sermons' }); return true;
-      case 'sermon-toggle': togglePlayer(t.dataset.id); return true;
-      case 'sermon-back': skipPlayer(-SL.SKIP_SECONDS); return true;
-      case 'sermon-fwd': skipPlayer(SL.SKIP_SECONDS); return true;
-      case 'sermon-speed': cycleSpeed(); return true;
-      case 'sermon-close': closePlayer(); return true;
-      case 'sermon-download': startDownload(t.dataset.id); return true;
-      case 'sermon-download-cancel': cancelDownload(t.dataset.id); return true;
-      case 'sermon-download-remove': removeDownload(t.dataset.id); return true;
-      case 'sermon-study':
-        if (t.dataset.id && deck(t.dataset.id)) setup(t.dataset.mode === 'quiz' ? 'quiz' : 'flash', t.dataset.id);
-        return true;
-      default: return false;
-    }
-  }
-
   /* ---------- render ---------- */
   function render(keep) {
-    var isMainTab = MAIN_TABS.indexOf(V.name) >= 0;
-    var hasDesktopSidebar = isMainTab || V.name === 'devotional' || V.name === 'sermon';
-    var view = V.name === 'exam' ? views.quiz : views[V.name];
+    MAIN_TABS = S.settings.experience === 'sermons' ? SERMONS_TABS : DISCIPLESHIP_TABS;
+    var isSermon = isSermonRoute(V.name);
+    var isMainTab = MAIN_TABS.indexOf(V.name) >= 0 || isSermon;
+    var hasDesktopSidebar = isMainTab || V.name === 'devotional';
+    var view = isSermon && SermonUI ? function () { return SermonUI.render(V.name, sermonContext()); } : (V.name === 'exam' ? views.quiz : views[V.name]);
     if (typeof view !== 'function') view = views.home;
     var tabBarHtml = isMainTab ? renderTabBar(V.name) : '';
-    var showRocket = V.name === 'home' || V.name === 'journey';
+    var showRocket = S.settings.experience !== 'sermons' && (V.name === 'home' || V.name === 'journey');
     var rocketHtml = showRocket ? renderRocketFab() : '';
+    var reminderHtml = V.reminder && SermonUI ? SermonUI.renderReminder(sermonContext(), V.reminder) : '';
+    var miniPlayerHtml = S.settings.experience === 'sermons' ? renderSermonMiniPlayer() : '';
+    var priorAudio = app.querySelector('.sermon-audio');
+    var priorWasPlaying = false;
+    if (priorAudio) {
+      var priorState = sermonState();
+      if (priorAudio.dataset && priorState.audio.sermonId === priorAudio.dataset.id) {
+        priorState.audio.currentTime = Number(priorAudio.currentTime) || 0;
+        priorWasPlaying = !priorAudio.paused;
+        priorState.audio.playing = priorWasPlaying;
+        priorState.audio.playbackRate = Number(priorAudio.playbackRate) || 1;
+        S.sermons = priorState;
+      }
+      if (priorAudio.parentNode) priorAudio.parentNode.removeChild(priorAudio);
+    }
     app.innerHTML = banner() +
-      '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + '">' +
-        (hasDesktopSidebar ? renderDesktopSidebar(V.name === 'devotional' ? 'home' : (V.name === 'sermon' ? 'sermons' : V.name)) : '') +
-        '<main class="desktop-main">' + view() + tabBarHtml + rocketHtml + '</main>' +
+      '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + (isSermon || (S.settings.experience === 'sermons' && V.name === 'settings') ? ' desktop-shell-sermons' : '') + '">' +
+        (hasDesktopSidebar ? renderDesktopSidebar(V.name === 'devotional' ? 'home' : V.name) : '') +
+        '<main class="desktop-main">' + renderExperienceToggle() + reminderHtml + view() + miniPlayerHtml + tabBarHtml + rocketHtml + '</main>' +
       '</div>';
+    var activeAudio = Array.prototype.slice.call(app.querySelectorAll('.sermon-audio'))[0];
+    if (priorAudio && activeAudio && priorAudio.dataset.id === activeAudio.dataset.id && activeAudio.parentNode) {
+      activeAudio.parentNode.replaceChild(priorAudio, activeAudio);
+      activeAudio = priorAudio;
+      if (priorWasPlaying && activeAudio.paused && typeof activeAudio.play === 'function') activeAudio.play().catch(function () {});
+    } else if (priorAudio && !priorAudio.paused && typeof priorAudio.pause === 'function') priorAudio.pause();
+    if (activeAudio) {
+      var audioState = sermonState().audio;
+      if (audioState.sermonId === activeAudio.dataset.id) {
+        activeAudio.playbackRate = Number(audioState.playbackRate) || 1;
+        activeAudio.addEventListener('loadedmetadata', function () { if (audioState.currentTime > 0 && Number.isFinite(activeAudio.duration)) activeAudio.currentTime = Math.min(audioState.currentTime, activeAudio.duration); }, { once: true });
+      }
+      if (activeAudio.dataset.sermonEventsBound !== 'true') {
+        activeAudio.dataset.sermonEventsBound = 'true';
+        activeAudio.addEventListener('timeupdate', function () {
+          var state = sermonState(); if (state.audio.sermonId && state.audio.sermonId !== activeAudio.dataset.id) return; state.audio.sermonId = activeAudio.dataset.id; state.audio.currentTime = Number(activeAudio.currentTime) || 0; state.audio.playbackRate = Number(activeAudio.playbackRate) || 1; S.sermons = state;
+          var miniTime = app.querySelector('.sermon-mini-time'); if (miniTime) miniTime.textContent = Math.floor(state.audio.currentTime) + ' sec';
+          var bucket = Math.floor(state.audio.currentTime / 10); if (bucket !== lastAudioSaveBucket) { lastAudioSaveBucket = bucket; save(); }
+        });
+        activeAudio.addEventListener('play', function () { var state = sermonState(); state.audio.sermonId = activeAudio.dataset.id; state.audio.playing = true; S.sermons = state; save(); });
+        activeAudio.addEventListener('pause', function () { var state = sermonState(); if (state.audio.sermonId !== activeAudio.dataset.id) return; state.audio.playing = false; var position = Number(activeAudio.currentTime); if (Number.isFinite(position) && position >= 0) state.audio.currentTime = position; S.sermons = state; save(); });
+        activeAudio.addEventListener('ended', function () { var state = sermonState(); if (state.audio.sermonId !== activeAudio.dataset.id) return; state.audio.playing = false; state.audio.currentTime = 0; S.sermons = SermonStudy.recordMode(state, activeAudio.dataset.id, 'listen', Date.now()); save(); });
+      }
+    }
     if (!keep) window.scrollTo(0, 0);
-    syncMini(true); updateTimeUI();
     if (V.name === 'flash') {
       var f = app.querySelector('.flip');
       if (f) f.focus({ preventScroll: true });
@@ -2801,13 +2525,152 @@
     res.warnings.forEach(function (e) { IMP.warnings.push({ message: pre + e.message }); });
   }
 
+  function openSermonMode(id, mode) {
+    var item = sermonRecord(id);
+    if (!item) { toast('That sermon is not available in the catalogue.'); return; }
+    var progress = sermonState().progress[id];
+    if (!progress || !progress.coaching.completedAt) {
+      S.sermons = SermonStudy.startCoaching(S.sermons, id, Date.now());
+      save(); go(sermonRoute('sermons-coaching', id)); return;
+    }
+    var names = { listen: 'sermons-player', read: 'sermons-reader', quiz: 'sermons-quiz', flashcards: 'sermons-flashcards' };
+    if (!names[mode]) return;
+    var dataExists = mode === 'listen' ? !!item.audioUrl : mode === 'read' ? (item.sections || []).some(function (s) { return s && s.body; }) : mode === 'quiz' ? !!(item.quiz || []).length : !!(item.flashcards || []).length;
+    var route = names[mode], extra = mode === 'quiz' ? { quiz: { index: 0, answers: [] } } : mode === 'flashcards' ? { flash: { index: 0, flipped: false } } : {};
+    if (!dataExists) { go(sermonRoute(route, id, extra)); return; }
+    S.sermons = SermonStudy.startMode(S.sermons, id, mode, Date.now());
+    if (mode === 'listen') { var state = sermonState(); if (state.audio.sermonId !== id) state.audio.currentTime = 0; state.audio.sermonId = id; state.audio.playing = false; S.sermons = state; }
+    save(); go(sermonRoute(route, id, extra));
+  }
+  function answerSermonQuiz(choice) {
+    var item = sermonRecord(V.id), questions = item && Array.isArray(item.quiz) ? item.quiz : [], session = V.quiz;
+    if (!session || session.answers[session.index] || !questions[session.index]) return;
+    var q = questions[session.index], answer = q.answer;
+    if (typeof answer === 'string') answer = 'ABCD'.indexOf(answer.toUpperCase());
+    session.answers[session.index] = { choice: choice, correct: Number(answer) === choice, feedback: q.explanation || '' };
+    render(true);
+  }
+  function finishSermonQuiz() {
+    var item = sermonRecord(V.id), questions = item && item.quiz || [], session = V.quiz || { answers: [] };
+    var correct = session.answers.filter(function (answer) { return answer && answer.correct; }).length;
+    var score = questions.length ? Math.round(100 * correct / questions.length) : 0;
+    S.sermons = SermonStudy.recordQuiz(S.sermons, V.id, score, Date.now()); save();
+    go(sermonRoute('sermons-complete', V.id, { result: { score: score, correct: correct, total: questions.length, answers: session.answers.slice(), questions: questions } }));
+  }
+  function downloadSermonAudio(id, kind) {
+    var item = sermonRecord(id), url = item && (kind === 'coaching' ? item.coachingAudioUrl : item.audioUrl), downloadKey = id + ':' + kind;
+    if (!url) { toast('This audio is not available to download.'); return; }
+    if (sermonDownloadControllers[downloadKey]) { toast('A download is already in progress.'); return; }
+    var controller = typeof AbortController === 'function' ? new AbortController() : null;
+    sermonDownloadControllers[downloadKey] = controller || { abort: function () {} };
+    sermonDownloadProgress[id + ':' + kind] = { received: 0, total: 0, percent: null }; render(true);
+    SermonStudy.downloadAudio(url, { controller: controller, onProgress: function (p) {
+      sermonDownloadProgress[id + ':' + kind] = p;
+      var playerProgress = app.querySelector('.sermon-download-progress');
+      if (playerProgress && playerProgress.firstChild) playerProgress.firstChild.nodeValue = 'Downloading audio' + (p.percent == null ? '' : ' · ' + p.percent + '%') + ' ';
+      var listProgress = app.querySelector('.sermon-download-row p[role="status"]');
+      if (listProgress) listProgress.textContent = 'Download in progress' + (p.percent == null ? '' : ' · ' + p.percent + '%');
+    } }).then(function (result) {
+      var state = sermonState(), row = state.downloads[id] || { audio: false, coachingAudio: false, bytes: 0, updatedAt: null };
+      var byteKey = kind === 'coaching' ? 'coachingBytes' : 'audioBytes';
+      row[kind === 'coaching' ? 'coachingAudio' : 'audio'] = true; row[byteKey] = result.bytes; row.bytes = (Number(row.audioBytes) || 0) + (Number(row.coachingBytes) || 0); row.updatedAt = Date.now(); state.downloads[id] = row; S.sermons = state;
+      toast('Audio saved for offline use.');
+    }).catch(function (error) { toast(error && error.name === 'AbortError' ? 'Audio download canceled.' : (error.message || 'Audio download failed. Check your connection and storage.')); })
+      .finally(function () { delete sermonDownloadControllers[downloadKey]; delete sermonDownloadProgress[downloadKey]; save(); render(true); });
+  }
   /* ---------- events ---------- */
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-act]'); if (!t) return;
     var a = t.dataset.act, d;
-    if (SL && handleSermonAction(a, t)) return;
     switch (a) {
       case 'home': closeModal(); go({ name: 'home' }); break;
+      case 'experience-switch':
+        if (t.dataset.experience === 'sermons' || t.dataset.experience === 'discipleship') {
+          S.settings.experience = t.dataset.experience; V.reminder = null; save();
+          go({ name: t.dataset.experience === 'sermons' ? 'sermons-home' : 'home' });
+        }
+        break;
+      case 'sermon-nav': S.settings.experience = 'sermons'; save(); go(sermonRoute(t.dataset.tab, t.dataset.id)); break;
+      case 'sermon-open': S.settings.experience = 'sermons'; save(); go(sermonRoute('sermons-detail', t.dataset.id)); break;
+      case 'sermon-back':
+        if (V.name === 'sermons-detail') go({ name: 'sermons-library' });
+        else if (V.name === 'sermons-coaching') go(sermonRoute('sermons-detail', V.id));
+        else if (V.name === 'sermons-complete') go(sermonRoute('sermons-detail', V.id));
+        else go(sermonRoute('sermons-detail', V.id));
+        break;
+      case 'sermon-open-player': go(sermonRoute('sermons-player', t.dataset.id)); break;
+      case 'sermon-reader-complete': S.sermons = SermonStudy.recordMode(S.sermons, V.id, 'read', Date.now()); save(); go(sermonRoute('sermons-detail', V.id)); break;
+      case 'sermon-action': openSermonMode(t.dataset.id, t.dataset.mode); break;
+      case 'sermon-open-quiz': openSermonMode(t.dataset.id, 'quiz'); break;
+      case 'sermon-open-coaching':
+        S.settings.experience = 'sermons';
+        if (!sermonState().progress[t.dataset.id] || !sermonState().progress[t.dataset.id].coaching.completedAt) S.sermons = SermonStudy.startCoaching(S.sermons, t.dataset.id, Date.now());
+        save(); go(sermonRoute('sermons-coaching', t.dataset.id)); break;
+      case 'sermon-coaching-continue':
+        S.sermons = SermonStudy.completeCoaching(S.sermons, t.dataset.id, Date.now()); save(); go(sermonRoute('sermons-detail', t.dataset.id)); break;
+      case 'sermon-answer': answerSermonQuiz(+t.dataset.index); break;
+      case 'sermon-quiz-next':
+        if (V.quiz && V.quiz.index + 1 < ((sermonRecord(V.id) || {}).quiz || []).length) { V.quiz.index++; render(true); }
+        else finishSermonQuiz();
+        break;
+      case 'sermon-review':
+        var reviewResult = V.result || {}, reviewRows = (reviewResult.questions || []).map(function (q, i) {
+          var answer = (reviewResult.answers || [])[i], chosen = answer && q.options && q.options[answer.choice];
+          var answerIndex = typeof q.answer === 'string' ? 'ABCD'.indexOf(q.answer.toUpperCase()) : Number(q.answer);
+          return '<li><strong>' + esc(q.question || 'Question') + '</strong><p>Your answer: ' + esc(chosen || 'No answer') + (answer && answer.correct ? ' · Correct' : ' · Not correct') + '</p><p>Correct answer: ' + esc(q.options && q.options[answerIndex] || '') + '</p></li>';
+        }).join('');
+        openModal('<div class="scrim" data-act="close"></div><section class="sheet sermon-review-dialog" role="dialog" aria-modal="true" aria-labelledby="sermon-review-title"><h2 id="sermon-review-title">Review answers</h2><ol>' + reviewRows + '</ol><button class="btn primary" data-act="close">Done</button></section>'); break;
+      case 'sermon-retry': openSermonMode(V.id, 'quiz'); break;
+      case 'sermon-flip': if (V.flash) { V.flash.flipped = !V.flash.flipped; render(true); } break;
+      case 'sermon-flash-step':
+        var flashItem = sermonRecord(V.id), flashCards = flashItem && flashItem.flashcards || [];
+        if (V.flash && flashCards.length) {
+          var nextCard = V.flash.index + (+t.dataset.dir || 0);
+          if (nextCard >= flashCards.length) { S.sermons = SermonStudy.recordMode(S.sermons, V.id, 'flashcards', Date.now()); save(); go(sermonRoute('sermons-detail', V.id)); }
+          else if (nextCard >= 0) { V.flash.index = nextCard; V.flash.flipped = false; render(true); }
+        }
+        break;
+      case 'sermon-resume':
+        var resumeProgress = sermonState().progress[t.dataset.id];
+        if (resumeProgress && !resumeProgress.coaching.completedAt) { S.settings.experience = 'sermons'; S.sermons = SermonStudy.startCoaching(S.sermons, t.dataset.id, Date.now()); save(); go(sermonRoute('sermons-coaching', t.dataset.id)); }
+        else if (resumeProgress && resumeProgress.lastMode && (resumeProgress.modes || {})[resumeProgress.lastMode]) { S.settings.experience = 'sermons'; save(); openSermonMode(t.dataset.id, resumeProgress.lastMode); }
+        else { S.settings.experience = 'sermons'; go(sermonRoute('sermons-detail', t.dataset.id)); }
+        break;
+      case 'sermon-reminder-open':
+        V.reminder = null;
+        if (t.dataset.kind === 'unfinished') {
+          var unfinishedId = Object.keys(sermonState().progress).filter(function (id) { return sermonState().progress[id].unfinished; })[0];
+          if (unfinishedId) { var unfinishedProgress = sermonState().progress[unfinishedId]; S.settings.experience = 'sermons'; if (!unfinishedProgress.coaching.completedAt) go(sermonRoute('sermons-coaching', unfinishedId)); else if (unfinishedProgress.lastMode) openSermonMode(unfinishedId, unfinishedProgress.lastMode); else go(sermonRoute('sermons-detail', unfinishedId)); }
+          else { S.settings.experience = 'sermons'; go({ name: 'sermons-home' }); }
+        } else { S.settings.experience = 'sermons'; go({ name: 'sermons-home' }); }
+        save(); break;
+      case 'sermon-reminder-dismiss':
+        V.reminder = null; S.sermons = SermonStudy.markReminderShown(S.sermons, t.dataset.kind, SermonStudy.localDateKey(new Date())); save(); render(true); break;
+      case 'sermon-setting-toggle':
+        var remState = sermonState();
+        if (t.dataset.key === 'showDraftSermons') S.settings.showDraftSermons = !S.settings.showDraftSermons;
+        else if (t.dataset.key === 'regularEnabled' || t.dataset.key === 'unfinishedEnabled') remState.reminders[t.dataset.key] = !remState.reminders[t.dataset.key];
+        S.sermons = remState; save(); render(true); break;
+      case 'sermon-notification-enable':
+        if (!window.Notification) toast('Browser notifications are not supported here. In-app reminders appear on open.');
+        else if (window.Notification.permission === 'denied') toast('Notifications are blocked in browser settings. In-app reminders remain available.');
+        else window.Notification.requestPermission().then(function () { render(true); toast(sermonNotificationStatus()); }).catch(function () { toast('Notification permission could not be requested.'); });
+        break;
+      case 'sermon-download': downloadSermonAudio(t.dataset.id, t.dataset.kind || 'audio'); break;
+      case 'sermon-download-cancel': if (sermonDownloadControllers[t.dataset.id + ':' + (t.dataset.kind || 'audio')]) sermonDownloadControllers[t.dataset.id + ':' + (t.dataset.kind || 'audio')].abort(); break;
+      case 'sermon-remove-download':
+        var removeItem = sermonRecord(t.dataset.id), removeKind = t.dataset.kind || 'audio';
+        var removeUrl = removeItem && (removeKind === 'coaching' ? removeItem.coachingAudioUrl : removeItem.audioUrl);
+        SermonStudy.removeAudio(removeUrl).then(function () {
+          var removeState = sermonState(), downloadRow = removeState.downloads[t.dataset.id];
+          if (downloadRow) { var byteKey = removeKind === 'coaching' ? 'coachingBytes' : 'audioBytes'; downloadRow[removeKind === 'coaching' ? 'coachingAudio' : 'audio'] = false; downloadRow[byteKey] = 0; downloadRow.bytes = (Number(downloadRow.audioBytes) || 0) + (Number(downloadRow.coachingBytes) || 0); downloadRow.updatedAt = Date.now(); S.sermons = removeState; save(); }
+          render(true); toast('Offline audio removed.');
+        }).catch(function () { toast('The offline file could not be removed.'); });
+        break;
+      case 'sermon-storage-refresh':
+        if (navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(function (estimate) { toast('Storage in use: ' + Math.round((estimate.usage || 0) / 1048576) + ' MB'); }).catch(function () { toast('Storage estimate is unavailable.'); });
+        else toast('Storage estimates are not supported by this browser.');
+        break;
       case 'open-chapter': go({ name: 'chapter', id: t.dataset.id }); break;
       case 'lesson-detail-open': openLessonDetailSheet(t.dataset.id); break;
       case 'lesson-detail-study':
@@ -3136,16 +2999,23 @@
     else if ('selall' in t.dataset) { SEL = t.checked ? new Set(S.decks.map(function (d) { return d.id; })) : new Set(); render(true); }
     else if ('rename' in t.dataset) { var d = deck(V.id), v = t.value.trim(); if (v) { d.title = v; save(); toast('Renamed'); } else t.value = d.title; }
     else if (t.id === 'files' && t.files.length) { IMP.text = ''; readFiles(t.files); }
+    else if (t.dataset.actChange === 'sermon-days') {
+      var reminderState = sermonState(); reminderState.reminders.days = Array.prototype.map.call(t.selectedOptions, function (option) { return +option.value; }); S.sermons = reminderState; save();
+    } else if (t.dataset.actChange === 'sermon-time') {
+      var timeState = sermonState(); timeState.reminders.time = t.value; S.sermons = timeState; save();
+    } else if (t.dataset.actChange === 'sermon-speed') {
+      var audio = app.querySelector('.sermon-audio'); if (audio) audio.playbackRate = Number(t.value) || 1;
+      var speedState = sermonState(); speedState.audio.playbackRate = Number(t.value) || 1; S.sermons = speedState; save();
+    }
   });
   document.addEventListener('submit', function (e) { e.preventDefault(); });
   document.addEventListener('input', function (e) {
-    if (e.target.id === 'sermon-seek' && SL) {
-      var seekId = e.target.dataset.sermonId, seekValue = Number(e.target.value);
-      if (player.id === seekId) seekPlayer(seekValue);
-      else if (sermonById(seekId)) { S.sermons.positions[seekId] = Math.round(seekValue); loadSermon(sermonById(seekId), false); }
-    } else if (e.target.id === 'filter') {
+    if (e.target.id === 'filter') {
       V.filter = e.target.value; var f = V.filter.toLowerCase();
       app.querySelectorAll('.crow').forEach(function (r) { r.hidden = !!f && r.dataset.text.indexOf(f) < 0; });
+    } else if (e.target.id === 'sermon-search') {
+      var sermonQuery = e.target.value.trim().toLowerCase();
+      app.querySelectorAll('.sermon-card[data-search]').forEach(function (card) { card.hidden = !!sermonQuery && card.dataset.search.indexOf(sermonQuery) < 0; });
     } else if (e.target.id === 'deck-search') {
       homeFilter = e.target.value.trim(); var q = homeFilter.toLowerCase(), visible = 0;
       app.querySelectorAll('.chapter-card[data-deck-name], .deck[data-deck-name]').forEach(function (r) {
@@ -3223,7 +3093,6 @@
       if (V.name === 'picker') { go({ name: V.from || 'home' }); return; }
       if (isStudySession(V.name)) { pauseStudySession(); return; }
       if (V.name === 'devotional') { go({ name: 'home' }); return; }
-      if (V.name === 'sermon') { go({ name: 'sermons' }); return; }
       if (V.name !== 'home') { go({ name: 'home' }); return; }
       window.CciNative.exitApp().catch(function () {});
     }).catch(function () {});
@@ -3236,21 +3105,24 @@
     return Promise.all([load(), loadStarterText(), loadDevotionals(), loadSermons()]).then(function (results) {
       var text = results[1];
       DEVOTIONALS = results[2] || [];
-      applySermons(results[3]);
+      SERMONS = results[3] || [];
       STARTER_DECKS = P.parseDecks(text).decks;
-      var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION;
+      var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION - 1;
       var isFirstRun = !S.seeded && (!S.onboarding || !S.onboarding.completed);
       seed();
       if (reconcileStarters && syncStarterDecks()) save();
       return applyDataMigrations().then(function () {
+        S.sermons = SermonStudy.normalizeState(S.sermons);
+        S.sermons.audio.playing = false;
         if (S.pausedSession) {
-          var restoredSession = MobileStudy.restore(S.pausedSession, S.decks.concat(SERMON_DECKS));
+          var restoredSession = MobileStudy.restore(S.pausedSession, S.decks);
           S.pausedSession = restoredSession ? MobileStudy.snapshot(restoredSession) : null;
         }
         applyTheme();
         if (isFirstRun) {
           V = { name: 'onboarding', step: 0, answers: MobileStudy.defaultOnboarding(false) };
-        }
+        } else if (S.settings.experience === 'sermons' && V.name === 'home') V = { name: 'sermons-home' };
+        checkSermonReminders();
         render();
         registerServiceWorker();
         registerNativeNavigation();
