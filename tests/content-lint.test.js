@@ -285,7 +285,7 @@ test('stored progress survives starter duplicate removal and renumbering', async
   const bible1 = migrated.decks.find(deck => deck.id === section7);
   const bible = migrated.decks.find(deck => deck.id === section8);
   const churchHistory = migrated.decks.find(deck => deck.id === section12);
-  assert.equal(migrated.dataVersion, 12);
+  assert.equal(migrated.dataVersion, 13);
   assert.ok(Number.isFinite(migrated.backupReminder.anchorAt));
   assert.equal(migrated.backupReminder.cardsStudied, 0);
   assert.ok(storageKeys.length > 0 && storageKeys.every(key => key === 'flashdecks.v1'));
@@ -346,9 +346,43 @@ test('duplicate starter-topic decks collapse into the canonical deck and keep ma
   const topicDecks = migrated.decks.filter(deck => /predestination and trinity/i.test(deck.title.replace(/&/g, 'and')));
   assert.equal(topicDecks.length, 1);
   assert.equal(topicDecks[0].id, canonicalId);
+  assert.equal(migrated.decks[2].id, canonicalId, 'Predestination & Trinity should be Lesson 3, after Soteriology II');
   assert.deepEqual(migrated.progress[canonicalId].cards[`${canonicalId}.${question.id}`], { box: 3, attempts: 4 });
   assert.equal(migrated.progress[canonicalId].best.pct, 90);
   assert.equal(migrated.progress[duplicateId], undefined);
+});
+
+test('version 12 learners get starter lessons reordered while custom decks remain after them', async () => {
+  const starterIds = parsed.decks.map(deck => 'd-' + deck.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60));
+  const storedDeck = id => {
+    const deck = parsed.decks.find(item => 'd-' + item.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) === id);
+    return { id, title: deck.title, cards: [] };
+  };
+  const outOfOrderIds = [starterIds[2], starterIds[1], starterIds[0]];
+  let stored = JSON.stringify({
+    decks: [storedDeck(outOfOrderIds[0]), { id: 'custom-deck', title: 'My Study Deck', cards: [] }, storedDeck(outOfOrderIds[1]), storedDeck(outOfOrderIds[2])],
+    progress: {},
+    settings: { theme: 'auto', shuffle: false },
+    seeded: true,
+    dataVersion: 12
+  });
+  const elements = {
+    app: { innerHTML: '', querySelectorAll: () => [], querySelector: () => null },
+    modal: { innerHTML: '' },
+    toast: { textContent: '', className: '' },
+    'starter-fallback': { textContent: JSON.stringify(starter) }
+  };
+  const document = { getElementById: id => elements[id], addEventListener: () => {}, documentElement: { removeAttribute: () => {}, setAttribute: () => {} } };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, SermonStudy, SermonUI, location: { protocol: 'file:' }, scrollTo: () => {} };
+  const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
+  vm.runInNewContext(testAppSource, { window, document, localStorage: { getItem: () => stored, setItem: (_, value) => { stored = value; } } });
+  await window.testAppReady;
+
+  const migrated = JSON.parse(stored);
+  assert.deepEqual(migrated.decks.slice(0, starterIds.length).map(deck => deck.id), starterIds);
+  assert.equal(migrated.decks[2].title, parsed.decks[2].title);
+  assert.equal(migrated.decks[2].cards.length, parsed.decks[2].questions.length, 'existing learners should receive the current Lesson 3 deck content');
+  assert.equal(migrated.decks[starterIds.length].id, 'custom-deck');
 });
 
 test('HTTP loads split decks with fetch and file URLs use the embedded fallback', async () => {
