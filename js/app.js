@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 12;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 13;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
   var S = { decks: [], progress: {}, sermons: SermonStudy ? SermonStudy.createState() : {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
   var STARTER_DECKS = [], DEVOTIONALS = [], SERMONS = [], sermonDownloadControllers = {};
@@ -459,6 +459,20 @@
           delete S.progress[duplicate.id];
         });
       });
+    } },
+    { version: 13, run: function () {
+      var starterIds = Object.create(null), ordered = [];
+      STARTER_DECKS.forEach(function (source) {
+        if (!source.questions.length) return;
+        var id = 'd-' + slug(source.title), saved = deck(id);
+        if (!saved) return;
+        starterIds[id] = true;
+        ordered.push(saved);
+      });
+      S.decks.forEach(function (saved) {
+        if (!starterIds[saved.id]) ordered.push(saved);
+      });
+      S.decks = ordered;
     } }
   ];
   function applyDataMigrations() {
@@ -3192,7 +3206,7 @@
       DEVOTIONALS = results[2] || [];
       SERMONS = results[3] || [];
       STARTER_DECKS = P.parseDecks(text).decks;
-      var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION - 2;
+      var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION - 3;
       var isFirstRun = !S.seeded && (!S.onboarding || !S.onboarding.completed);
       seed();
       if (reconcileStarters && syncStarterDecks()) save();
