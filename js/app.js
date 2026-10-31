@@ -935,14 +935,15 @@
       : (dueCount ? 'Your next step: ' + plural(dailyFocusCount, 'card') : (totalKnown < totalCards ? 'A little progress goes a long way' : 'You’ve mastered every card'));
     var desktopHeroDescription = S.pausedSession
       ? 'Your study session is ready when you are.'
-      : (dueCount ? plural(dueCount, 'card') + ' are ready for review. Start with your daily focus.' : 'Keep your rhythm going with a focused review.');
+      : (dueCount ? plural(dueCount, 'card') + ' are ready to study. Start with your daily focus.' : 'Keep your rhythm going with a focused review.');
     var desktopHeroAction = S.pausedSession ? 'resume-study' : dailyAction;
     var desktopHero = '<section class="desktop-today-card" aria-label="Today’s study">' +
       '<div class="desktop-today-copy">' +
         '<p class="desktop-today-eyebrow">Today’s study</p>' +
         '<h2>' + esc(desktopHeroTitle) + '</h2>' +
         '<p>' + esc(desktopHeroDescription) + '</p>' +
-        '<button type="button" class="desktop-today-action" data-act="' + desktopHeroAction + '">Continue</button>' +
+        '<div class="desktop-today-actions"><button type="button" class="desktop-today-action" data-act="' + desktopHeroAction + '">Continue</button>' +
+        (S.pausedSession ? '<button type="button" class="desktop-today-action-secondary" data-act="discard-study">End session</button>' : '') + '</div>' +
       '</div>' +
       '<svg class="desktop-today-landscape" viewBox="0 0 440 170" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">' +
         '<circle cx="335" cy="48" r="30" fill="#FFE6A8"/>' +
@@ -953,7 +954,7 @@
 
     var desktopStats = '<section class="desktop-home-stats" aria-label="Study statistics">' +
       '<div class="desktop-stat-card"><strong>' + masterPct + '%</strong><span>Mastered</span></div>' +
-      '<div class="desktop-stat-card"><strong>' + dueCount + '</strong><span>Due today</span></div>' +
+      '<div class="desktop-stat-card"><strong>' + dueCount + '</strong><span>Ready to study</span></div>' +
       '<div class="desktop-stat-card"><strong>' + totalCards.toLocaleString() + '</strong><span>Cards</span></div>' +
     '</section>';
 
@@ -1279,7 +1280,7 @@
       '</button>';
     }).join('');
     var startText = mode === 'challenge' ? 'Start challenge' : mode === 'exam' ? 'Start exam' : V.practiceMixed ? (mode === 'flash' ? 'Start mixed flashcards' : 'Start mixed review') : 'Start ' + (mode === 'flash' ? 'flashcards' : 'quiz') + (selectedCount ? ' · ' + selectedCount + ' ' + (selectedCount === 1 ? 'set' : 'sets') : '');
-    var startDisabled = !selectedCount && mode !== 'challenge' && mode !== 'exam';
+    var startDisabled = !selectedCount && mode !== 'challenge';
     return '<section class="practice-selection-view" aria-labelledby="practice-title">' +
       '<header class="view-header practice-view-header">' +
         '<h1 id="practice-title">Practice</h1>' +
@@ -1342,7 +1343,7 @@
       '<div class="stat"><b>' + S.decks.length + '</b><span>Lessons</span></div>' +
       '<div class="stat"><b>' + totalCards + '</b><span>Cards</span></div>' +
       '<div class="stat"><b>' + masterPct + '%</b><span>Mastered</span></div>' +
-      '<div class="stat stat-due"><b>' + dueCount + '</b><span>Due Today</span></div>' +
+      '<div class="stat stat-due"><b>' + dueCount + '</b><span>Ready to study</span></div>' +
     '</div>' +
     (streak > 0 ? '<div class="streak-card"><span class="flame-icon">🔥</span><div><b>' + streak + ' Day Study Streak</b><p>Keep studying daily to maintain momentum.</p></div></div>' : '') +
     '<div class="progress-decks-card">' +
@@ -2386,18 +2387,64 @@
          : '<label class="check"><input type="checkbox" id="s-shuf"' + (S.settings.shuffle ? ' checked' : '') + '> Shuffle cards</label>') +
       '<label class="check"><input type="checkbox" id="s-unk"> Skip cards I already know</label><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="start">Start</button></div></div>');
   }
-  function setupExam() {
-    V.setup = { mode: 'exam', ids: S.decks.map(function (d) { return d.id; }) };
-    var total = S.decks.reduce(function (count, d) { return count + d.cards.length; }, 0);
+  function setupExam(ids, mixed, defaultCount, defaultMinutes) {
+    var selectedIds = ids && ids.length ? ids.slice() : S.decks.map(function (d) { return d.id; });
+    var cards = [];
+    selectedIds.forEach(function (id) {
+      var d = deck(id);
+      if (d) d.cards.forEach(function (c) { cards.push({ deckId: id, card: c }); });
+    });
+    if (mixed) {
+      var available = allCardItems();
+      var eligible = StudyLogic.dueItems(available, Date.now()).concat(StudyLogic.weakSpots(available, 10));
+      var eligibleKeys = Object.create(null);
+      eligible.forEach(function (item) { eligibleKeys[JSON.stringify([item.deckId, item.card.id])] = true; });
+      cards = cards.filter(function (item) { return eligibleKeys[JSON.stringify([item.deckId, item.card.id])]; });
+    }
+    var total = cards.length;
+    if (!total) { toast('No questions are available for this exam.'); return; }
+    var countChoices = [10, 20, 30, 60].filter(function (count) { return count <= total; });
+    var selectedCount = countChoices.indexOf(defaultCount) >= 0
+      ? defaultCount
+      : (countChoices.indexOf(20) >= 0 ? 20 : (countChoices[0] || 0));
+    var countOptions = countChoices.map(function (count) {
+      return '<option value="' + count + '"' + (selectedCount === count ? ' selected' : '') + '>' + count + '</option>';
+    }).join('');
+    if (countChoices.indexOf(total) < 0) {
+      countOptions += '<option value="0"' + (!selectedCount ? ' selected' : '') + '>All ' + total + '</option>';
+    }
+    var baseMinutes = Number.isFinite(defaultMinutes) && defaultMinutes > 0 ? defaultMinutes : 30;
+    var baseCount = selectedCount || total;
+    var scopeText;
+    if (mixed) {
+      scopeText = 'Questions will come from due and weak cards.';
+    } else if (selectedIds.length === 1) {
+      var selectedDeck = deck(selectedIds[0]);
+      scopeText = 'Questions will come from ' + (selectedDeck ? MobileStudy.parseChapterTitle(selectedDeck.title).topic : 'the selected lesson') + '.';
+    } else if (selectedIds.length === S.decks.length) {
+      scopeText = 'Questions are mixed across all lessons.';
+    } else {
+      scopeText = 'Questions are mixed across the selected lessons.';
+    }
+    V.setup = { mode: 'exam', ids: selectedIds, mixed: !!mixed, cards: cards };
     openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="exam-setup-title"><h2 id="exam-setup-title">Start exam</h2>' +
-      '<label class="field"><span>Question count</span><select id="exam-count"><option value="10">10</option><option value="20" selected>20</option><option value="30">30</option><option value="0">All ' + total + '</option></select></label>' +
-      '<label class="field"><span>Time limit (minutes)</span><input id="exam-minutes" type="number" min="1" max="180" value="30"></label>' +
-      '<p class="note">Questions are mixed across all decks. Answers and explanations appear after submission.</p>' +
+      '<label class="field"><span>Question count</span><select id="exam-count">' + countOptions + '</select></label>' +
+      '<label class="field"><span>Time limit (minutes)</span><input id="exam-minutes" type="number" min="1" max="180" value="' + baseMinutes + '"></label>' +
+      '<p class="note">' + esc(scopeText) + ' ' + total + ' questions available. Answers and explanations appear after submission.</p>' +
       '<div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="start">Start exam</button></div></div>');
+    var countSelect = document.getElementById('exam-count');
+    var minutesInput = document.getElementById('exam-minutes');
+    var autoTime = true;
+    if (minutesInput) minutesInput.addEventListener('input', function () { autoTime = false; });
+    if (countSelect && minutesInput) countSelect.addEventListener('change', function () {
+      if (!autoTime) return;
+      var questionCount = +countSelect.value || total;
+      minutesInput.value = Math.max(1, Math.min(180, Math.ceil(baseMinutes * questionCount / baseCount)));
+    });
   }
   function start() {
-    var s = V.setup, cards = [];
-    s.ids.forEach(function (id) { var d = deck(id); if (d) d.cards.forEach(function (c) { cards.push({ deckId: id, card: c }); }); });
+    var s = V.setup, cards = s.cards ? s.cards.slice() : [];
+    if (!s.cards) s.ids.forEach(function (id) { var d = deck(id); if (d) d.cards.forEach(function (c) { cards.push({ deckId: id, card: c }); }); });
     var exam = s.mode === 'exam';
     var o = exam
       ? { unk: false, limit: +document.getElementById('exam-count').value, shuf: true, duration: Math.max(1, Math.min(180, +document.getElementById('exam-minutes').value || 30)) * 60 * 1000, saveBest: false }
@@ -2745,11 +2792,7 @@
         break;
       case 'chapter-exam':
         var ceDeck = deck(t.dataset.id);
-        if (ceDeck) {
-          var ceCards = ceDeck.cards.map(function (c) { return { deckId: ceDeck.id, card: c }; });
-          var ceCount = Math.min(20, ceCards.length);
-          begin('exam', StudyLogic.examQuestions(ceCards, ceCount), { unk: false, limit: ceCount, shuf: true, duration: 15 * 60 * 1000, saveBest: false }, [ceDeck.id]);
-        }
+        if (ceDeck) setupExam([ceDeck.id], false, 20, 15);
         break;
 
       case 'nav-tab': closeModal(); if (t.dataset.tab) go({ name: t.dataset.tab }); break;
@@ -2921,7 +2964,11 @@
       case 'practice-start':
         var practiceMode = t.dataset.mode || V.practiceMode || 'quiz';
         var practiceIds = Array.from(SEL);
-        if (practiceMode === 'exam') setupExam();
+        if (practiceMode === 'exam') {
+          if (V.practiceMixed) setupExam(null, true);
+          else if (practiceIds.length) setupExam(practiceIds, false);
+          else toast('Choose one or more lessons to cover.');
+        }
         else if (practiceMode === 'challenge') startChallenge(practiceIds.length ? practiceIds : null);
         else if (V.practiceMixed) startChallenge(null, practiceMode);
         else if (!practiceIds.length) toast('Choose one or more lessons to cover.');
