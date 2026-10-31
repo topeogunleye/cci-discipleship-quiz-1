@@ -3145,7 +3145,7 @@
       DEVOTIONALS = results[2] || [];
       SERMONS = results[3] || [];
       STARTER_DECKS = P.parseDecks(text).decks;
-      var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION - 1;
+      var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION - 2;
       var isFirstRun = !S.seeded && (!S.onboarding || !S.onboarding.completed);
       seed();
       if (reconcileStarters && syncStarterDecks()) save();
