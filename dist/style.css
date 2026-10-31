@@ -4798,6 +4798,13 @@ button.opt.wrong .opt-badge {
   }
 }
 
+@media (max-width: 640px) {
+  .rocket-container,
+  .rocket-backdrop {
+    display: none;
+  }
+}
+
 .rocket-container > * {
   pointer-events: auto;
 }
@@ -5496,6 +5503,53 @@ html[data-theme="dark"] .picker-selection-footer {
   color: #3624A4;
   font: inherit;
   font-weight: 700;
+}
+
+.desktop-today-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.desktop-today-actions .desktop-today-action,
+.desktop-shell-home .desktop-today-actions .desktop-today-action {
+  margin-top: 0;
+}
+
+.mobile-home-content .desktop-today-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mobile-home-content .desktop-today-actions .desktop-today-action {
+  margin-top: 0;
+}
+
+.desktop-today-actions .desktop-today-action-secondary {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.desktop-today-actions .desktop-today-action-secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.desktop-today-actions .desktop-today-action-secondary:focus-visible {
+  outline: 3px solid #FFE6A8;
+  outline-offset: 3px;
 }
 
 .mobile-home-content .desktop-home-stats {
@@ -6239,6 +6293,10 @@ html[data-theme="dark"] .picker-selection-footer {
     font-weight: 700;
     cursor: pointer;
     transition: transform var(--duration-fast) ease, background var(--duration-fast) ease;
+  }
+
+  .desktop-today-actions {
+    margin-top: 20px;
   }
 
   .desktop-today-action:hover {
