@@ -381,6 +381,7 @@ test('version 12 learners get starter lessons reordered while custom decks remai
   const migrated = JSON.parse(stored);
   assert.deepEqual(migrated.decks.slice(0, starterIds.length).map(deck => deck.id), starterIds);
   assert.equal(migrated.decks[2].title, parsed.decks[2].title);
+  assert.equal(migrated.decks[2].cards.length, parsed.decks[2].questions.length, 'existing learners should receive the current Lesson 3 deck content');
   assert.equal(migrated.decks[starterIds.length].id, 'custom-deck');
 });
 
