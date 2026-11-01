@@ -3,7 +3,7 @@
   var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 14;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
   var S = { decks: [], progress: {}, sermons: SermonStudy ? SermonStudy.createState() : {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
-  var STARTER_DECKS = [], DEVOTIONALS = [], SERMONS = [], sermonDownloadControllers = {};
+  var STARTER_DECKS = [], DEVOTIONALS = [], SERMONS = [], LESSON_VIDEOS = [], sermonDownloadControllers = {};
   var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, biblePreviewCache = null, suppressBiblePreviewFocus = null;
   var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null }, sermonAudioElement = null, sermonDownloadProgress = {}, lastAudioSaveBucket = -1;
   var browserLocalStorage = null, browserIndexedDB = null;
@@ -318,6 +318,51 @@
       return response.json();
     }).then(function (data) { var normalized = normalizeSermons(data); return normalized.length || (data && Array.isArray(data.sermons) && data.sermons.length === 0) ? normalized : normalizeSermons(fallback); })
       .catch(function () { return normalizeSermons(fallback); });
+  }
+
+  function inlineLessonVideosData() {
+    var el = document.getElementById('lesson-videos-fallback');
+    if (!el) return { schemaVersion: 1, videos: [] };
+    try { return JSON.parse(el.textContent || '{"schemaVersion":1,"videos":[]}'); } catch (e) { return { schemaVersion: 1, videos: [] }; }
+  }
+  function normalizeLessonVideos(data) {
+    if (!data || data.schemaVersion !== 1 || !Array.isArray(data.videos)) return [];
+    function mediaUrl(value) {
+      if (typeof value !== 'string' || !value.trim()) return '';
+      try {
+        var parsed = new URL(value.trim(), window.location && window.location.href || 'http://localhost/');
+        if (parsed.protocol !== 'https:' && !(window.location && parsed.origin === window.location.origin && parsed.protocol === 'http:')) return '';
+        return value.trim();
+      } catch (e) { return ''; }
+    }
+    return data.videos.filter(function (item) {
+      return item && /^[a-zA-Z0-9._-]{1,120}$/.test(item.id || '') && /^d-[a-z0-9-]{1,120}$/.test(item.deckId || '') && typeof item.title === 'string';
+    }).map(function (item) {
+      return {
+        id: item.id,
+        deckId: item.deckId,
+        title: item.title.trim(),
+        videoUrl: mediaUrl(item.videoUrl),
+        posterUrl: mediaUrl(item.posterUrl),
+        captionsUrl: mediaUrl(item.captionsUrl),
+        captionsLanguage: typeof item.captionsLanguage === 'string' && /^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,8})*$/.test(item.captionsLanguage) ? item.captionsLanguage : 'en',
+        captionsLabel: typeof item.captionsLabel === 'string' && item.captionsLabel.trim() ? item.captionsLabel.trim() : 'English'
+      };
+    }).filter(function (item) { return !!item.videoUrl; });
+  }
+  function loadLessonVideos() {
+    var fallback = inlineLessonVideosData();
+    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(normalizeLessonVideos(fallback));
+    return window.fetch('content/lesson-videos.json').then(function (response) {
+      if (!response.ok) throw new Error('Could not load lesson videos');
+      return response.json();
+    }).then(function (data) {
+      var normalized = normalizeLessonVideos(data);
+      return normalized.length || (data && Array.isArray(data.videos) && data.videos.length === 0) ? normalized : normalizeLessonVideos(fallback);
+    }).catch(function () { return normalizeLessonVideos(fallback); });
+  }
+  function lessonVideosForDeck(deckId) {
+    return LESSON_VIDEOS.filter(function (item) { return item.deckId === deckId; });
   }
 
   function sermonState() { return SermonStudy.normalizeState(S.sermons); }
@@ -1477,6 +1522,10 @@
       '</div>' +
       chapterSvgIllustration(secNum) +
     '</header>' +
+    '<section class="chapter-video-entry" aria-labelledby="chapter-video-title">' +
+      '<div class="chapter-video-copy"><span class="eyebrow">VIDEO LESSON</span><h2 id="chapter-video-title">Watch this chapter</h2><p>' + (lessonVideosForDeck(d.id).length ? plural(lessonVideosForDeck(d.id).length, 'recording') + ' available. Watch, then reinforce the lesson with flashcards or a quiz.' : 'No recording is linked yet. You can still study with flashcards or take the chapter quiz.') + '</p></div>' +
+      '<button type="button" class="btn primary" data-act="open-lesson-video" data-id="' + esc(d.id) + '">Open video lesson</button>' +
+    '</section>' +
     '<section class="chapter-timeline-section" aria-label="Study Steps">' +
       '<div class="timeline-intro">' +
         '<h2>Study Timeline</h2>' +
@@ -1484,6 +1533,27 @@
       '</div>' +
       '<div class="chapter-timeline">' + timelineHtml + '</div>' +
     '</section>';
+  };
+
+  views['lesson-video'] = function () {
+    var d = deck(V.id);
+    if (!d) return '<div class="lesson-video-page"><p class="lesson-video-alert" role="status">This lesson is unavailable.</p><button type="button" class="btn" data-act="nav-tab" data-tab="journey">Back to Journey</button></div>';
+    var parsed = MobileStudy.parseChapterTitle(d.title), section = parsed.sectionNum || 1;
+    var videos = lessonVideosForDeck(d.id), index = Math.max(0, Math.min(Number.isInteger(V.videoIndex) ? V.videoIndex : 0, videos.length - 1));
+    var video = videos[index] || null, title = video ? video.title : parsed.topic + ' video lesson';
+    var player = video
+      ? '<video class="lesson-video-player" id="lesson-video-player" controls playsinline preload="metadata"' + (video.posterUrl ? ' poster="' + esc(video.posterUrl) + '"' : '') + ' aria-label="Video lesson: ' + esc(title) + '"><source src="' + esc(video.videoUrl) + '">' + (video.captionsUrl ? '<track kind="captions" src="' + esc(video.captionsUrl) + '" srclang="' + esc(video.captionsLanguage) + '" label="' + esc(video.captionsLabel) + '" default>' : '') + '<span>Your browser does not support video playback.</span></video>'
+      : '<div class="lesson-video-unavailable" role="status"><strong>Lesson video not available yet</strong><p>The ' + esc(parsed.topic) + ' video has not been added yet. Use Flashcards or Take quiz below.</p></div>';
+    var videoNav = videos.length > 1
+      ? '<nav class="lesson-video-segments" aria-label="Videos in this chapter">' + videos.map(function (item, itemIndex) { return '<button type="button" class="lesson-video-segment' + (itemIndex === index ? ' is-active' : '') + '" data-act="lesson-video-select" data-index="' + itemIndex + '" aria-current="' + (itemIndex === index ? 'true' : 'false') + '">' + (itemIndex + 1) + '. ' + esc(item.title) + '</button>'; }).join('') + '</nav>'
+      : '<div class="lesson-video-progress" aria-label="Chapter ' + section + ' of ' + S.decks.length + '"><span>Chapter ' + section + ' of ' + S.decks.length + '</span><progress value="' + section + '" max="' + S.decks.length + '">Chapter ' + section + ' of ' + S.decks.length + '</progress></div>';
+    return '<main class="lesson-video-page" aria-labelledby="lesson-video-title">' +
+      '<header class="lesson-video-topbar"><button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button><div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong></div><span class="lesson-video-section-count">' + section + ' / ' + S.decks.length + '</span></header>' +
+      '<section class="lesson-video-frame' + (video ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
+      '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title">' + esc(title) + '</h1><p>Watch the lesson, then reinforce what you learned with a quick study activity.</p></div>' + (video ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">Continue lesson</button>' : '') + '</section>' +
+      '<div class="lesson-video-study-actions" role="group" aria-label="Study this lesson"><button type="button" class="btn" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '">Flashcards</button><button type="button" class="btn" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '">Take quiz</button></div>' +
+      videoNav +
+    '</main>';
   };
 
 
@@ -2527,7 +2597,7 @@
     var tabBarHtml = isMainTab ? renderTabBar(V.name) : '';
     var showRocket = S.settings.experience !== 'sermons' && (V.name === 'home' || V.name === 'journey');
     var rocketHtml = showRocket ? renderRocketFab() : '';
-    var reminderHtml = V.reminder && SermonUI ? SermonUI.renderReminder(sermonContext(), V.reminder) : '';
+    var reminderHtml = V.name !== 'lesson-video' && V.reminder && SermonUI ? SermonUI.renderReminder(sermonContext(), V.reminder) : '';
     var miniPlayerHtml = S.settings.experience === 'sermons' ? renderSermonMiniPlayer() : '';
     var priorAudio = app.querySelector('.sermon-audio');
     var priorWasPlaying = false;
@@ -2545,7 +2615,7 @@
     app.innerHTML = banner() +
       '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + (isSermon || (S.settings.experience === 'sermons' && V.name === 'settings') ? ' desktop-shell-sermons' : '') + '">' +
         (hasDesktopSidebar ? renderDesktopSidebar(V.name === 'devotional' ? 'home' : V.name) : '') +
-        '<main class="desktop-main">' + renderExperienceToggle() + reminderHtml + view() + miniPlayerHtml + tabBarHtml + rocketHtml + '</main>' +
+        '<main class="desktop-main">' + (V.name === 'lesson-video' ? '' : renderExperienceToggle()) + reminderHtml + view() + miniPlayerHtml + tabBarHtml + rocketHtml + '</main>' +
       '</div>';
     var activeAudio = Array.prototype.slice.call(app.querySelectorAll('.sermon-audio'))[0];
     if (priorAudio && activeAudio && priorAudio.dataset.id === activeAudio.dataset.id && activeAudio.parentNode) {
@@ -2592,6 +2662,7 @@
         if (replace) {
           window.history.replaceState(stateObj, '', window.location.href);
         } else if (!prev || prev.name !== V.name || prev.id !== V.id) {
+          stateObj.videoIndex = Number.isInteger(V.videoIndex) ? V.videoIndex : 0;
           window.history.pushState(stateObj, '', window.location.href);
         }
       }
@@ -2606,7 +2677,7 @@
           pauseStudySession();
         }
         rocketMenuOpen = false;
-        V = { name: e.state.name, id: e.state.id };
+        V = { name: e.state.name, id: e.state.id, videoIndex: Number.isInteger(e.state.videoIndex) ? e.state.videoIndex : 0 };
         render();
       }
     });
@@ -3057,6 +3128,22 @@
       case 'lesson-detail-study':
         closeModal();
         go({ name: 'chapter', id: t.dataset.id });
+        break;
+      case 'open-lesson-video':
+        go({ name: 'lesson-video', id: t.dataset.id, videoIndex: 0 });
+        break;
+      case 'lesson-video-back':
+        go({ name: 'chapter', id: t.dataset.id || V.id });
+        break;
+      case 'lesson-video-select':
+        if (lessonVideosForDeck(V.id)[+t.dataset.index]) { V.videoIndex = +t.dataset.index; render(true); }
+        break;
+      case 'lesson-video-play':
+        var lessonVideoElement = document.getElementById('lesson-video-player');
+        if (lessonVideoElement && lessonVideoElement.play) {
+          var playbackAttempt = lessonVideoElement.play();
+          if (playbackAttempt && playbackAttempt.catch) playbackAttempt.catch(function () { toast('Video playback could not start. Check the video source and try again.'); });
+        }
         break;
       case 'chapter-info':
         openLessonDetailSheet(t.dataset.id);
@@ -3512,10 +3599,11 @@
   }
 
   function boot() {
-    return Promise.all([load(), loadStarterText(), loadDevotionals(), loadSermons()]).then(function (results) {
+    return Promise.all([load(), loadStarterText(), loadDevotionals(), loadSermons(), loadLessonVideos()]).then(function (results) {
       var text = results[1];
       DEVOTIONALS = results[2] || [];
       SERMONS = results[3] || [];
+      LESSON_VIDEOS = results[4] || [];
       STARTER_DECKS = P.parseDecks(text).decks;
       var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION - 3;
       var isFirstRun = !S.seeded && (!S.onboarding || !S.onboarding.completed);

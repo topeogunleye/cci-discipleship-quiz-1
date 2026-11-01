@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v37';
+const CACHE_NAME = CACHE_PREFIX + 'v45';
 const SERMON_AUDIO_CACHE = 'cci-sermon-downloads-v1';
 const CORE_FILES = [
   './',
@@ -22,7 +22,8 @@ const CORE_FILES = [
   'js/app.js',
   'decks/manifest.json',
   'content/devotionals.json',
-  'content/sermons.json'
+  'content/sermons.json',
+  'content/lesson-videos.json'
 ];
 
 function assetUrl(file) {
