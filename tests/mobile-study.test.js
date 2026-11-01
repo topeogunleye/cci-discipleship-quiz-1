@@ -154,7 +154,7 @@ test('getChapterSteps returns four study steps with soft unlock states', () => {
   assert.equal(freshSteps[1].id, 'quiz');
   assert.equal(freshSteps[1].state, 'recommended-next');
   assert.equal(freshSteps[2].id, 'weak');
-  assert.equal(freshSteps[2].state, 'unlocked');
+  assert.equal(freshSteps[2].state, 'empty');
   assert.equal(freshSteps[3].id, 'exam');
   assert.equal(freshSteps[3].state, 'unlocked');
 
@@ -185,7 +185,7 @@ test('getChapterSteps returns four study steps with soft unlock states', () => {
   const masteredSteps = MobileStudy.getChapterSteps(deck, masteredProgress);
   assert.equal(masteredSteps[0].state, 'complete');
   assert.equal(masteredSteps[1].state, 'complete');
-  assert.equal(masteredSteps[2].state, 'complete');
+  assert.equal(masteredSteps[2].state, 'empty');
   assert.equal(masteredSteps[3].state, 'complete');
 });
 

@@ -1,10 +1,11 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 13;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 14;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
   var S = { decks: [], progress: {}, sermons: SermonStudy ? SermonStudy.createState() : {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
   var STARTER_DECKS = [], DEVOTIONALS = [], SERMONS = [], sermonDownloadControllers = {};
-  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null }, sermonAudioElement = null, sermonDownloadProgress = {}, lastAudioSaveBucket = -1;
+  var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, biblePreviewCache = null, suppressBiblePreviewFocus = null;
+  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null }, sermonAudioElement = null, sermonDownloadProgress = {}, lastAudioSaveBucket = -1;
   var browserLocalStorage = null, browserIndexedDB = null;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
   if (!browserLocalStorage) { try { if (typeof localStorage !== 'undefined') browserLocalStorage = localStorage; } catch (e) {} }
@@ -13,7 +14,188 @@
 
   var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var linkify = function (s) { return esc(s).replace(/https?:\/\/[^\s)]+/g, function (u) { return '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + u + '</a>'; }); };
-  var bibleNote = function (c) { return c && c.bible ? '<p class="card-note card-ref card-bible"><strong>Bible References:</strong> ' + linkify(c.bible) + '</p>' : ''; };
+  var renderBible = function (value) {
+    function renderCitation(citation) {
+      var reference = citation.replace(/\s+(?:\(https?:\/\/[^)]+\)|<https?:\/\/[^>]+>)\s*$/, '').trim();
+      if (!reference) return '';
+      var path = encodeURIComponent(reference).replace(/%20/g, '+');
+      var url = 'https://www.esv.org/verses/' + path + '/';
+      var previewId = 'bible-reference-preview-' + (++biblePreviewSequence);
+      var titleId = previewId + '-title';
+      var messageId = previewId + '-message';
+      return '<span class="bible-reference-wrap">' +
+        '<a class="bible-reference-link" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" data-bible-reference-link="true" aria-haspopup="dialog" aria-controls="' + previewId + '" aria-describedby="' + messageId + '" aria-expanded="false">' + esc(reference) + '</a>' +
+        '<span class="bible-reference-preview" id="' + previewId + '" role="dialog" aria-labelledby="' + titleId + '">' +
+          '<span class="bible-preview-heading"><strong id="' + titleId + '">' + esc(reference) + '</strong><span class="bible-preview-version">ESV</span><button class="bible-preview-close" type="button" data-bible-preview-close aria-label="Close Bible passage preview">×</button></span>' +
+          '<span class="bible-preview-text" hidden></span>' +
+          '<span class="bible-preview-fallback" id="' + messageId + '">Verse text isn’t available in this preview. Open the ESV passage to read it.</span>' +
+          '<a class="btn sm primary bible-preview-open" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">Open passage on ESV.org</a>' +
+        '</span>' +
+      '</span>';
+    }
+    return String(value).split(/\s+\|\s+/).map(function (segment) {
+      var labeled = /^(Confirmed in lesson and deck|Also cited in lesson segment|Added from online research):\s*(.*)$/.exec(segment);
+      var label = labeled ? labeled[1] + ': ' : '', citations = (labeled ? labeled[2] : segment).split(/;\s*/);
+      return esc(label) + citations.map(renderCitation).join('; ');
+    }).join(' | ');
+  };
+  var bibleNote = function (c) { return c && c.bible ? '<p class="card-note card-ref card-bible"><strong>Bible References:</strong> ' + renderBible(c.bible) + '</p>' : ''; };
+  function positionBiblePreview(link, preview) {
+    if (!link || !preview) return;
+    var anchor = link.getBoundingClientRect(), margin = 12, gap = 8;
+    var visual = window.visualViewport;
+    var leftEdge = visual ? visual.offsetLeft : 0;
+    var topEdge = visual ? visual.offsetTop : 0;
+    var viewportWidth = visual ? visual.width : document.documentElement.clientWidth;
+    var viewportHeight = visual ? visual.height : window.innerHeight;
+    var rightEdge = leftEdge + viewportWidth, bottomEdge = topEdge + viewportHeight;
+    var maxWidth = Math.max(200, viewportWidth - margin * 2);
+    preview.style.width = Math.min(340, maxWidth) + 'px';
+    preview.style.maxHeight = Math.max(120, viewportHeight - margin * 2) + 'px';
+    preview.style.overflowY = 'auto';
+    preview.style.left = (leftEdge + margin) + 'px';
+    preview.style.top = (topEdge + margin) + 'px';
+    var panel = preview.getBoundingClientRect();
+    var minLeft = leftEdge + margin, maxLeft = Math.max(minLeft, rightEdge - panel.width - margin);
+    var minTop = topEdge + margin, maxTop = Math.max(minTop, bottomEdge - panel.height - margin);
+    var leftOfAnchor = Math.max(minLeft, Math.min(anchor.left, maxLeft));
+    var centeredTop = Math.max(minTop, Math.min(anchor.top + (anchor.height - panel.height) / 2, maxTop));
+    var candidates = [
+      { left: leftOfAnchor, top: anchor.bottom + gap },
+      { left: leftOfAnchor, top: anchor.top - panel.height - gap },
+      { left: anchor.right + gap, top: centeredTop },
+      { left: anchor.left - panel.width - gap, top: centeredTop }
+    ];
+    var controls = Array.prototype.slice.call(document.querySelectorAll('.btn-continue, .study-navigation, .flash-rating')).filter(function (control) {
+      if (preview.contains(control) || control.disabled) return false;
+      var rect = control.getBoundingClientRect(), style = window.getComputedStyle(control);
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    });
+    var best = null, bestOverlap = Infinity;
+    candidates.forEach(function (candidate) {
+      var left = Math.max(minLeft, Math.min(candidate.left, maxLeft));
+      var top = Math.max(minTop, Math.min(candidate.top, maxTop));
+      var overlap = 0;
+      controls.forEach(function (control) {
+        var rect = control.getBoundingClientRect();
+        var width = Math.max(0, Math.min(left + panel.width, rect.right) - Math.max(left, rect.left));
+        var height = Math.max(0, Math.min(top + panel.height, rect.bottom) - Math.max(top, rect.top));
+        overlap += width * height;
+      });
+      if (overlap < bestOverlap) { best = { left: left, top: top }; bestOverlap = overlap; }
+    });
+    preview.style.left = (best ? best.left : leftOfAnchor) + 'px';
+    preview.style.top = (best ? best.top : centeredTop) + 'px';
+  }
+  function updateBiblePreviewText(preview, text, fallbackMessage) {
+    if (!preview) return;
+    var passage = preview.querySelector('.bible-preview-text'), fallback = preview.querySelector('.bible-preview-fallback');
+    if (text) {
+      passage.textContent = text;
+      passage.hidden = false;
+      fallback.hidden = true;
+    } else {
+      passage.textContent = '';
+      passage.hidden = true;
+      fallback.textContent = fallbackMessage || 'Verse text isn’t available in this preview. Open the ESV passage to read it.';
+      fallback.hidden = false;
+    }
+  }
+  function loadBiblePreviewText(link, preview) {
+    var reference = link.textContent.trim();
+    if (!reference || !activeBiblePreview || activeBiblePreview.link !== link) return;
+    if (biblePreviewCache && biblePreviewCache.reference === reference) {
+      updateBiblePreviewText(preview, biblePreviewCache.text);
+      return;
+    }
+    if (biblePreviewRequest && biblePreviewRequest.preview === preview) return;
+    if (biblePreviewRequest) {
+      biblePreviewRequest.controller.abort();
+      biblePreviewRequest = null;
+    }
+    updateBiblePreviewText(preview, '', 'Loading ESV passage…');
+    var controller = new AbortController();
+    var request = { id: ++biblePreviewRequestSequence, controller: controller, link: link, preview: preview };
+    biblePreviewRequest = request;
+    var timeout = window.setTimeout(function () { controller.abort(); }, 8000);
+    fetch('/api/esv-passage?q=' + encodeURIComponent(reference), {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal
+    }).then(function (response) {
+      if (!response.ok) throw new Error('Passage service unavailable');
+      return response.json();
+    }).then(function (result) {
+      if (biblePreviewRequest !== request || !activeBiblePreview || activeBiblePreview.link !== link) return;
+      var text = result && typeof result.text === 'string' ? result.text.trim() : '';
+      if (!text) throw new Error('Passage text unavailable');
+      biblePreviewCache = { reference: reference, text: text };
+      updateBiblePreviewText(preview, text);
+      positionBiblePreview(link, preview);
+    }).catch(function () {
+      if (controller.signal.aborted || biblePreviewRequest !== request) return;
+      updateBiblePreviewText(preview, '', 'Verse text isn’t available in this preview. Open the ESV passage to read it.');
+      positionBiblePreview(link, preview);
+    }).finally(function () {
+      window.clearTimeout(timeout);
+      if (biblePreviewRequest === request) biblePreviewRequest = null;
+    });
+  }
+  function closeBiblePreview(restoreFocus) {
+    if (biblePreviewCloseTimer) { window.clearTimeout(biblePreviewCloseTimer); biblePreviewCloseTimer = null; }
+    if (!activeBiblePreview) return false;
+    var current = activeBiblePreview;
+    if (biblePreviewRequest && biblePreviewRequest.preview === current.preview) {
+      biblePreviewRequest.controller.abort();
+      biblePreviewRequest = null;
+    }
+    current.wrapper.classList.remove('is-open', 'is-pinned');
+    current.link.setAttribute('aria-expanded', 'false');
+    activeBiblePreview = null;
+    if (restoreFocus && current.link.isConnected) {
+      suppressBiblePreviewFocus = current.link;
+      current.link.focus();
+      window.setTimeout(function () { if (suppressBiblePreviewFocus === current.link) suppressBiblePreviewFocus = null; }, 0);
+    }
+    return true;
+  }
+  function repositionActiveBiblePreview() {
+    if (!activeBiblePreview) return;
+    if (!activeBiblePreview.link.isConnected) { closeBiblePreview(false); return; }
+    var rect = activeBiblePreview.link.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > window.innerHeight) { closeBiblePreview(false); return; }
+    positionBiblePreview(activeBiblePreview.link, activeBiblePreview.preview);
+  }
+  function openBiblePreview(link, pinned) {
+    var wrapper = link && link.closest('.bible-reference-wrap'), previewId = link && link.getAttribute('aria-controls');
+    var preview = previewId && document.getElementById(previewId);
+    if (!wrapper || !preview) return;
+    if (biblePreviewCloseTimer) { window.clearTimeout(biblePreviewCloseTimer); biblePreviewCloseTimer = null; }
+    if (activeBiblePreview && activeBiblePreview.link !== link) closeBiblePreview(false);
+    if (activeBiblePreview && activeBiblePreview.link === link) {
+      if (pinned) { activeBiblePreview.pinned = true; wrapper.classList.add('is-pinned'); }
+    } else {
+      activeBiblePreview = { link: link, wrapper: wrapper, preview: preview, pinned: !!pinned };
+    }
+    wrapper.classList.add('is-open');
+    if (pinned) wrapper.classList.add('is-pinned');
+    link.setAttribute('aria-expanded', 'true');
+    positionBiblePreview(link, preview);
+    loadBiblePreviewText(link, preview);
+  }
+  function scheduleBiblePreviewClose() {
+    if (!activeBiblePreview || activeBiblePreview.pinned) return;
+    if (biblePreviewCloseTimer) window.clearTimeout(biblePreviewCloseTimer);
+    biblePreviewCloseTimer = window.setTimeout(function () {
+      biblePreviewCloseTimer = null;
+      if (!activeBiblePreview || activeBiblePreview.pinned) return;
+      if (activeBiblePreview.wrapper.contains(document.activeElement)) return;
+      closeBiblePreview(false);
+    }, 180);
+  }
+  function isTouchLayout() {
+    return !!(window.matchMedia && window.matchMedia('(hover: none)').matches);
+  }
   var uid = function () { return Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4); };
   var slug = function (t) { return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'deck'; };
   var shuffle = function (a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
@@ -31,6 +213,13 @@
       d.cards.forEach(function (card) { items.push({ deckId: d.id, card: card, record: p.cards[card.id] }); });
     });
     return items;
+  }
+  function dueReviewItems(items, now) {
+    var scheduled = items.filter(function (item) {
+      var record = item && item.record;
+      return record === 'known' || record === 'unknown' || (record && typeof record === 'object' && !Array.isArray(record));
+    });
+    return StudyLogic.dueItems(scheduled, now);
   }
   function deckIdsFor(items) {
     return Array.from(new Set(items.map(function (item) { return item.deckId; })));
@@ -283,12 +472,31 @@
       if (!source.questions.length) return;
       var id = 'd-' + slug(source.title), saved = deck(id);
       if (!saved) { addParsed(source, true); changed = true; return; }
-      var previous = Object.create(null), next = [], deckChanged = false;
+      var previous = Object.create(null), next = [], deckChanged = false, reviewSetChanged = false;
       saved.cards.forEach(function (card) { previous[card.id] = card; });
+      if (/predestination.*trinity/i.test(source.title)) {
+        var formerWorkersId = id + '.q71', currentWorkersId = id + '.q72';
+        var formerWorkers = previous[formerWorkersId];
+        var currentWorkers = source.questions.filter(function (question) { return question.id === 'q72'; })[0];
+        if (formerWorkers && !previous[currentWorkersId] && currentWorkers &&
+            /workers hired at the eleventh hour/i.test(formerWorkers.question) &&
+            /workers hired at the eleventh hour/i.test(currentWorkers.question)) {
+          var topicProgress = S.progress[id];
+          if (topicProgress && topicProgress.cards && topicProgress.cards[formerWorkersId] !== undefined) {
+            topicProgress.cards[currentWorkersId] = topicProgress.cards[formerWorkersId];
+            delete topicProgress.cards[formerWorkersId];
+          }
+          previous[currentWorkersId] = Object.assign({}, formerWorkers, { id: currentWorkersId, question: currentWorkers.question });
+          delete previous[formerWorkersId];
+        }
+      }
       source.questions.forEach(function (question) {
         var cardId = id + '.' + question.id, existing = previous[cardId];
         if (!existing || existing.question !== question.question) deckChanged = true;
-        if (existing && existing.question !== question.question && S.progress[id] && S.progress[id].cards) delete S.progress[id].cards[cardId];
+        if (existing && existing.question !== question.question) {
+          reviewSetChanged = true;
+          if (S.progress[id] && S.progress[id].cards) delete S.progress[id].cards[cardId];
+        }
         next.push({ id: cardId, question: question.question, options: question.options.slice(), answer: question.answer, explanation: question.explanation || '', ref: question.ref || '', bible: question.bible || '' });
         delete previous[cardId];
       });
@@ -298,10 +506,11 @@
       Object.keys(previous).forEach(function (cardId) {
         if (cardId.indexOf(id + '.q') === 0) {
           deckChanged = true;
+          reviewSetChanged = true;
           if (S.progress[id] && S.progress[id].cards) delete S.progress[id].cards[cardId];
         }
       });
-      if (deckChanged && S.progress[id]) S.progress[id].best = null;
+      if (reviewSetChanged && S.progress[id]) S.progress[id].best = null;
       if (deckChanged) changed = true;
       if (JSON.stringify(saved.cards) !== JSON.stringify(next)) changed = true;
       saved.cards = next;
@@ -460,7 +669,8 @@
         });
       });
     } },
-    { version: 13, run: function () {
+    { version: 14, run: function () {
+      syncStarterDecks();
       var starterIds = Object.create(null), ordered = [];
       STARTER_DECKS.forEach(function (source) {
         if (!source.questions.length) return;
@@ -607,11 +817,17 @@
   var views = {};
   function banner() {
     var storageNotice = storageMessage ? '<div class="note warn" role="alert">' + esc(storageMessage) + '</div>' : (storageOk ? '' : '<div class="note warn" role="alert">Study data could not be saved. Export a backup before closing this page.</div>');
-    var updateNotice = updateAvailable ? '<div class="note update-prompt" role="status" aria-live="polite"><span>A new version is ready.</span><button class="btn sm primary" data-act="update-app">Update now</button></div>' : '';
+    var updateNotice = updateAvailable && !updateDeferred
+      ? '<div class="note update-prompt" role="status" aria-live="polite" aria-atomic="true">' +
+          '<div class="update-prompt-copy"><strong>CCI Study update ready</strong><span>' + (updateApplying ? 'Saving your study progress before updating…' : 'Install the latest app and lesson files. Your saved progress stays on this device.') + '</span></div>' +
+          (!updateApplying ? '<div class="update-prompt-actions"><button type="button" class="btn sm primary" data-act="update-app">Update now</button><button type="button" class="btn sm ghost" data-act="defer-update">Remind me later</button></div>' : '') +
+        '</div>'
+      : '';
     return storageNotice + updateNotice;
   }
   function offerUpdate(worker) {
     if (!worker) return;
+    if (worker !== waitingWorker) { updateDeferred = false; updateApplying = false; }
     waitingWorker = worker;
     updateAvailable = true;
     if (app.innerHTML) render(true);
@@ -780,7 +996,11 @@
     var totalKnown = S.decks.reduce(function (n, d) { return n + d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length; }, 0);
     var now = Date.now();
     var all = allCardItems();
-    var dueCount = StudyLogic.dueItems(all, now).length;
+    var dueItems = dueReviewItems(all, now);
+    var dueCount = dueItems.length;
+    var unmasteredCount = Math.max(totalCards - totalKnown, 0);
+    var dailyMinutes = (S.onboarding && S.onboarding.dailyMinutes) || 10;
+    var dailyFocusCount = Math.min(dueCount || unmasteredCount, dailyMinutes);
     var masterPct = totalCards ? Math.round(100 * totalKnown / totalCards) : 0;
     var streak = MobileStudy.calculateStreak(getStudyTimestamps(), now);
     var showStreak = S.settings.showStreak !== false;
@@ -820,18 +1040,18 @@
         '</div>' +
       '</section>';
     } else if (S.decks.length) {
-      var heroTitle = dueCount > 0 ? 'Start Today’s Focus' : (totalKnown < totalCards ? 'Continue Your Journey' : 'All Cards Mastered!');
+      var heroTitle = dueCount > 0 ? 'Start Today’s Focus' : (unmasteredCount > 0 ? 'Begin Your Journey' : 'All Cards Mastered!');
       var heroDesc = dueCount > 0
-        ? dueCount + ' ' + (dueCount === 1 ? 'card is' : 'cards are') + ' ready for review today (~5 min).'
-        : (totalKnown < totalCards
-          ? 'Build your discipleship foundation with a quick 10-card session.'
+        ? dueCount + ' ' + (dueCount === 1 ? 'card is' : 'cards are') + ' scheduled for review today. Start with your ' + dailyFocusCount + '-card focus.'
+        : (unmasteredCount > 0
+          ? 'Choose ' + dailyFocusCount + ' cards from your ' + totalCards.toLocaleString() + '-card study library.'
           : 'Outstanding! You have mastered all 12 lesson decks. Challenge yourself with a comprehensive exam.');
-      var heroBtnText = dueCount > 0 ? 'Start Today’s Review' : (totalKnown < totalCards ? 'Start 10-Card Session' : 'Take Comprehensive Exam');
       var heroAction = (totalKnown >= totalCards && totalCards > 0) ? 'exam' : 'daily-study';
+      var heroBtnText = heroAction === 'exam' ? 'Take Comprehensive Exam' : (dueCount > 0 ? 'Review Today’s Focus' : 'Study ' + dailyFocusCount + ' Cards');
       heroCard = '<section class="hero-card hero-today" aria-label="Today’s focus">' +
         '<div class="hero-card-header">' +
           '<span class="hero-chip">TODAY’S FOCUS</span>' +
-          (dueCount > 0 ? '<span class="hero-meta">' + dueCount + ' due</span>' : '<span class="hero-meta">~5 min</span>') +
+          (dueCount > 0 ? '<span class="hero-meta">' + dueCount + ' scheduled</span>' : '<span class="hero-meta">' + dailyFocusCount + ' cards</span>') +
         '</div>' +
         '<h2 class="hero-card-title">' + heroTitle + '</h2>' +
         '<p class="hero-card-desc">' + heroDesc + '</p>' +
@@ -889,7 +1109,7 @@
 
     // Your Plan for Today: short cards with icon, one-line title, minute estimate and state
     var planCards = MobileStudy.selectPlanCards({
-      dueItems: StudyLogic.dueItems(all, now),
+      dueItems: dueItems,
       weakItems: StudyLogic.weakSpots(all, 10),
       allItems: all,
       isMastered: function (it) { return isMastered(it.deckId, it.card.id); },
@@ -942,21 +1162,24 @@
       : '';
 
     var dailyAction = totalCards > 0 && totalKnown >= totalCards ? 'exam' : 'daily-study';
-    var dailyMinutes = (S.onboarding && S.onboarding.dailyMinutes) || 10;
-    var dailyFocusCount = Math.min(dueCount || Math.max(totalCards - totalKnown, 0), dailyMinutes);
     var desktopHeroTitle = S.pausedSession
       ? 'Continue · ' + Math.min((S.pausedSession.i || 0) + 1, (S.pausedSession.cards || []).length) + ' of ' + S.pausedSession.cards.length + ' cards'
-      : (dueCount ? 'Your next step: ' + plural(dailyFocusCount, 'card') : (totalKnown < totalCards ? 'A little progress goes a long way' : 'You’ve mastered every card'));
+      : (dueCount ? 'Your next step: ' + plural(dailyFocusCount, 'card') : (unmasteredCount > 0 ? 'Start your ' + dailyFocusCount + '-card daily focus' : 'You’ve mastered every card'));
     var desktopHeroDescription = S.pausedSession
       ? 'Your study session is ready when you are.'
-      : (dueCount ? plural(dueCount, 'card') + ' are ready to study. Start with your daily focus.' : 'Keep your rhythm going with a focused review.');
+      : (dueCount
+        ? plural(dueCount, 'card') + ' scheduled for review today. Start with your ' + dailyFocusCount + '-card focus.'
+        : (unmasteredCount > 0
+          ? 'Choose ' + dailyFocusCount + ' cards from your ' + totalCards.toLocaleString() + '-card study library.'
+          : 'Nothing is scheduled for review today. Your study library is complete.'));
     var desktopHeroAction = S.pausedSession ? 'resume-study' : dailyAction;
+    var desktopHeroButtonText = S.pausedSession ? 'Resume Study' : (dailyAction === 'exam' ? 'Take Comprehensive Exam' : (dueCount ? 'Review Today’s Focus' : 'Study ' + dailyFocusCount + ' Cards'));
     var desktopHero = '<section class="desktop-today-card" aria-label="Today’s study">' +
       '<div class="desktop-today-copy">' +
         '<p class="desktop-today-eyebrow">Today’s study</p>' +
         '<h2>' + esc(desktopHeroTitle) + '</h2>' +
         '<p>' + esc(desktopHeroDescription) + '</p>' +
-        '<div class="desktop-today-actions"><button type="button" class="desktop-today-action" data-act="' + desktopHeroAction + '">Continue</button>' +
+        '<div class="desktop-today-actions"><button type="button" class="desktop-today-action" data-act="' + desktopHeroAction + '">' + desktopHeroButtonText + '</button>' +
         (S.pausedSession ? '<button type="button" class="desktop-today-action-secondary" data-act="discard-study">End session</button>' : '') + '</div>' +
       '</div>' +
       '<svg class="desktop-today-landscape" viewBox="0 0 440 170" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">' +
@@ -968,8 +1191,8 @@
 
     var desktopStats = '<section class="desktop-home-stats" aria-label="Study statistics">' +
       '<div class="desktop-stat-card"><strong>' + masterPct + '%</strong><span>Mastered</span></div>' +
-      '<div class="desktop-stat-card"><strong>' + dueCount + '</strong><span>Ready to study</span></div>' +
-      '<div class="desktop-stat-card"><strong>' + totalCards.toLocaleString() + '</strong><span>Cards</span></div>' +
+      '<div class="desktop-stat-card"><strong>' + dueCount + '</strong><span>Scheduled review</span></div>' +
+      '<div class="desktop-stat-card"><strong>' + totalCards.toLocaleString() + '</strong><span>In library</span></div>' +
     '</section>';
 
     var desktopLessons = '<section class="desktop-lessons" aria-labelledby="desktop-lessons-title">' +
@@ -1205,7 +1428,14 @@
       var stateClass = 'step-' + s.state;
       var stateBadge = s.state === 'complete'
         ? '<span class="step-badge complete">Complete ✓</span>'
-        : (s.state === 'in-progress' ? '<span class="step-badge in-progress">In progress</span>' : '<span class="step-badge unlocked">Unlocked</span>');
+        : (s.state === 'in-progress' ? '<span class="step-badge in-progress">In progress</span>' : (s.state === 'empty' ? '<span class="step-badge empty">No weak spots yet</span>' : '<span class="step-badge unlocked">Unlocked</span>'));
+      var stepActions = s.state === 'empty' && s.id === 'weak'
+        ? '<p class="timeline-empty-guidance">No questions have been missed in this chapter yet. Study flashcards or take the chapter quiz; missed answers will appear here for review.</p>' +
+          '<div class="timeline-step-empty-actions">' +
+            '<button class="btn sm primary" data-act="setup" data-mode="flash" data-id="' + d.id + '">Study flashcards</button>' +
+            '<button class="btn sm" data-act="setup" data-mode="quiz" data-id="' + d.id + '">Take chapter quiz</button>' +
+          '</div>'
+        : '<button class="btn sm' + (s.state === 'complete' ? '' : ' primary') + '" data-act="' + s.action + '" data-mode="' + s.mode + '" data-id="' + d.id + '">Start ' + esc(s.title) + '</button>';
 
       return '<div class="timeline-step ' + stateClass + '">' +
         '<div class="timeline-node" aria-hidden="true">' +
@@ -1222,9 +1452,7 @@
             stateBadge +
           '</div>' +
           '<p class="timeline-step-desc">' + esc(s.desc) + '</p>' +
-          '<div class="timeline-step-act">' +
-            '<button class="btn sm' + (s.state === 'complete' ? '' : ' primary') + '" data-act="' + s.action + '" data-mode="' + s.mode + '" data-id="' + d.id + '">Start ' + esc(s.title) + '</button>' +
-          '</div>' +
+          '<div class="timeline-step-act' + (s.state === 'empty' && s.id === 'weak' ? ' timeline-step-act-empty' : '') + '">' + stepActions + '</div>' +
         '</div>' +
       '</div>';
     }).join('');
@@ -1263,7 +1491,6 @@
     var mode = V.practiceMode || 'quiz';
     var multi = V.practiceMulti !== false;
     var all = allCardItems();
-    var dueCount = StudyLogic.dueItems(all, Date.now()).length;
     var weakCount = StudyLogic.weakSpots(all, 10).length;
     var totalCards = all.length;
     var allSelected = S.decks.length > 0 && S.decks.every(function (d) { return SEL.has(d.id); });
@@ -1326,7 +1553,7 @@
     var totalCards = S.decks.reduce(function (n, d) { return n + d.cards.length; }, 0);
     var totalKnown = S.decks.reduce(function (n, d) { return n + d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length; }, 0);
     var now = Date.now();
-    var dueCount = StudyLogic.dueItems(allCardItems(), now).length;
+    var dueCount = dueReviewItems(allCardItems(), now).length;
     var masterPct = totalCards ? Math.round(100 * totalKnown / totalCards) : 0;
     var streak = MobileStudy.calculateStreak(getStudyTimestamps(), now);
     var backupReminder = StudyLogic.backupReminderDue(S.backupReminder, now)
@@ -1357,7 +1584,7 @@
       '<div class="stat"><b>' + S.decks.length + '</b><span>Lessons</span></div>' +
       '<div class="stat"><b>' + totalCards + '</b><span>Cards</span></div>' +
       '<div class="stat"><b>' + masterPct + '%</b><span>Mastered</span></div>' +
-      '<div class="stat stat-due"><b>' + dueCount + '</b><span>Ready to study</span></div>' +
+      '<div class="stat stat-due"><b>' + dueCount + '</b><span>Scheduled review</span></div>' +
     '</div>' +
     (streak > 0 ? '<div class="streak-card"><span class="flame-icon">🔥</span><div><b>' + streak + ' Day Study Streak</b><p>Keep studying daily to maintain momentum.</p></div></div>' : '') +
     '<div class="progress-decks-card">' +
@@ -1425,6 +1652,7 @@
       '<h2 class="settings-group-title">About</h2>' +
       '<p class="meta">CCI Discipleship Quiz &amp; Study App · Offline PWA</p>' +
       '<p class="meta">Storage engine: ' + esc(storageBackend) + '</p>' +
+      '<p class="meta">Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved. The ESV text may not be quoted in any publication made available to the public by a Creative Commons license. The ESV may not be translated into any other language. Users may not copy or download more than 500 verses of the ESV Bible or more than one half of any book of the ESV Bible. <a href="https://www.esv.org/" target="_blank" rel="noopener noreferrer">ESV.org</a></p>' +
     '</div>' +
     (SermonUI ? SermonUI.renderSettingsSection(sermonContext().settings) : '');
   };
@@ -1441,44 +1669,36 @@
     var displayTitle = parsed.topic || title;
     var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') + bibleNote(c);
     var isLast = V.i === V.cards.length - 1;
+    var cardFace = V.flipped
+      ? '<div class="flip on flash-card-back" data-flip-surface="true">' +
+          '<div class="inner"><div class="face back" aria-hidden="false">' +
+            '<span class="card-face-top"><span class="tag">Answer · ' + c.answer + '</span><span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span></span>' +
+            '<span class="a">' + esc(c.options[ai]) + '</span>' +
+            notes +
+            '<span class="qs">' + esc(c.question) + '</span>' +
+            '<button class="flip-cue flip-cue-button" data-act="flip" type="button" aria-label="Show question"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap or Space to see question</button>' +
+          '</div></div>' +
+        '</div>'
+      : '<button class="flip" data-act="flip" type="button" aria-pressed="false" aria-label="Reveal answer">' +
+          '<span class="inner"><span class="face front" aria-hidden="false">' +
+            '<span class="card-face-top"><span class="tag">' + esc(d ? (MobileStudy.parseChapterTitle(d.title).topic || d.title) : '') + '</span><span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span></span>' +
+            '<span class="q">' + esc(c.question) + '</span>' +
+            '<span class="flip-cue"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap or Space to flip</span>' +
+          '</span></span>' +
+        '</button>';
 
     return '<section class="study-shell flash-session coaching-study-flow" aria-label="Flashcard study session">' +
       sessionHead(displayTitle, (V.i + 1) + ' / ' + V.cards.length) +
       progressBar(V.i + 1, V.cards.length) +
-      '<div class="coaching-question-container">' +
-        '<button class="flip' + (V.flipped ? ' on' : '') + '" data-act="flip" type="button" aria-pressed="' + V.flipped + '" aria-label="' + (V.flipped ? 'Show question' : 'Reveal answer') + '">' +
-          '<span class="inner">' +
-            '<span class="face front" aria-hidden="' + V.flipped + '">' +
-              '<span class="card-face-top">' +
-                '<span class="tag">' + esc(d ? (MobileStudy.parseChapterTitle(d.title).topic || d.title) : '') + '</span>' +
-                '<span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span>' +
-              '</span>' +
-              '<span class="q">' + esc(c.question) + '</span>' +
-              '<span class="flip-cue"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap or Space to flip</span>' +
-            '</span>' +
-            '<span class="face back" aria-hidden="' + !V.flipped + '">' +
-              '<span class="card-face-top">' +
-                '<span class="tag">Answer · ' + c.answer + '</span>' +
-                '<span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span>' +
-              '</span>' +
-              '<span class="a">' + esc(c.options[ai]) + '</span>' +
-              notes +
-              '<span class="qs">' + esc(c.question) + '</span>' +
-              '<span class="flip-cue"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap or Space to see question</span>' +
-            '</span>' +
-          '</span>' +
-        '</button>' +
-      '</div>' +
+      '<div class="coaching-question-container">' + cardFace + '</div>' +
       (V.flipped ? '<div class="flash-rating row grow" role="group" aria-label="Mark your confidence">' +
         '<button class="btn btn-confidence" data-act="mark" data-v="unknown">Still learning</button>' +
         '<button class="btn primary btn-confidence" data-act="mark" data-v="known">I know it</button>' +
       '</div>' : '') +
-      '<div class="study-bottom-bar">' +
-        '<div class="row grow nav study-navigation">' +
-          '<button class="btn ghost btn-prev" data-act="prev"' + (V.i ? '' : ' disabled') + '>Previous</button>' +
-          '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'Finish session' : (V.flipped ? 'Next card' : 'Skip card')) + '</button>' +
-        '</div>' +
-      '</div>' +
+      '<div class="study-bottom-bar"><div class="row grow nav study-navigation">' +
+        '<button class="btn ghost btn-prev" data-act="prev"' + (V.i ? '' : ' disabled') + '>Previous</button>' +
+        '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'Finish session' : (V.flipped ? 'Next card' : 'Skip card')) + '</button>' +
+      '</div></div>' +
       '<p class="study-shortcuts">Use ← / → to move between cards</p>' +
     '</section>';
   };
@@ -1521,8 +1741,8 @@
         '</div>';
       } else {
         var ok = picked === answerAt;
-        var feedbackContent =
-            '<div class="feedback-panel ' + (ok ? 'is-correct' : 'is-incorrect') + '">' +
+        var feedbackContent = function () {
+          return '<div class="feedback-panel ' + (ok ? 'is-correct' : 'is-incorrect') + '">' +
               '<div class="feedback-header">' +
                 '<span class="feedback-mark-icon" aria-hidden="true">' + (ok ? '✓' : '✗') + '</span>' +
                 '<p class="fb ' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'Correct.' : 'Not quite.') + '</p>' +
@@ -1532,15 +1752,16 @@
               (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') +
               bibleNote(c) +
             '</div>';
+        };
         fbSheet = '<div class="coaching-bottom-sheet ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '" role="status" aria-live="polite">' +
           '<div class="sheet-drag-handle" aria-hidden="true"></div>' +
           '<div class="sheet-content">' +
-            feedbackContent +
+            feedbackContent() +
             '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Next question') + '</button>' +
           '</div>' +
         '</div>';
         desktopFeedback = '<aside class="quiz-explanation-card ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '" role="status" aria-live="polite">' +
-          '<div class="quiz-explanation-content">' + feedbackContent + '</div>' +
+          '<div class="quiz-explanation-content">' + feedbackContent() + '</div>' +
           '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Continue') + '</button>' +
         '</aside>';
       }
@@ -2296,6 +2517,7 @@
 
   /* ---------- render ---------- */
   function render(keep) {
+    closeBiblePreview(false);
     MAIN_TABS = S.settings.experience === 'sermons' ? SERMONS_TABS : DISCIPLESHIP_TABS;
     var isSermon = isSermonRoute(V.name);
     var isMainTab = MAIN_TABS.indexOf(V.name) >= 0 || isSermon;
@@ -2471,12 +2693,12 @@
     closeModal(); begin(s.mode, exam ? cards : (o.shuf ? shuffle(cards) : cards), o, s.ids);
   }
   function startDue() {
-    var cards = StudyLogic.dueItems(allCardItems(), Date.now());
-    if (!cards.length) { toast('No cards are due today.'); return; }
+    var cards = dueReviewItems(allCardItems(), Date.now());
+    if (!cards.length) { toast('No cards are scheduled for review today.'); return; }
     begin('flash', shuffle(cards), { unk: false, limit: 0, shuf: true }, deckIdsFor(cards));
   }
   function startDailyStudy() {
-    var all = allCardItems(), due = StudyLogic.dueItems(all, Date.now());
+    var all = allCardItems(), due = dueReviewItems(all, Date.now());
     var dailyLimit = (S.onboarding && S.onboarding.dailyMinutes) ? S.onboarding.dailyMinutes : 10;
     var cards = MobileStudy.selectDailyItems(due, all, function (item) { return isMastered(item.deckId, item.card.id); }, dailyLimit);
     if (!cards.length) { toast('All cards are mastered. Try a quiz or exam to review them.'); return; }
@@ -2490,7 +2712,7 @@
   function startChallenge(ids, requestedMode) {
     var all = allCardItems();
     if (ids && ids.length) all = all.filter(function (item) { return ids.indexOf(item.deckId) >= 0; });
-    var due = StudyLogic.dueItems(all, Date.now());
+    var due = dueReviewItems(all, Date.now());
     var weak = StudyLogic.weakSpots(all, 10);
     var cards = MobileStudy.selectChallengeItems(
       due,
@@ -2678,7 +2900,67 @@
       .finally(function () { delete sermonDownloadControllers[downloadKey]; delete sermonDownloadProgress[downloadKey]; save(); render(true); });
   }
   /* ---------- events ---------- */
+  document.addEventListener('pointerover', function (e) {
+    if (e.pointerType === 'touch') return;
+    var target = e.target && e.target.closest ? e.target : null;
+    if (!target) return;
+    var wrapper = target.closest('.bible-reference-wrap');
+    if (activeBiblePreview && wrapper === activeBiblePreview.wrapper && biblePreviewCloseTimer) {
+      window.clearTimeout(biblePreviewCloseTimer); biblePreviewCloseTimer = null;
+    }
+    var link = target.closest('.bible-reference-link');
+    if (link) openBiblePreview(link, false);
+  });
+  document.addEventListener('pointerout', function (e) {
+    var target = e.target && e.target.closest ? e.target : null;
+    if (!target || !activeBiblePreview) return;
+    var wrapper = target.closest('.bible-reference-wrap');
+    if (wrapper !== activeBiblePreview.wrapper || (e.relatedTarget && wrapper.contains(e.relatedTarget))) return;
+    scheduleBiblePreviewClose();
+  });
+  document.addEventListener('focusin', function (e) {
+    var target = e.target && e.target.closest ? e.target : null;
+    if (!target) return;
+    if (target === suppressBiblePreviewFocus) { suppressBiblePreviewFocus = null; return; }
+    var wrapper = target.closest('.bible-reference-wrap');
+    if (activeBiblePreview && wrapper === activeBiblePreview.wrapper && biblePreviewCloseTimer) {
+      window.clearTimeout(biblePreviewCloseTimer); biblePreviewCloseTimer = null;
+    }
+    var link = target.closest('.bible-reference-link');
+    if (link) openBiblePreview(link, false);
+  });
+  document.addEventListener('focusout', function (e) {
+    var target = e.target && e.target.closest ? e.target : null;
+    if (!target || !activeBiblePreview) return;
+    var wrapper = target.closest('.bible-reference-wrap');
+    if (wrapper !== activeBiblePreview.wrapper || (e.relatedTarget && wrapper.contains(e.relatedTarget))) return;
+    scheduleBiblePreviewClose();
+  });
+  document.addEventListener('pointerdown', function (e) {
+    if (activeBiblePreview && !activeBiblePreview.wrapper.contains(e.target)) closeBiblePreview(false);
+  });
   document.addEventListener('click', function (e) {
+    var target = e.target && e.target.closest ? e.target : null;
+    if (!target) return;
+    if (target.closest('[data-bible-preview-close]')) {
+      e.preventDefault(); closeBiblePreview(true); return;
+    }
+    var link = target.closest('.bible-reference-link');
+    if (!link || !isTouchLayout() || e.detail === 0) return;
+    e.preventDefault();
+    if (activeBiblePreview && activeBiblePreview.link === link && activeBiblePreview.pinned) closeBiblePreview(false);
+    else openBiblePreview(link, true);
+  });
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('resize', repositionActiveBiblePreview);
+    window.addEventListener('scroll', repositionActiveBiblePreview, true);
+  }
+
+  document.addEventListener('click', function (e) {
+    var flipSurface = e.target.closest('[data-flip-surface]');
+    if (flipSurface && !e.target.closest('a, button, input, select, textarea, [contenteditable="true"]')) {
+      V.flipped = false; saveActiveSession(); render(true); return;
+    }
     var t = e.target.closest('[data-act]'); if (!t) return;
     var a = t.dataset.act, d;
     switch (a) {
@@ -2999,7 +3281,33 @@
       case 'import': IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null }; go({ name: 'import' }); break;
       case 'backup': resetBackupReminder(); exportBackup(); render(true); break;
       case 'backup-dismiss': resetBackupReminder(); render(true); break;
-      case 'update-app': if (waitingWorker) { reloadForUpdate = true; waitingWorker.postMessage({ type: 'SKIP_WAITING' }); } break;
+      case 'update-app':
+        if (waitingWorker && !updateApplying) {
+          var updateTarget = waitingWorker;
+          updateDeferred = false;
+          updateApplying = true;
+          render(true);
+          save().then(function (result) {
+            if (!result || !result.ok) {
+              updateApplying = false;
+              reloadForUpdate = false;
+              render(true);
+              toast('The update is paused because your study data could not be saved. Export a backup before trying again.');
+              return;
+            }
+            try {
+              reloadForUpdate = true;
+              updateTarget.postMessage({ type: 'SKIP_WAITING' });
+            } catch (error) {
+              updateApplying = false;
+              reloadForUpdate = false;
+              render(true);
+              toast('The update could not start. Your saved study data is safe.');
+            }
+          });
+        }
+        break;
+      case 'defer-update': updateDeferred = true; render(true); break;
       case 'iparse': var txt = document.getElementById('paste').value; IMP = { decks: [], errors: [], warnings: [], text: txt, parsed: true, backup: null }; merge(P.parseDecks(txt, { fallbackTitle: 'Pasted deck' }), ''); render(true); break;
       case 'isave':
         var n = 0; IMP.decks.forEach(function (x) { if (x.questions.length) { addParsed(x, false); n++; } }); save(); toast('Saved ' + plural(n, 'deck')); go({ name: 'home' }); break;
@@ -3131,6 +3439,9 @@
     }
   });
   document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && activeBiblePreview) {
+      e.preventDefault(); closeBiblePreview(activeBiblePreview.wrapper.contains(document.activeElement)); return;
+    }
     if (rocketMenuOpen) {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -3170,14 +3481,14 @@
     if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || modal.innerHTML) return;
     if (V.name === 'flash') {
       if (e.key === 'ArrowRight') step(1); else if (e.key === 'ArrowLeft') step(-1);
-      else if ((e.key === ' ' || e.key === 'Enter') && e.target.closest('.flip')) { e.preventDefault(); V.flipped = !V.flipped; render(true); }
+      else if ((e.key === ' ' || e.key === 'Enter') && e.target.closest('button.flip[data-act="flip"], button.flip-cue-button')) { e.preventDefault(); V.flipped = !V.flipped; render(true); }
     } else if (V.name === 'quiz' || V.name === 'exam') {
       var k = 'abcd'.indexOf(e.key.toLowerCase()); if (k < 0) k = '1234'.indexOf(e.key);
       if (k >= 0 && V.picked === null) pick(k); else if ((e.key === 'Enter' || e.key === 'ArrowRight') && V.picked !== null) step(1);
     }
   });
   var tx = 0, ty = 0;
-  document.addEventListener('touchstart', function (e) { if (e.target.closest('.flip')) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; } else tx = 0; }, { passive: true });
+  document.addEventListener('touchstart', function (e) { if (e.target.closest('.flip') && !e.target.closest('a, button')) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; } else tx = 0; }, { passive: true });
   document.addEventListener('touchend', function (e) {
     if (!tx || V.name !== 'flash') return;
     var dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; tx = 0;

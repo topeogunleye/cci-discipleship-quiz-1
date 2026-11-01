@@ -436,10 +436,10 @@
         id: 'weak',
         mode: 'weak',
         title: 'Weak Spot Practice',
-        desc: 'Focus on questions you have previously missed',
-        state: weakCount === 0 ? (attemptsCount > 0 ? 'complete' : 'unlocked') : 'in-progress',
+        desc: weakCount > 0 ? 'Focus on questions you have previously missed' : 'Missed quiz questions will appear here for focused review.',
+        state: weakCount === 0 ? 'empty' : 'in-progress',
         action: 'chapter-weak',
-        meta: weakCount > 0 ? (weakCount + ' ' + (weakCount === 1 ? 'card' : 'cards') + ' to strengthen') : (attemptsCount > 0 ? 'No weak spots!' : 'Available anytime'),
+        meta: weakCount > 0 ? (weakCount + ' ' + (weakCount === 1 ? 'card' : 'cards') + ' to strengthen') : (attemptsCount > 0 ? 'No missed questions yet' : 'Quiz practice builds this list'),
         icon: 'target'
       },
       {

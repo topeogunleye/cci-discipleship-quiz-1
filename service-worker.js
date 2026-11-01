@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v30';
+const CACHE_NAME = CACHE_PREFIX + 'v37';
 const SERMON_AUDIO_CACHE = 'cci-sermon-downloads-v1';
 const CORE_FILES = [
   './',
@@ -106,6 +106,15 @@ self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+
+  const esvPreviewPath = new URL('api/esv-passage', self.registration.scope).pathname;
+  if (url.pathname === esvPreviewPath) {
+    event.respondWith(fetch(request, { cache: 'no-store' }).catch(() => new Response(
+      JSON.stringify({ error: 'The ESV passage service is temporarily unavailable.' }),
+      { status: 503, headers: { 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8' } }
+    )));
+    return;
+  }
 
   event.respondWith((async () => {
     if (request.destination === 'audio') {

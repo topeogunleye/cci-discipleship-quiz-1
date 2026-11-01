@@ -210,6 +210,58 @@ test('explanations-todo.md lists every starter question without an explanation',
   assert.equal(missing.length, parsed.decks.reduce((count, deck) => count + deck.questions.filter(question => !question.explanation).length, 0));
 });
 
+test('an older saved starter deck is reconciled to the manifest without losing matching progress', async () => {
+  const source = parsed.decks.find(deck => deck.title.endsWith('Soteriology II'));
+  const sourceId = 'd-discipleship-experience-section-2-soteriology-ii';
+  const savedCards = source.questions.slice(0, 93).map(question => ({
+    id: `${sourceId}.${question.id}`,
+    question: question.question,
+    options: question.options,
+    answer: question.answer,
+    explanation: question.explanation,
+    ref: question.ref,
+    bible: question.bible
+  }));
+  const firstCardId = `${sourceId}.${source.questions[0].id}`;
+  const savedProgress = { box: 2, dueAt: 123456789, attempts: 3, misses: 1, lastSeen: 123456000 };
+  let stored = JSON.stringify({
+    decks: [{ id: sourceId, title: source.title, cards: savedCards }],
+    progress: { [sourceId]: { best: { score: 45, total: 93, pct: 48 }, cards: { [firstCardId]: savedProgress } } },
+    settings: { theme: 'auto', shuffle: false },
+    seeded: true,
+    dataVersion: 11
+  });
+  const elements = {
+    app: { innerHTML: '', querySelectorAll: () => [], querySelector: () => null },
+    modal: { innerHTML: '' },
+    toast: { textContent: '', className: '' },
+    'starter-fallback': { textContent: JSON.stringify(starter) }
+  };
+  const document = {
+    getElementById: id => elements[id],
+    addEventListener: () => {},
+    documentElement: { removeAttribute: () => {}, setAttribute: () => {} }
+  };
+  const window = { DeckParser: parser, StudyLogic, StudyStorage, MobileStudy, SermonStudy, SermonUI, location: { protocol: 'file:' }, scrollTo: () => {} };
+  const testAppSource = appSource.replace('  boot();', '  window.testAppReady = boot();');
+  vm.runInNewContext(testAppSource, {
+    window,
+    document,
+    localStorage: { getItem: () => stored, setItem: (_, value) => { stored = value; } }
+  });
+  await window.testAppReady;
+
+  const migrated = JSON.parse(stored);
+  const currentDeck = migrated.decks.find(deck => deck.id === sourceId);
+  const expectedTotal = parsed.decks.reduce((total, deck) => total + deck.questions.length, 0);
+  assert.equal(currentDeck.cards.length, source.questions.length);
+  assert.equal(currentDeck.cards.at(-1).id, `${sourceId}.${source.questions.at(-1).id}`);
+  assert.equal(migrated.decks.reduce((total, deck) => total + deck.cards.length, 0), expectedTotal);
+  assert.deepEqual(migrated.progress[sourceId].cards[firstCardId], savedProgress);
+  assert.deepEqual(migrated.progress[sourceId].best, { score: 45, total: 93, pct: 48 });
+  assert.equal(migrated.dataVersion, 14);
+});
+
 test('stored progress survives starter duplicate removal and renumbering', async () => {
   const section1 = 'd-discipleship-experience-section-1-soteriology';
   const section6 = 'd-discipleship-experience-section-6-prayer';
@@ -285,7 +337,7 @@ test('stored progress survives starter duplicate removal and renumbering', async
   const bible1 = migrated.decks.find(deck => deck.id === section7);
   const bible = migrated.decks.find(deck => deck.id === section8);
   const churchHistory = migrated.decks.find(deck => deck.id === section12);
-  assert.equal(migrated.dataVersion, 13);
+  assert.equal(migrated.dataVersion, 14);
   assert.ok(Number.isFinite(migrated.backupReminder.anchorAt));
   assert.equal(migrated.backupReminder.cardsStudied, 0);
   assert.ok(storageKeys.length > 0 && storageKeys.every(key => key === 'flashdecks.v1'));
@@ -294,22 +346,22 @@ test('stored progress survives starter duplicate removal and renumbering', async
   assert.equal(soteriology.cards.find(card => card.id === `${section1}.q1`).explanation, parsed.decks[0].questions[0].explanation);
   assert.equal(soteriology.cards.find(card => card.id === `${section1}.q1`).ref, parsed.decks[0].questions[0].ref);
   assert.equal(bible1.cards.find(card => card.id === `${section7}.q9`).question, 'The Greek word musterion in Ephesians 3, is explained in the lesson as referring to:');
-  assert.deepEqual(prayer.cards.filter(card => /^.+\.q\d+$/.test(card.id)).map(card => card.id), Array.from({ length: 29 }, (_, index) => `${section6}.q${index + 1}`));
-  assert.equal(prayer.cards.find(card => card.id === `${section6}.q25`).question, 'Saved card 26');
+  assert.deepEqual(prayer.cards.filter(card => /^.+\.q\d+$/.test(card.id)).map(card => card.id), Array.from({ length: parsed.decks.find(deck => deck.title.endsWith('Prayer')).questions.length }, (_, index) => `${section6}.q${index + 1}`));
+  assert.equal(prayer.cards.find(card => card.id === `${section6}.q25`).question, parsed.decks.find(deck => deck.title.endsWith('Prayer')).questions[24].question);
   assert.equal(prayer.cards.find(card => card.id === `${section6}.ncustom`).question, 'Custom card');
   assert.equal(prayer.cards.find(card => card.id === `${section6}.ncustom`).explanation, 'Custom explanation');
   assert.equal(prayer.cards.find(card => card.id === `${section6}.ncustom`).ref, 'Custom reference');
-  assert.equal(migrated.progress[section6].cards[`${section6}.q25`].box, 2);
-  assert.equal(migrated.progress[section6].cards[`${section6}.q29`].box, 1);
+  assert.equal(migrated.progress[section6].cards[`${section6}.q25`], undefined);
+  assert.equal(migrated.progress[section6].cards[`${section6}.q29`], undefined);
   assert.equal(migrated.progress[section6].cards[`${section6}.ncustom`].box, 2);
   assert.equal(migrated.progress[section6].cards[`${section6}.q30`], undefined);
-  assert.deepEqual(bible.cards.map(card => card.id), Array.from({ length: 29 }, (_, index) => `${section8}.q${index + 1}`));
-  assert.equal(migrated.progress[section8].cards[`${section8}.q28`].box, 2);
-  assert.equal(migrated.progress[section8].cards[`${section8}.q29`].box, 2);
+  assert.deepEqual(bible.cards.map(card => card.id), Array.from({ length: parsed.decks.find(deck => deck.title.endsWith('Bible Experience II')).questions.length }, (_, index) => `${section8}.q${index + 1}`));
+  assert.equal(migrated.progress[section8].cards[`${section8}.q28`], undefined);
+  assert.equal(migrated.progress[section8].cards[`${section8}.q29`], undefined);
   assert.equal(migrated.progress[section8].cards[`${section8}.q30`], undefined);
-  assert.equal(churchHistory.cards.length, 30);
+  assert.equal(churchHistory.cards.length, sourceChurchHistory.questions.length);
   assert.equal(churchHistory.cards.find(card => card.id === `${section12}.q20`).question, 'What did Sabellianism teach about the Father, Son and Holy Spirit?');
-  assert.equal(churchHistory.cards.find(card => card.id === `${section12}.q30`).answer, 'C');
+  assert.equal(churchHistory.cards.find(card => card.id === `${section12}.q30`).answer, sourceChurchHistory.questions[29].answer);
   assert.equal(churchHistory.cards.find(card => card.id === `${section12}.q1`).explanation, sourceChurchHistory.questions[0].explanation);
   assert.equal(churchHistory.cards.find(card => card.id === `${section12}.q1`).ref, sourceChurchHistory.questions[0].ref);
   assert.equal(migrated.progress[section12].cards[`${section12}.q19`].box, 2);
@@ -687,7 +739,8 @@ test('quiz and exam keyboard answers store stats and defer exam feedback until r
     options: ['First answer', 'Second answer', 'Third answer', 'Fourth answer'],
     answer: 'A',
     explanation: 'The lesson supports the first answer.',
-    ref: 'Lesson 4, slide 2'
+    ref: 'Lesson 4, slide 2',
+    bible: 'Confirmed in lesson and deck: John 3:16'
   };
   let stored = JSON.stringify({
     decks: [{ id: deckId, title: 'Study test', cards: [card] }],
@@ -732,19 +785,20 @@ test('quiz and exam keyboard answers store stats and defer exam feedback until r
   const flashFront = window.studyTestApi.flash();
   assert.match(flashFront, /<button class="flip"[^>]*aria-pressed="false"/);
   assert.match(flashFront, /class="face front" aria-hidden="false"/);
-  assert.match(flashFront, /class="face back" aria-hidden="true"/);
-  const flipTarget = { tagName: 'BUTTON', closest: selector => selector === '.flip' ? {} : null };
+  assert.doesNotMatch(flashFront, /class="face back"/);
+  const flipTarget = { tagName: 'BUTTON', closest: selector => selector.indexOf('button.flip[data-act="flip"]') >= 0 ? {} : null };
   listeners.keydown({ key: ' ', target: flipTarget, preventDefault: () => {} });
-  assert.match(window.studyTestApi.flash(), /aria-pressed="true"/);
+  assert.match(window.studyTestApi.flash(), /data-flip-surface="true"/);
   listeners.keydown({ key: 'Enter', target: flipTarget, preventDefault: () => {} });
   assert.match(window.studyTestApi.flash(), /aria-pressed="false"/);
   window.studyTestApi.setSession({ name: 'flash', cards: [item], i: 0, flipped: true, opts: {}, ids: [deckId] });
   const flashBack = window.studyTestApi.flash();
-  assert.match(flashBack, /class="face front" aria-hidden="true"/);
   assert.match(flashBack, /class="face back" aria-hidden="false"/);
   assert.match(flashBack, /<strong>Explanation:<\/strong> The lesson supports the first answer/);
   assert.match(flashBack, /<strong>Reference:<\/strong> Lesson 4, slide 2/);
-  const plainItem = { deckId, card: { ...card, explanation: '', ref: '' }, optionOrder: [0, 1, 2, 3] };
+  assert.match(flashBack, /class="bible-reference-link"/);
+  assert.match(flashBack, /class="bible-preview-close"/);
+  const plainItem = { deckId, card: { ...card, explanation: '', ref: '', bible: '' }, optionOrder: [0, 1, 2, 3] };
   window.studyTestApi.setSession({ name: 'flash', cards: [plainItem], i: 0, flipped: true, opts: {}, ids: [deckId] });
   assert.doesNotMatch(window.studyTestApi.flash(), /card-note|Lesson 4, slide 2|The lesson supports the first answer/);
   window.studyTestApi.setSession({ name: 'flash', cards: [item, item], i: 0, flipped: false, opts: {}, ids: [deckId] });
@@ -888,8 +942,11 @@ test('a waiting service worker shows an update prompt and receives SKIP_WAITING'
   });
   await window.testAppReady;
   await new Promise(resolve => setImmediate(resolve));
-  assert.match(elements.app.innerHTML, /A new version is ready/);
+  assert.match(elements.app.innerHTML, /CCI Study update ready/);
+  assert.match(elements.app.innerHTML, /Remind me later/);
   listeners.click({ target: { closest: () => ({ dataset: { act: 'update-app' } }) } });
+  await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(JSON.parse(JSON.stringify(messages)), [{ type: 'SKIP_WAITING' }]);
 });
 
