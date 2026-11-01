@@ -39,27 +39,38 @@ test('exported deck text can be parsed back without changing card content', () =
 });
 
 test('optional BIBLE field round-trips through parse and export', () => {
-  const source = `DECK: Bible refs\n\nQ1. First question?\nA. Alpha\nB. Beta\nC. Gamma\nD. Delta\nANSWER: C\nREF: Lesson 1 — 01:00\nBIBLE: Confirmed in lesson and deck: John 3:16\n\nQ2. Second question?\nA. Red\nB. Green\nC. Blue\nD. Gold\nANSWER: B\n`;
+  const source = `DECK: Bible refs\n\nQ1. First question?\nA. Alpha\nB. Beta\nC. Gamma\nD. Delta\nANSWER: C\nREF: Lesson 1 — 01:00\nBIBLE: Confirmed in lesson and deck: John 3:16 <https://www.esv.org/verses/John+3%3A16/>\n\nQ2. Second question?\nA. Red\nB. Green\nC. Blue\nD. Gold\nANSWER: B\n`;
   const parsed = parser.parseDecks(source);
   assert.equal(parsed.errors.length, 0);
   assert.equal(parsed.warnings.length, 0);
-  assert.equal(parsed.decks[0].questions[0].bible, 'Confirmed in lesson and deck: John 3:16');
+  assert.equal(parsed.decks[0].questions[0].bible, 'Confirmed in lesson and deck: John 3:16 <https://www.esv.org/verses/John+3%3A16/>');
   assert.equal(parsed.decks[0].questions[1].bible, '');
   const exported = parser.serializeDeck(parsed.decks[0]);
-  assert.match(exported, /REF: Lesson 1 — 01:00\nBIBLE: Confirmed in lesson and deck: John 3:16/);
-  assert.equal(parser.parseDecks(exported).decks[0].questions[0].bible, 'Confirmed in lesson and deck: John 3:16');
+  assert.match(exported, /REF: Lesson 1 — 01:00\nBIBLE: Confirmed in lesson and deck: John 3:16 <https:\/\/www\.esv\.org\/verses\/John\+3%3A16\/>/);
+  assert.equal(parser.parseDecks(exported).decks[0].questions[0].bible, 'Confirmed in lesson and deck: John 3:16 <https://www.esv.org/verses/John+3%3A16/>');
 });
 
-test('starter BIBLE lines use the documented labels and link every online-research addition', () => {
+test('starter BIBLE lines use the documented labels and link every passage directly to ESV', () => {
   const result = parser.parseDecks(starter);
   const withBible = result.decks.flatMap(deck => deck.questions.filter(question => question.bible));
+  assert.equal(result.decks.length, deckFiles.length);
   assert.ok(withBible.length >= 700, `expected many BIBLE lines, found ${withBible.length}`);
+  assert.ok(result.decks.every(deck => deck.questions.some(question => question.bible)), 'all 12 canonical decks should include linked Bible references');
   withBible.forEach(question => {
+    assert.doesNotMatch(question.bible, /\(https?:\/\//, `${question.id} should not expose a URL in parentheses`);
     const segments = question.bible.split(' | ');
     segments.forEach(segment => assert.match(segment, /^(Confirmed in lesson and deck|Also cited in lesson segment|Added from online research): \S/));
-    segments.filter(segment => segment.startsWith('Added from online research')).forEach(segment => {
-      const body = segment.replace('Added from online research: ', '');
-      assert.match(body, /^(.+? \(https:\/\/[^\s)]+\))(; .+? \(https:\/\/[^\s)]+\))*$/, `every researched entry needs a source link: ${body}`);
+    segments.forEach(segment => {
+      const body = segment.slice(segment.indexOf(': ') + 2);
+      assert.match(body, /^(.+? <https:\/\/www\.esv\.org\/verses\/[^\s>]+>)(; .+? <https:\/\/www\.esv\.org\/verses\/[^\s>]+>)*$/, `every Bible reference needs a direct ESV link: ${body}`);
     });
+  });
+});
+
+test('generated deck copies match the canonical sources', () => {
+  deckFiles.forEach(file => {
+    const canonical = fs.readFileSync(path.join(root, 'decks', file), 'utf8');
+    const generated = fs.readFileSync(path.join(root, 'dist', 'decks', file), 'utf8');
+    assert.equal(generated, canonical, `${file} should match its generated copy`);
   });
 });

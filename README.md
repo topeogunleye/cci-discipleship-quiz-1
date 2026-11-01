@@ -60,7 +60,7 @@ node --test
 - **Mobile Coaching Navigation:** persistent 5-tab navigation shell (`Home`, `Journey`, `Practice`, `Progress`, `Settings`) optimized for one-handed mobile and touch use.
 - **Today’s Plan:** personalized coaching plan on Home with minute estimates, prioritizing cards due for spaced repetition, weak spots, and next lessons based on the learner's daily study commitment.
 - **Chapter Journey & Timeline:** visual progress across all 12 curriculum chapters, each with an interactive 4-step study timeline (`Flashcards` → `Quiz` → `Weak spots` → `Chapter exam`).
-- **One-Question Study Flow:** single-question focus with large tap targets, thin progress tracking, first-use tooltip, coaching bottom sheet feedback with tappable Bible References, and encouraging completion summaries.
+- **One-Question Study Flow:** single-question focus with large tap targets, thin progress tracking, first-use tooltip, coaching bottom sheet feedback with Bible References that link to ESV and preview on hover or focus, and encouraging completion summaries.
 - **First-Run Onboarding & Commitment:** skippable 4-question routine builder with a personalized study plan summary and interactive "tap-and-hold to commit" screen.
 - **Gentle Streaks:** optional daily streak tracker with a supportive "Daily Grace" celebration screen after the first session of the day; no guilt messaging and no required reminders.
 - **Flashcards:** reveal answers, mark cards as known or still learning, and move with the keyboard or touch gestures.
@@ -90,7 +90,7 @@ REF: Lesson 2, Page 4 (also optional)
 BIBLE: John 3:16; Romans 5:12 (also optional)
 ```
 
-`EXPLANATION:`, `REF:` and `BIBLE:` are optional single-line fields that may follow `ANSWER:`. Use the explanation for why the answer is correct, the reference for a lesson, slide, or Scripture passage, and `BIBLE:` for the Bible references cited in the lesson. In the starter decks, `BIBLE:` separates what the lessons and decks confirm (`Confirmed in lesson and deck:`, `Also cited in lesson segment:`) from anything added through online research (`Added from online research:`, with source links). It is shown as **Bible References** beneath **Reference**. Decks and backups created before these fields were added remain importable.
+`EXPLANATION:`, `REF:` and `BIBLE:` are optional single-line fields that may follow `ANSWER:`. Use the explanation for why the answer is correct, the reference for a lesson, slide, or Scripture passage, and `BIBLE:` for the Bible references cited in the lesson. In the starter decks, `BIBLE:` separates what the lessons and decks confirm (`Confirmed in lesson and deck:`, `Also cited in lesson segment:`) from anything added through online research (`Added from online research:`). Each passage is paired with its direct ESV URL in angle brackets; the app displays the passage itself as a link without showing the URL. Hovering or focusing a reference opens a preview, and touch users can tap it to open the preview. When ESV passage text is unavailable, the preview offers a direct link to read the passage on ESV.org. Bible references appear beneath **Reference**. Decks and backups created before these fields were added remain importable.
 
 Question numbers may also use `1.` instead of `Q1.`. Blank lines are optional between questions. Invalid questions are reported and skipped.
 
@@ -98,7 +98,11 @@ Question numbers may also use `1.` instead of `Q1.`. Blank lines are optional be
 
 ## Data and privacy
 
-Decks, preferences, and study progress are stored locally in IndexedDB, with local storage as a fallback. Existing `flashdecks.v1` data is copied automatically and that key is kept until the IndexedDB copy is confirmed. The app reminds you to back up after 14 days or 50 cards studied; the reminder can be dismissed. There is no server-side account, sync, or third-party remote service. Browser storage can be cleared by the browser, so export or back up anything you want to keep.
+Decks, preferences, and study progress are stored locally in IndexedDB, with local storage as a fallback. Existing `flashdecks.v1` data is copied automatically and that key is kept until the IndexedDB copy is confirmed. The app reminds you to back up after 14 days or 50 cards studied; the reminder can be dismissed. There is no server-side account or progress sync. When online ESV previews are configured, the app sends the selected passage reference to the ESV API through a Cloudflare Pages Function; it does not send learner progress or the API key. The app keeps only the currently open passage in memory and falls back to the ESV.org link when the service is unavailable. Browser storage can be cleared by the browser, so export or back up anything you want to keep.
+
+### ESV passage previews
+
+The Cloudflare Pages project must have an encrypted secret named `ESV_API_KEY` for verse text previews to load. Add it in the Cloudflare dashboard under the Pages project’s **Settings → Variables and Secrets**, then redeploy. Keep the key out of source files, frontend configuration, and Git. For local Pages Function development, place it in an ignored `.dev.vars` file as `ESV_API_KEY="your-key"` and run the project with Wrangler Pages Dev. Without the secret, or while offline, previews continue to offer the direct ESV.org passage link.
 
 ## Accessibility and responsive behavior
 
