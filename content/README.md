@@ -2,6 +2,44 @@
 
 This directory contains offline, bundled devotional content for the CCI Discipleship Study App.
 
+## Optional lesson videos: `content/lesson-videos.json`
+
+This catalog connects a CCI lesson deck to one or more direct video files. It is empty until approved lesson video URLs are supplied.
+
+Each entry in `videos` may contain:
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `string` | Stable unique ID for the recording. |
+| `deckId` | `string` | Matching deck ID, such as `d-discipleship-experience-section-1-soteriology`. |
+| `title` | `string` | Recording or lesson title. |
+| `videoUrl` | `string` | Direct HTTPS video file URL (MP4/WebM), or a same-origin URL. |
+| `posterUrl` | `string` | Optional image URL for the video poster. |
+| `captionsUrl` | `string` | Optional WebVTT caption file URL. |
+| `captionsLanguage` | `string` | Optional BCP 47 language code for captions (defaults to `en`). |
+| `captionsLabel` | `string` | Optional captions menu label (defaults to `English`). |
+
+Example:
+
+```json
+{
+  "schemaVersion": 1,
+  "videos": [
+    {
+      "id": "soteriology-introduction",
+      "deckId": "d-discipleship-experience-section-1-soteriology",
+      "title": "Soteriology: Introduction",
+      "videoUrl": "https://media.example.org/soteriology-introduction.mp4",
+      "captionsUrl": "https://media.example.org/soteriology-introduction.en.vtt",
+      "captionsLanguage": "en",
+      "captionsLabel": "English"
+    }
+  ]
+}
+```
+
+Use public or otherwise authorized direct media URLs. Do not put API keys, signed credentials, or private tokens in this checked-in file. YouTube/Vimeo watch-page URLs are not direct video files and are not supported by the native video player.
+
 ## Schema: `content/devotionals.json`
 
 Each entry in `content/devotionals.json` is a JSON object with the following fields:

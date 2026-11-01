@@ -11,6 +11,7 @@ const deckText = manifest.map(file => read(path.join('decks', file)).trimEnd()).
 const inlineJson = JSON.stringify(deckText).replace(/</g, '\\u003c');
 const devotionalsJson = JSON.stringify(JSON.parse(read('content/devotionals.json'))).replace(/</g, '\\u003c');
 const sermonsJson = JSON.stringify(JSON.parse(read('content/sermons.json'))).replace(/</g, '\\u003c');
+const lessonVideosJson = JSON.stringify(JSON.parse(read('content/lesson-videos.json'))).replace(/</g, '\\u003c');
 let html = read('index.html');
 
 function replaceOnce(source, search, replacement) {
@@ -36,6 +37,7 @@ html = replaceOnce(html, '<link rel="stylesheet" href="style.css">', `<style>\n$
 html = replaceOnce(html, '<script type="application/json" id="starter-fallback">""</script>', `<script type="application/json" id="starter-fallback">${inlineJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="devotionals-fallback">[]</script>', `<script type="application/json" id="devotionals-fallback">${devotionalsJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="sermons-fallback">{"schemaVersion":1,"sermons":[]}</script>', `<script type="application/json" id="sermons-fallback">${sermonsJson}</script>`);
+html = replaceOnce(html, '<script type="application/json" id="lesson-videos-fallback">{"schemaVersion":1,"videos":[]}</script>', `<script type="application/json" id="lesson-videos-fallback">${lessonVideosJson}</script>`);
 html = replaceOnce(html, '<script src="js/native-bridge.bundle.js"></script>', `<script>\n${read('js/native-bridge.bundle.js')}\n</script>`);
 html = replaceOnce(html, '<script src="js/parser.js"></script>', `<script>\n${read('js/parser.js')}\n</script>`);
 html = replaceOnce(html, '<script src="js/study.js"></script>', `<script>\n${read('js/study.js')}\n</script>`);

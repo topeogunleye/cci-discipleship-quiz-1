@@ -2,6 +2,7 @@ node_modules/
 .DS_Store
 .dev.vars*
 .env*
+public/videos/
 
 android/.gradle/
 android/**/build/
