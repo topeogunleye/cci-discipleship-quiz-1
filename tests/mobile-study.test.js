@@ -6,6 +6,10 @@ function item(deckId, id) {
   return { deckId, card: { id, question: `Question ${id}`, options: ['A', 'B', 'C', 'D'], answer: 'A' } };
 }
 
+function reviewedItem(deckId, id) {
+  return { ...item(deckId, id), record: { attempts: 1 } };
+}
+
 test('daily study prioritizes due cards and limits the session to ten items', () => {
   const due = Array.from({ length: 12 }, (_, index) => item('due', `d${index}`));
   const all = [item('new', 'n1'), item('known', 'k1')];
@@ -41,7 +45,7 @@ test('paused sessions are discarded when their saved card no longer exists', () 
 });
 
 test('selectPlanCards returns three cards with minute estimates, states, and actions', () => {
-  const due = [item('d1', 'c1'), item('d1', 'c2')];
+  const due = [reviewedItem('d1', 'c1'), reviewedItem('d1', 'c2')];
   const weak = [item('d1', 'c3')];
   const decks = [
     { id: 'd1', title: 'Discipleship Experience (Section 1) Soteriology', cards: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }] }
@@ -241,7 +245,7 @@ test('normalizeStreak sanitizes stored dates', () => {
 });
 
 test('selectPlanCards adapts to dailyMinutes and startingTopic from onboarding', () => {
-  const due = Array.from({ length: 25 }, (_, i) => item('d1', `c${i}`));
+  const due = Array.from({ length: 25 }, (_, i) => reviewedItem('d1', `c${i}`));
   const decks = [
     { id: 'd1', title: 'Discipleship Experience (Section 1) Soteriology', cards: [{ id: 'c1' }] },
     { id: 'd2', title: 'Discipleship Experience (Section 5) Christian Conduct', cards: [{ id: 'cc1' }] }

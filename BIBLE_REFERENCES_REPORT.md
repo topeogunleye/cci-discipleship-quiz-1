@@ -4,7 +4,7 @@ Scope: optional `BIBLE:` field added under `REF:` in all 12 decks; shown in the 
 
 ## Current follow-up review — 2026-11-01
 
-The first pass reviewed all **462 questions** that lacked a populated BIBLE field at the start. It added **206 researched fields** with **235 references across 163 passages**. In this follow-up, CCI lessons and transcripts were treated as authoritative: **23 lesson-cited BIBLE fields** were added, and **5 missing REF citations** were supplied where a matching CCI lesson passage was available. Across both passes, **229 of the original 462 questions** now have a BIBLE field containing **280 reference entries across 199 distinct passages**; **233** still lack a BIBLE field. Historical and statistical claims are sourced to CCI through REF where a lesson source exists; Bible references are used for the scriptural basis CCI cites, not as proof of external historical facts.
+The first pass reviewed all **462 questions** that lacked a populated BIBLE field at the start. It added **206 researched fields** with **235 references across 163 passages**. In this follow-up, CCI lessons and transcripts were treated as authoritative: **23 lesson-cited BIBLE fields** were added, and **5 missing REF citations** were supplied where a matching CCI lesson passage was available. Across both audit passes, **229 of the original 462 questions** gained a BIBLE field containing **280 reference entries across 199 distinct passages**. After reconciling this branch with the latest `main`, the canonical decks contain **1,421 questions**: **1,194** have a BIBLE field and **227** remain unresolved. The merged decks contain **1,892 direct ESV.org links**, one for each displayed Bible reference. This reconciliation retained current `main` citations where present, carried forward branch citations where `main` had none, and retained the Propitiation question in Section 2. The merge also keeps the three newer Predestination and Trinity questions and four newer Apologetics questions from `main`, while honoring `main`’s removal of six transcript-dependent placeholder questions (Section 12 Q35–Q40). Historical and statistical claims are sourced to CCI through REF where a lesson source exists; Bible references are used for the scriptural basis CCI cites, not as proof of external historical facts.
 
 ### Current coverage
 
@@ -12,16 +12,22 @@ The first pass reviewed all **462 questions** that lacked a populated BIBLE fiel
 |---|---:|---:|---:|---:|---:|
 | section-01-soteriology.txt | 2 | 2 | 3 | 91 | 0 |
 | section-02-soteriology-ii.txt | 2 | 2 | 4 | 94 | 0 |
-| section-03-predestination-and-trinity.txt | 3 | 3 | 6 | 71 | 0 |
+| section-03-predestination-and-trinity.txt | 3 | 3 | 6 | 74 | 0 |
 | section-04-christology.txt | 8 | 5 | 10 | 97 | 3 |
 | section-05-christian-conduct.txt | 21 | 13 | 14 | 124 | 8 |
 | section-06-prayer.txt | 50 | 30 | 32 | 103 | 20 |
 | section-07-bible-experience-i.txt | 49 | 23 | 24 | 130 | 26 |
 | section-08-bible-experience-ii.txt | 41 | 21 | 28 | 106 | 20 |
 | section-09-evangelism.txt | 143 | 68 | 89 | 166 | 75 |
-| section-10-apologetics.txt | 34 | 14 | 14 | 66 | 20 |
+| section-10-apologetics.txt | 34 | 14 | 14 | 70 | 20 |
 | section-11-believers-authority-charisma.txt | 45 | 27 | 30 | 82 | 18 |
-| section-12-church-history.txt | 64 | 21 | 26 | 57 | 43 |
+| section-12-church-history.txt | 64 | 21 | 26 | 57 | 37 |
+
+### Interpretation cautions retained
+
+- Section 03 Q2 and Q8: 1 Samuel 23:9–14 is the narrative cited in the lesson; the distinction between foreknowledge and predestination is the speaker’s interpretation.
+- Section 03 Q68: identifying the speaker in Revelation 1:8 as Jesus is an interpretation, not an explicit identification in that verse.
+- Section 04 Q16: Hebrews 1 contrasts the Son with angels; identifying Jesus specifically as Michael requires an additional interpretation.
 
 ### CCI lesson citations added in this follow-up
 
@@ -322,7 +328,7 @@ The remaining **233 questions** still have no BIBLE field. Where the question st
 | section-10-apologetics.txt | Q1, Q3, Q12, Q13, Q20, Q22, Q25, Q26, Q28, Q36, Q47, Q51, Q52, Q59, Q62, Q64, Q71, Q75, Q76 | This historical, statistical, or denominational claim is sourced to the CCI lesson in REF where a matching lesson segment is available; a Bible passage is not used to verify the external fact. |
 | section-10-apologetics.txt | Q72 | This historical, statistical, or denominational claim is sourced to the CCI lesson in REF where a matching lesson segment is available; a Bible passage is not used to verify the external fact. |
 | section-11-believers-authority-charisma.txt | Q8, Q11, Q12, Q17, Q21, Q26, Q34, Q45, Q60, Q80, Q84, Q87, Q89, Q91, Q95, Q96, Q98, Q100 | CCI’s position is retained and the relevant lesson is cited in REF. No additional lesson-cited Bible passage was identified for this question. |
-| section-12-church-history.txt | Q1, Q12, Q22, Q23, Q24, Q26, Q27, Q33, Q34, Q35, Q36, Q37, Q38, Q39, Q40, Q41, Q43, Q45, Q46, Q47, Q48, Q50, Q51, Q55, Q60, Q64, Q74, Q76, Q77, Q78, Q80, Q81, Q82, Q83, Q84, Q85, Q86, Q88, Q95 | This historical, statistical, or denominational claim is sourced to the CCI lesson in REF where a matching lesson segment is available; a Bible passage is not used to verify the external fact. |
+| section-12-church-history.txt | Q1, Q12, Q22, Q23, Q24, Q26, Q27, Q33, Q34, Q41, Q43, Q45, Q46, Q47, Q48, Q50, Q51, Q55, Q60, Q64, Q74, Q76, Q77, Q78, Q80, Q81, Q82, Q83, Q84, Q85, Q86, Q88, Q95 | This historical, statistical, or denominational claim is sourced to the CCI lesson in REF where a matching lesson segment is available; a Bible passage is not used to verify the external fact. |
 | section-12-church-history.txt | Q2, Q4, Q9, Q17 | This historical, statistical, or denominational claim is sourced to the CCI lesson in REF where a matching lesson segment is available; a Bible passage is not used to verify the external fact. |
 
 ## Initial coverage snapshot before the first re-review
@@ -550,7 +556,7 @@ Each row groups new researched references that share a source URL. The full refe
 
 ### Initial unresolved list (superseded by the current follow-up review above)
 
-The IDs below are the current questions still lacking `BIBLE:`. IDs in a row share the stated reason. No-`REF:` questions are listed explicitly because a transcript-window check could not be performed.
+This is the historical unresolved snapshot from the original review; the current per-deck unresolved totals are shown above. IDs in a row share the stated reason. Section 12 Q35–Q40 were later removed as transcript-dependent placeholders, and should be disregarded in this historical list. No-`REF:` questions are listed explicitly because a transcript-window check could not be performed.
 
 | Deck | Unresolved question IDs | Why no BIBLE field was added |
 |---|---|---|
@@ -584,7 +590,7 @@ The IDs below are the current questions still lacking `BIBLE:`. IDs in a row sha
 | section-11-believers-authority-charisma.txt | Q33 | The claim that believers’ presence prevents total demonic destruction of the earth is a speculative theological application; no directly supporting passage was verified. |
 | section-11-believers-authority-charisma.txt | Q3, Q5, Q6, Q8, Q9, Q10, Q11, Q12, Q13, Q15, Q17, Q18, Q19, Q21, Q26, Q30, Q32, Q34, Q37, Q38, Q42, Q45, Q47, Q49, Q57, Q59, Q60, Q64, Q67, Q76, Q78, Q80, Q84, Q85, Q87, Q88, Q89, Q90, Q91, Q95, Q96, Q98, Q99, Q100 | These are anecdotes or broad claims about spiritual authority and deliverance; the timestamped lesson passage did not supply an uncontested direct reference. |
 | section-12-church-history.txt | Q2, Q4, Q9, Q17, Q20, Q25 | These questions have no usable REF or matching lesson transcript. They ask historical/doctrinal descriptions, and no direct passage is provided in the question text. |
-| section-12-church-history.txt | Q1, Q8, Q10, Q12, Q13, Q14, Q15, Q22, Q23, Q24, Q26, Q27, Q29, Q33, Q34, Q35, Q36, Q37, Q38, Q39, Q40, Q41, Q42, Q43, Q45, Q46, Q47, Q48, Q50, Q51, Q53, Q55, Q56, Q58, Q60, Q64, Q68, Q69, Q70, Q74, Q75, Q76, Q77, Q78, Q80, Q81, Q82, Q83, Q84, Q85, Q86, Q88, Q89, Q95, Q96, Q97, Q98, Q100 | These are historical or denominational claims, or theological interpretations not settled by one direct passage; no sufficiently direct verse was verified. |
+| section-12-church-history.txt | Q1, Q8, Q10, Q12, Q13, Q14, Q15, Q22, Q23, Q24, Q26, Q27, Q29, Q33, Q34, Q41, Q42, Q43, Q45, Q46, Q47, Q48, Q50, Q51, Q53, Q55, Q56, Q58, Q60, Q64, Q68, Q69, Q70, Q74, Q75, Q76, Q77, Q78, Q80, Q81, Q82, Q83, Q84, Q85, Q86, Q88, Q89, Q95, Q96, Q97, Q98, Q100 | These are historical or denominational claims, or theological interpretations not settled by one direct passage; no sufficiently direct verse was verified. |
 
 
-At the time of this first re-review, the unresolved total was **462**. The six no-REF questions were Section 12 Q2, Q4, Q9, Q17, Q20, and Q25. This snapshot is superseded by the current follow-up review above. No question or answer wording was changed.
+At the time of the first re-review, the unresolved total was **462**. The six questions without a usable REF were Section 12 Q2, Q4, Q9, Q17, Q20, and Q25; the follow-up supplied matching lesson REF citations for Q2, Q9, Q17, Q20, and Q25. The current canonical inventory and unresolved totals are recorded above. No existing question or answer wording was changed during conflict resolution.

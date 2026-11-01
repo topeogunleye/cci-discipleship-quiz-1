@@ -187,11 +187,18 @@
     if (countDue > 0) {
       var countToReview = Math.min(countDue, dueLimit);
       var estMinutes = Math.max(1, Math.round(countToReview * 0.35));
+      var includesNewCards = dueItems.slice(0, countToReview).some(function (item) {
+        return !item.record || !(item.record.attempts > 0);
+      });
+      var reviewVerb = includesNewCards ? 'Study' : 'Review';
+      var reviewLabel = includesNewCards
+        ? (countToReview === 1 ? 'card' : 'cards')
+        : (countToReview === 1 ? 'due card' : 'due cards');
       cards.push({
         id: 'due',
         type: 'review',
-        title: 'Review ' + countToReview + ' due ' + (countToReview === 1 ? 'card' : 'cards'),
-        oneLine: 'Review ' + countToReview + ' due ' + (countToReview === 1 ? 'card' : 'cards') + ' · ' + estMinutes + ' min',
+        title: reviewVerb + ' ' + countToReview + ' ' + reviewLabel,
+        oneLine: reviewVerb + ' ' + countToReview + ' ' + reviewLabel + ' · ' + estMinutes + ' min',
         minuteEstimate: estMinutes,
         state: completedToday.due ? 'done' : 'ready',
         action: 'daily-study',

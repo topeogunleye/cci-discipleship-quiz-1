@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 13;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 14;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
   var S = { decks: [], progress: {}, sermons: SermonStudy ? SermonStudy.createState() : {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
   var STARTER_DECKS = [], DEVOTIONALS = [], SERMONS = [], sermonDownloadControllers = {};
@@ -474,6 +474,22 @@
       if (!saved) { addParsed(source, true); changed = true; return; }
       var previous = Object.create(null), next = [], deckChanged = false, reviewSetChanged = false;
       saved.cards.forEach(function (card) { previous[card.id] = card; });
+      if (/predestination.*trinity/i.test(source.title)) {
+        var formerWorkersId = id + '.q71', currentWorkersId = id + '.q72';
+        var formerWorkers = previous[formerWorkersId];
+        var currentWorkers = source.questions.filter(function (question) { return question.id === 'q72'; })[0];
+        if (formerWorkers && !previous[currentWorkersId] && currentWorkers &&
+            /workers hired at the eleventh hour/i.test(formerWorkers.question) &&
+            /workers hired at the eleventh hour/i.test(currentWorkers.question)) {
+          var topicProgress = S.progress[id];
+          if (topicProgress && topicProgress.cards && topicProgress.cards[formerWorkersId] !== undefined) {
+            topicProgress.cards[currentWorkersId] = topicProgress.cards[formerWorkersId];
+            delete topicProgress.cards[formerWorkersId];
+          }
+          previous[currentWorkersId] = Object.assign({}, formerWorkers, { id: currentWorkersId, question: currentWorkers.question });
+          delete previous[formerWorkersId];
+        }
+      }
       source.questions.forEach(function (question) {
         var cardId = id + '.' + question.id, existing = previous[cardId];
         if (!existing || existing.question !== question.question) deckChanged = true;
@@ -653,8 +669,20 @@
         });
       });
     } },
-    { version: 13, run: function () {
+    { version: 14, run: function () {
       syncStarterDecks();
+      var starterIds = Object.create(null), ordered = [];
+      STARTER_DECKS.forEach(function (source) {
+        if (!source.questions.length) return;
+        var id = 'd-' + slug(source.title), saved = deck(id);
+        if (!saved) return;
+        starterIds[id] = true;
+        ordered.push(saved);
+      });
+      S.decks.forEach(function (saved) {
+        if (!starterIds[saved.id]) ordered.push(saved);
+      });
+      S.decks = ordered;
     } }
   ];
   function applyDataMigrations() {
@@ -1151,7 +1179,8 @@
         '<p class="desktop-today-eyebrow">Today’s study</p>' +
         '<h2>' + esc(desktopHeroTitle) + '</h2>' +
         '<p>' + esc(desktopHeroDescription) + '</p>' +
-        '<button type="button" class="desktop-today-action" data-act="' + desktopHeroAction + '">' + desktopHeroButtonText + '</button>' +
+        '<div class="desktop-today-actions"><button type="button" class="desktop-today-action" data-act="' + desktopHeroAction + '">' + desktopHeroButtonText + '</button>' +
+        (S.pausedSession ? '<button type="button" class="desktop-today-action-secondary" data-act="discard-study">End session</button>' : '') + '</div>' +
       '</div>' +
       '<svg class="desktop-today-landscape" viewBox="0 0 440 170" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">' +
         '<circle cx="335" cy="48" r="30" fill="#FFE6A8"/>' +
@@ -1492,7 +1521,7 @@
       '</button>';
     }).join('');
     var startText = mode === 'challenge' ? 'Start challenge' : mode === 'exam' ? 'Start exam' : V.practiceMixed ? (mode === 'flash' ? 'Start mixed flashcards' : 'Start mixed review') : 'Start ' + (mode === 'flash' ? 'flashcards' : 'quiz') + (selectedCount ? ' · ' + selectedCount + ' ' + (selectedCount === 1 ? 'set' : 'sets') : '');
-    var startDisabled = !selectedCount && mode !== 'challenge' && mode !== 'exam';
+    var startDisabled = !selectedCount && mode !== 'challenge';
     return '<section class="practice-selection-view" aria-labelledby="practice-title">' +
       '<header class="view-header practice-view-header">' +
         '<h1 id="practice-title">Practice</h1>' +
@@ -2594,18 +2623,64 @@
          : '<label class="check"><input type="checkbox" id="s-shuf"' + (S.settings.shuffle ? ' checked' : '') + '> Shuffle cards</label>') +
       '<label class="check"><input type="checkbox" id="s-unk"> Skip cards I already know</label><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="start">Start</button></div></div>');
   }
-  function setupExam() {
-    V.setup = { mode: 'exam', ids: S.decks.map(function (d) { return d.id; }) };
-    var total = S.decks.reduce(function (count, d) { return count + d.cards.length; }, 0);
+  function setupExam(ids, mixed, defaultCount, defaultMinutes) {
+    var selectedIds = ids && ids.length ? ids.slice() : S.decks.map(function (d) { return d.id; });
+    var cards = [];
+    selectedIds.forEach(function (id) {
+      var d = deck(id);
+      if (d) d.cards.forEach(function (c) { cards.push({ deckId: id, card: c }); });
+    });
+    if (mixed) {
+      var available = allCardItems();
+      var eligible = StudyLogic.dueItems(available, Date.now()).concat(StudyLogic.weakSpots(available, 10));
+      var eligibleKeys = Object.create(null);
+      eligible.forEach(function (item) { eligibleKeys[JSON.stringify([item.deckId, item.card.id])] = true; });
+      cards = cards.filter(function (item) { return eligibleKeys[JSON.stringify([item.deckId, item.card.id])]; });
+    }
+    var total = cards.length;
+    if (!total) { toast('No questions are available for this exam.'); return; }
+    var countChoices = [10, 20, 30, 60].filter(function (count) { return count <= total; });
+    var selectedCount = countChoices.indexOf(defaultCount) >= 0
+      ? defaultCount
+      : (countChoices.indexOf(20) >= 0 ? 20 : (countChoices[0] || 0));
+    var countOptions = countChoices.map(function (count) {
+      return '<option value="' + count + '"' + (selectedCount === count ? ' selected' : '') + '>' + count + '</option>';
+    }).join('');
+    if (countChoices.indexOf(total) < 0) {
+      countOptions += '<option value="0"' + (!selectedCount ? ' selected' : '') + '>All ' + total + '</option>';
+    }
+    var baseMinutes = Number.isFinite(defaultMinutes) && defaultMinutes > 0 ? defaultMinutes : 30;
+    var baseCount = selectedCount || total;
+    var scopeText;
+    if (mixed) {
+      scopeText = 'Questions will come from due and weak cards.';
+    } else if (selectedIds.length === 1) {
+      var selectedDeck = deck(selectedIds[0]);
+      scopeText = 'Questions will come from ' + (selectedDeck ? MobileStudy.parseChapterTitle(selectedDeck.title).topic : 'the selected lesson') + '.';
+    } else if (selectedIds.length === S.decks.length) {
+      scopeText = 'Questions are mixed across all lessons.';
+    } else {
+      scopeText = 'Questions are mixed across the selected lessons.';
+    }
+    V.setup = { mode: 'exam', ids: selectedIds, mixed: !!mixed, cards: cards };
     openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="exam-setup-title"><h2 id="exam-setup-title">Start exam</h2>' +
-      '<label class="field"><span>Question count</span><select id="exam-count"><option value="10">10</option><option value="20" selected>20</option><option value="30">30</option><option value="0">All ' + total + '</option></select></label>' +
-      '<label class="field"><span>Time limit (minutes)</span><input id="exam-minutes" type="number" min="1" max="180" value="30"></label>' +
-      '<p class="note">Questions are mixed across all decks. Answers and explanations appear after submission.</p>' +
+      '<label class="field"><span>Question count</span><select id="exam-count">' + countOptions + '</select></label>' +
+      '<label class="field"><span>Time limit (minutes)</span><input id="exam-minutes" type="number" min="1" max="180" value="' + baseMinutes + '"></label>' +
+      '<p class="note">' + esc(scopeText) + ' ' + total + ' questions available. Answers and explanations appear after submission.</p>' +
       '<div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="start">Start exam</button></div></div>');
+    var countSelect = document.getElementById('exam-count');
+    var minutesInput = document.getElementById('exam-minutes');
+    var autoTime = true;
+    if (minutesInput) minutesInput.addEventListener('input', function () { autoTime = false; });
+    if (countSelect && minutesInput) countSelect.addEventListener('change', function () {
+      if (!autoTime) return;
+      var questionCount = +countSelect.value || total;
+      minutesInput.value = Math.max(1, Math.min(180, Math.ceil(baseMinutes * questionCount / baseCount)));
+    });
   }
   function start() {
-    var s = V.setup, cards = [];
-    s.ids.forEach(function (id) { var d = deck(id); if (d) d.cards.forEach(function (c) { cards.push({ deckId: id, card: c }); }); });
+    var s = V.setup, cards = s.cards ? s.cards.slice() : [];
+    if (!s.cards) s.ids.forEach(function (id) { var d = deck(id); if (d) d.cards.forEach(function (c) { cards.push({ deckId: id, card: c }); }); });
     var exam = s.mode === 'exam';
     var o = exam
       ? { unk: false, limit: +document.getElementById('exam-count').value, shuf: true, duration: Math.max(1, Math.min(180, +document.getElementById('exam-minutes').value || 30)) * 60 * 1000, saveBest: false }
@@ -3013,11 +3088,7 @@
         break;
       case 'chapter-exam':
         var ceDeck = deck(t.dataset.id);
-        if (ceDeck) {
-          var ceCards = ceDeck.cards.map(function (c) { return { deckId: ceDeck.id, card: c }; });
-          var ceCount = Math.min(20, ceCards.length);
-          begin('exam', StudyLogic.examQuestions(ceCards, ceCount), { unk: false, limit: ceCount, shuf: true, duration: 15 * 60 * 1000, saveBest: false }, [ceDeck.id]);
-        }
+        if (ceDeck) setupExam([ceDeck.id], false, 20, 15);
         break;
 
       case 'nav-tab': closeModal(); if (t.dataset.tab) go({ name: t.dataset.tab }); break;
@@ -3189,7 +3260,11 @@
       case 'practice-start':
         var practiceMode = t.dataset.mode || V.practiceMode || 'quiz';
         var practiceIds = Array.from(SEL);
-        if (practiceMode === 'exam') setupExam();
+        if (practiceMode === 'exam') {
+          if (V.practiceMixed) setupExam(null, true);
+          else if (practiceIds.length) setupExam(practiceIds, false);
+          else toast('Choose one or more lessons to cover.');
+        }
         else if (practiceMode === 'challenge') startChallenge(practiceIds.length ? practiceIds : null);
         else if (V.practiceMixed) startChallenge(null, practiceMode);
         else if (!practiceIds.length) toast('Choose one or more lessons to cover.');
@@ -3442,7 +3517,7 @@
       DEVOTIONALS = results[2] || [];
       SERMONS = results[3] || [];
       STARTER_DECKS = P.parseDecks(text).decks;
-      var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION - 1;
+      var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION - 3;
       var isFirstRun = !S.seeded && (!S.onboarding || !S.onboarding.completed);
       seed();
       if (reconcileStarters && syncStarterDecks()) save();

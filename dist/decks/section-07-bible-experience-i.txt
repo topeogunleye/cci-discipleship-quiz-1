@@ -8,7 +8,7 @@ D. Eloquence
 ANSWER: C
 EXPLANATION: The lesson prioritizes faithfulness in preserving doctrine and handing it on.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION III — [11:56]–[14:32] (approximate range)
-BIBLE: Also cited in lesson segment: 2 Timothy 2 <https://www.esv.org/verses/2+Timothy+2/>; Deuteronomy 4 <https://www.esv.org/verses/Deuteronomy+4/>; Galatians 1 <https://www.esv.org/verses/Galatians+1/>
+BIBLE: Also cited in lesson segment: 2 Timothy 2:2–3 <https://www.esv.org/verses/2+Timothy+2%3A2%E2%80%933/>; Deuteronomy 4 <https://www.esv.org/verses/Deuteronomy+4/>; Galatians 1:8 <https://www.esv.org/verses/Galatians+1%3A8/>
 
 Q2. Final authority of Scripture means that the Word of God has:
 A. The last word on all matters of faith, doctrine and practice
@@ -67,7 +67,7 @@ D. The content of Scripture ultimately reflects God's intention through human au
 ANSWER: C
 EXPLANATION: The lesson explicitly says inspiration establishes God as the source of Scripture.
 REF: HAVING A BIBLICAL WORLDVIEW I — [09:00]–[10:11] (approximate range)
-BIBLE: Also cited in lesson segment: 2 Timothy 3:16, 17 <https://www.esv.org/verses/2+Timothy+3%3A16%2C+17/>
+BIBLE: Confirmed in lesson and deck: 2 Timothy 3:16–17 <https://www.esv.org/verses/2+Timothy+3%3A16%E2%80%9317/>
 
 Q8. According to the lesson on Having a Biblical Worldview, what should happen when a believer discovers that an ideology they hold is wrong?
 A. The Word should straighten the ideology rather than the believer searching for a church that reinforces it.
@@ -165,7 +165,7 @@ D. Freedom from the authority of the Old Testament because the Spirit has replac
 ANSWER: B
 EXPLANATION: In context, liberty means the veil is removed so the writings’ meaning and God’s glory can be seen.
 REF: HERMENEUTICS (PART 2) I — [17:45]–[18:32] (approximate range)
-BIBLE: Also cited in lesson segment: 2 Corinthians 4 <https://www.esv.org/verses/2+Corinthians+4/>
+BIBLE: Also cited in lesson segment: 2 Corinthians 3:14–18 <https://www.esv.org/verses/2+Corinthians+3%3A14%E2%80%9318/>
 
 Q18. The lesson on hermeneutics uses the description of Christ as "the express image of his person" to emphasize that:
 A. Christ's teachings are more practical than those of the prophets
@@ -175,7 +175,7 @@ D. In Christ, we understand exactly who God is
 ANSWER: D
 EXPLANATION: The lesson says Christ reveals exactly who God is.
 REF: HERMENEUTICS (PART 1) II — [01:13]–[02:57] (approximate range)
-BIBLE: Also cited in lesson segment: 2 Corinthians 3 <https://www.esv.org/verses/2+Corinthians+3/>; Hebrews 1 <https://www.esv.org/verses/Hebrews+1/>
+BIBLE: Also cited in lesson segment: Hebrews 1:3 <https://www.esv.org/verses/Hebrews+1%3A3/>
 
 Q19. Which pair correctly matches the biblical statement with the figure of speech identified in the hermeneutics lesson?
 A. "I am the door" - simile
@@ -205,7 +205,7 @@ D. Circumcision of the heart was exclusively a New Testament doctrine with no Ol
 ANSWER: A
 EXPLANATION: The lesson distinguishes physical circumcision from the spiritual reality of circumcision of the heart.
 REF: HERMENEUTICS (PART 2) II — [14:44]–[16:44] (approximate range)
-BIBLE: Also cited in lesson segment: Ephesians 2:11 <https://www.esv.org/verses/Ephesians+2%3A11/>; Philippians 3:2 <https://www.esv.org/verses/Philippians+3%3A2/>; Acts 7:51 <https://www.esv.org/verses/Acts+7%3A51/>; Hebrews 10:1 <https://www.esv.org/verses/Hebrews+10%3A1/>; Hebrews 1:1, 1–3 <https://www.esv.org/verses/Hebrews+1%3A1%2C+1%E2%80%933/>
+BIBLE: Also cited in lesson segment: Acts 7:51 <https://www.esv.org/verses/Acts+7%3A51/>; Ephesians 2:11 <https://www.esv.org/verses/Ephesians+2%3A11/>; Philippians 3:2 <https://www.esv.org/verses/Philippians+3%3A2/>
 
 Q22. Which interpretation does the lesson on Hermeneutics explicitly reject concerning the statement "the letter kills"?
 A. That "the letter" specifically refers to the law written on stones
@@ -225,7 +225,7 @@ D. Sundry times refers to Old Testament communication, while diverse manners ref
 ANSWER: C
 EXPLANATION: The lesson distinguishes communication given in many parts from communication delivered through different modes.
 REF: HERMENEUTICS (PART 1) II — [02:57]–[03:55]; HERMENEUTICS (PART 2) I — [01:46]–[02:44] (approximate ranges)
-BIBLE: Also cited in lesson segment: Matthew 1:20 <https://www.esv.org/verses/Matthew+1%3A20/>; John 3 <https://www.esv.org/verses/John+3/>
+BIBLE: Also cited in lesson segment: Hebrews 1:1 <https://www.esv.org/verses/Hebrews+1%3A1/>
 
 Q24. The instruction to read "per book, per chapter" is specifically intended to prevent the interpreter from:
 A. Relying on individual verses instead of the full counsel of Scripture
@@ -275,7 +275,7 @@ D. Scripture gives believers sufficient wisdom to make decisions without externa
 ANSWER: B
 EXPLANATION: The lesson uses the verse to describe Scripture as a guide for navigating life and ordering one’s steps.
 REF: HAVING A BIBLICAL WORLDVIEW I — [06:51]–[07:50] (approximate range)
-BIBLE: Also cited in lesson segment: 2 Timothy 3:16, 17 <https://www.esv.org/verses/2+Timothy+3%3A16%2C+17/>
+BIBLE: Added from online research: Psalm 119:105 <https://www.esv.org/verses/Psalm+119%3A105/>
 
 Q29. Which combination best reflects the progression identified in Isaiah 53 within the lesson on hermeneutics?
 A. Christ's incarnation -> earthly ministry -> ascension -> enthronement
@@ -788,7 +788,7 @@ D. Five
 ANSWER: A
 EXPLANATION: The speaker says the word of God says it four times and lists Romans 16:16, 1 Corinthians 16:20, 2 Corinthians 13:12 and 1 Thessalonians 5:26.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION II — [12:08]
-BIBLE: Confirmed in lesson and deck: Romans 16:16 <https://www.esv.org/verses/Romans+16%3A16/>; 1 Corinthians 16:20 <https://www.esv.org/verses/1+Corinthians+16%3A20/>; 2 Corinthians 13:12 <https://www.esv.org/verses/2+Corinthians+13%3A12/>; 1 Thessalonians 5:26 <https://www.esv.org/verses/1+Thessalonians+5%3A26/> | Also cited in lesson segment: 1 Corinthians 16:12 <https://www.esv.org/verses/1+Corinthians+16%3A12/>
+BIBLE: Confirmed in lesson and deck: Romans 16:16 <https://www.esv.org/verses/Romans+16%3A16/>; 1 Corinthians 16:20 <https://www.esv.org/verses/1+Corinthians+16%3A20/>; 2 Corinthians 13:12 <https://www.esv.org/verses/2+Corinthians+13%3A12/>; 1 Thessalonians 5:26 <https://www.esv.org/verses/1+Thessalonians+5%3A26/>
 
 Q82. What does the speaker say is the real interpretation of the instruction to greet with a holy kiss?
 A. To signal forgiveness between believers who had quarreled
@@ -798,7 +798,7 @@ D. To mark church members as belonging to one spiritual family
 ANSWER: B
 EXPLANATION: The speaker says the real interpretation is for you to be cordial; this was the way they showed cordiality in their day.
 REF: INTRODUCTION TO BIBLICAL INTERPRETATION II — [13:14]
-BIBLE: Also cited in lesson segment: Romans 16:16 <https://www.esv.org/verses/Romans+16%3A16/>; 1 Corinthians 16:20 <https://www.esv.org/verses/1+Corinthians+16%3A20/>; 2 Corinthians 13:12 <https://www.esv.org/verses/2+Corinthians+13%3A12/>; 1 Thessalonians 5:26 <https://www.esv.org/verses/1+Thessalonians+5%3A26/>; 1 Corinthians 16:12 <https://www.esv.org/verses/1+Corinthians+16%3A12/>
+BIBLE: Added from online research: Romans 16:16 <https://www.esv.org/verses/Romans+16%3A16/>; 1 Corinthians 16:20 <https://www.esv.org/verses/1+Corinthians+16%3A20/>; 2 Corinthians 13:12 <https://www.esv.org/verses/2+Corinthians+13%3A12/>; 1 Thessalonians 5:26 <https://www.esv.org/verses/1+Thessalonians+5%3A26/>
 
 Q83. What does the speaker say Paul is doing when he says 'Judge in yourselves' in 1 Corinthians 11:13?
 A. Leaving the matter to each believer's private conscience before God
@@ -1043,7 +1043,7 @@ D. Instruction
 ANSWER: A
 EXPLANATION: The speaker says the text simply meant association, because that was how communication was understood in that day.
 REF: HERMENEUTICS (PART 1) I — [08:32]
-BIBLE: Added from online research: Joshua 10:12–14 <https://www.esv.org/verses/Joshua+10%3A12%E2%80%9314/>
+BIBLE: Added from online research: 1 Corinthians 15:33 <https://www.esv.org/verses/1+Corinthians+15%3A33/>
 
 Q108. What does the speaker say Jesus means by 'I am the door' in John 10:9?
 A. Jesus is the guardian who watches over the sheepfold
@@ -1053,7 +1053,7 @@ D. He is the way of access to eternal life and salvation
 ANSWER: D
 EXPLANATION: The speaker calls it a metaphor and says there is no revelation about a wooden door; it means that by Him you have access to eternal life and salvation.
 REF: HERMENEUTICS (PART 1) I — [10:36]
-BIBLE: Confirmed in lesson and deck: John 10:9 <https://www.esv.org/verses/John+10%3A9/> | Also cited in lesson segment: 2 Corinthians 11:16 <https://www.esv.org/verses/2+Corinthians+11%3A16/>; Matthew 10:16 <https://www.esv.org/verses/Matthew+10%3A16/>
+BIBLE: Confirmed in lesson and deck: John 10:9 <https://www.esv.org/verses/John+10%3A9/>
 
 Q109. How does the speaker explain Jesus's saying about hating father and mother as hyperbole?
 A. Jesus meant that relatives who oppose the gospel must be avoided
@@ -1063,7 +1063,7 @@ D. You must love the Lord so much that other love looks like hatred by compariso
 ANSWER: D
 EXPLANATION: The speaker defines hyperbole as extravagant words to drive home a point and says love for others should seem like hatred compared with love for the Lord.
 REF: HERMENEUTICS (PART 1) I — [11:33]
-BIBLE: Also cited in lesson segment: John 10:9 <https://www.esv.org/verses/John+10%3A9/>; John 15:5 <https://www.esv.org/verses/John+15%3A5/>; John 12 <https://www.esv.org/verses/John+12/>; John 21:25 <https://www.esv.org/verses/John+21%3A25/>
+BIBLE: Added from online research: Luke 14:26 <https://www.esv.org/verses/Luke+14%3A26/>
 
 Q110. What point does the speaker make with the example of a husband traveling without his wedding ring?
 A. A ring can express biblical love and accountability, though it is not commanded
@@ -1103,7 +1103,7 @@ D. It teaches that speaking in tongues is the primary sign of the Spirit
 ANSWER: A
 EXPLANATION: The speaker says Peter pointed the crowd to Joel's prophecy, which is how New Testament teaching brings to light things foreordained in the Old Testament.
 REF: HERMENEUTICS (PART 1) I — [19:44; 20:41]
-BIBLE: Also cited in lesson segment: Ephesians 3 <https://www.esv.org/verses/Ephesians+3/>
+BIBLE: Added from online research: Acts 2:16–21 <https://www.esv.org/verses/Acts+2%3A16%E2%80%9321/>
 
 Q114. What does the speaker conclude from 'God, who at sundry times and in divers manners spoke... by the prophets' about Old Testament communication?
 A. It was incomplete in doctrine
@@ -1152,7 +1152,7 @@ D. Hosea and Malachi
 ANSWER: A
 EXPLANATION: The speaker traces 'out of Egypt I have called my son' to Hosea 11:1 and the weeping of Rachel to Jeremiah 31:15.
 REF: HERMENEUTICS (PART 1) II — [09:08; 10:02]
-BIBLE: Confirmed in lesson and deck: Matthew 2:13 <https://www.esv.org/verses/Matthew+2%3A13/>; Hosea 11:1 <https://www.esv.org/verses/Hosea+11%3A1/>; Jeremiah 31:15 <https://www.esv.org/verses/Jeremiah+31%3A15/> | Also cited in lesson segment: Micah 5:2 <https://www.esv.org/verses/Micah+5%3A2/>; Isaiah 7:14 <https://www.esv.org/verses/Isaiah+7%3A14/>
+BIBLE: Confirmed in lesson and deck: Matthew 2:13 <https://www.esv.org/verses/Matthew+2%3A13/>; Hosea 11:1 <https://www.esv.org/verses/Hosea+11%3A1/>; Matthew 2:17–18 <https://www.esv.org/verses/Matthew+2%3A17%E2%80%9318/>; Jeremiah 31:15 <https://www.esv.org/verses/Jeremiah+31%3A15/>
 
 Q119. According to the speaker, what was the book of Matthew written for?
 A. To record the events of Jesus's life for the very first time
@@ -1192,7 +1192,7 @@ D. Zechariah 9:9
 ANSWER: D
 EXPLANATION: In his list of prophecies, the speaker gives Zechariah 9:9 for riding into Jerusalem on a donkey.
 REF: HERMENEUTICS (PART 1) II — [15:07]
-BIBLE: Confirmed in lesson and deck: Zechariah 9:9 <https://www.esv.org/verses/Zechariah+9%3A9/> | Also cited in lesson segment: Malachi 3:1 <https://www.esv.org/verses/Malachi+3%3A1/>; Isaiah 43 <https://www.esv.org/verses/Isaiah+43/>; Isaiah 35:5, 6 <https://www.esv.org/verses/Isaiah+35%3A5%2C+6/>; Psalm 41:9 <https://www.esv.org/verses/Psalm+41%3A9/>
+BIBLE: Confirmed in lesson and deck: Zechariah 9:9 <https://www.esv.org/verses/Zechariah+9%3A9/>
 
 Q123. Which reference does the speaker give for the betraying friend who will be paid 30 pieces of silver?
 A. Zechariah 9:9
@@ -1202,7 +1202,7 @@ D. Psalm 22:16
 ANSWER: B
 EXPLANATION: The speaker lists the betraying friend paying 30 pieces of silver at Zechariah 11:12-13.
 REF: HERMENEUTICS (PART 1) II — [16:30]
-BIBLE: Confirmed in lesson and deck: Zechariah 11:12–13 <https://www.esv.org/verses/Zechariah+11%3A12%E2%80%9313/> | Also cited in lesson segment: Malachi 3:1 <https://www.esv.org/verses/Malachi+3%3A1/>; Isaiah 43 <https://www.esv.org/verses/Isaiah+43/>; Isaiah 35:5, 6 <https://www.esv.org/verses/Isaiah+35%3A5%2C+6/>; Zechariah 9:9 <https://www.esv.org/verses/Zechariah+9%3A9/>; Psalm 41:9 <https://www.esv.org/verses/Psalm+41%3A9/>; Isaiah 50:6 <https://www.esv.org/verses/Isaiah+50%3A6/>; Isaiah 56 <https://www.esv.org/verses/Isaiah+56/>; Psalm 28:19 <https://www.esv.org/verses/Psalm+28%3A19/>; Isaiah 53:7 <https://www.esv.org/verses/Isaiah+53%3A7/>; Psalm 22:16 <https://www.esv.org/verses/Psalm+22%3A16/>
+BIBLE: Confirmed in lesson and deck: Zechariah 11:12–13 <https://www.esv.org/verses/Zechariah+11%3A12%E2%80%9313/>
 
 Q124. Why does the speaker call the prophecy of crucifixion phenomenal?
 A. Crucifixion did not yet exist as a form of execution at that time
@@ -1222,7 +1222,7 @@ D. He will be crucified with sinners (Isaiah 53:12)
 ANSWER: D
 EXPLANATION: The speaker says 'crucified with sinners' is how the two thieves came to be by His side, citing Isaiah 53:12.
 REF: HERMENEUTICS (PART 1) II — [18:09]
-BIBLE: Confirmed in lesson and deck: Isaiah 53:12 <https://www.esv.org/verses/Isaiah+53%3A12/> | Also cited in lesson segment: Zechariah 11 <https://www.esv.org/verses/Zechariah+11/>; Isaiah 50:6 <https://www.esv.org/verses/Isaiah+50%3A6/>; Isaiah 56 <https://www.esv.org/verses/Isaiah+56/>; Psalm 28:19 <https://www.esv.org/verses/Psalm+28%3A19/>; Isaiah 53:7 <https://www.esv.org/verses/Isaiah+53%3A7/>; Psalm 22:16 <https://www.esv.org/verses/Psalm+22%3A16/>; Psalm 34:20 <https://www.esv.org/verses/Psalm+34%3A20/>; Psalm 22:11 <https://www.esv.org/verses/Psalm+22%3A11/>; Isaiah 53:8 <https://www.esv.org/verses/Isaiah+53%3A8/>; Isaiah 53:9 <https://www.esv.org/verses/Isaiah+53%3A9/>; Psalm 16:10 <https://www.esv.org/verses/Psalm+16%3A10/>; Psalm 68:18 <https://www.esv.org/verses/Psalm+68%3A18/>; Psalm 110:1 <https://www.esv.org/verses/Psalm+110%3A1/>
+BIBLE: Confirmed in lesson and deck: Isaiah 53:12 <https://www.esv.org/verses/Isaiah+53%3A12/>
 
 Q126. Which sequence correctly pairs the references the speaker gives for the resurrection, the ascension and sitting at the right hand of God?
 A. Psalm 110:1; Psalm 68:18; Psalm 16:10
@@ -1232,7 +1232,7 @@ D. Psalm 68:18; Psalm 16:10; Psalm 110:1
 ANSWER: B
 EXPLANATION: The speaker gives Psalm 16:10 for the resurrection, Psalm 68:18 for the ascension, and Psalm 110:1 for sitting at the right hand of God.
 REF: HERMENEUTICS (PART 1) II — [18:09]
-BIBLE: Confirmed in lesson and deck: Psalm 16:10 <https://www.esv.org/verses/Psalm+16%3A10/>; Psalm 68:18 <https://www.esv.org/verses/Psalm+68%3A18/>; Psalm 110:1 <https://www.esv.org/verses/Psalm+110%3A1/> | Also cited in lesson segment: Zechariah 11 <https://www.esv.org/verses/Zechariah+11/>; Isaiah 50:6 <https://www.esv.org/verses/Isaiah+50%3A6/>; Isaiah 56 <https://www.esv.org/verses/Isaiah+56/>; Psalm 28:19 <https://www.esv.org/verses/Psalm+28%3A19/>; Isaiah 53:7 <https://www.esv.org/verses/Isaiah+53%3A7/>; Psalm 22:16 <https://www.esv.org/verses/Psalm+22%3A16/>; Isaiah 53:12 <https://www.esv.org/verses/Isaiah+53%3A12/>; Psalm 34:20 <https://www.esv.org/verses/Psalm+34%3A20/>; Psalm 22:11 <https://www.esv.org/verses/Psalm+22%3A11/>; Isaiah 53:8 <https://www.esv.org/verses/Isaiah+53%3A8/>; Isaiah 53:9 <https://www.esv.org/verses/Isaiah+53%3A9/>
+BIBLE: Confirmed in lesson and deck: Psalm 16:10 <https://www.esv.org/verses/Psalm+16%3A10/>; Psalm 68:18 <https://www.esv.org/verses/Psalm+68%3A18/>; Psalm 110:1 <https://www.esv.org/verses/Psalm+110%3A1/>
 
 Q127. What does the speaker say about the Old Testament's communication not being 'exact' in Christ's comparison?
 A. It means it was meant only for a past generation
@@ -1282,7 +1282,7 @@ D. Poetic passages that carry no doctrinal meaning at all
 ANSWER: C
 EXPLANATION: The speaker says the New Testament unpacks what theologians call types and shadows, symbolisms in the Old Testament.
 REF: HERMENEUTICS (PART 2) I — [05:36]
-BIBLE: Also cited in lesson segment: John 3 <https://www.esv.org/verses/John+3/>; 2 Corinthians 3 <https://www.esv.org/verses/2+Corinthians+3/>
+BIBLE: Also cited in lesson segment: John 3 <https://www.esv.org/verses/John+3/>; 2 Corinthians 3 <https://www.esv.org/verses/2+Corinthians+3/> | Added from online research: Hebrews 10:1 <https://www.esv.org/verses/Hebrews+10%3A1/>
 
 Q132. What did the fading of the glory on Moses's face symbolize, according to the speaker?
 A. That Moses had failed to remain faithful to God's commands
@@ -1502,7 +1502,7 @@ D. The rebuilding of the temple after the long exile in Babylon
 ANSWER: A
 EXPLANATION: The speaker cites Ezekiel 36:26 for the real circumcision, where God takes away the stony heart and puts His Spirit in us, so sinful propensity is removed by His Spirit.
 REF: HERMENEUTICS (PART 2) II — [12:41; 13:38]
-BIBLE: Confirmed in lesson and deck: Ezekiel 36:26 <https://www.esv.org/verses/Ezekiel+36%3A26/> | Also cited in lesson segment: Colossians 2:11 <https://www.esv.org/verses/Colossians+2%3A11/>; Ephesians 2:11 <https://www.esv.org/verses/Ephesians+2%3A11/>
+BIBLE: Confirmed in lesson and deck: Ezekiel 36:26 <https://www.esv.org/verses/Ezekiel+36%3A26/>; Colossians 2:11 <https://www.esv.org/verses/Colossians+2%3A11/>
 
 Q154. Whom does the speaker say Paul warns against in Philippians 3:2 with 'beware of the concision'?
 A. Teachers who deny the bodily resurrection of Christ
@@ -1512,7 +1512,7 @@ D. Those who still want to cut the flesh after the real circumcision
 ANSWER: D
 EXPLANATION: The speaker reads 'beware of the concision' as beware of people who still want to slit your flesh when the real circumcision is available by faith in Christ.
 REF: HERMENEUTICS (PART 2) II — [14:44]
-BIBLE: Confirmed in lesson and deck: Philippians 3:2 <https://www.esv.org/verses/Philippians+3%3A2/> | Also cited in lesson segment: Ephesians 2:11 <https://www.esv.org/verses/Ephesians+2%3A11/>; Acts 7:51 <https://www.esv.org/verses/Acts+7%3A51/>
+BIBLE: Confirmed in lesson and deck: Philippians 3:2 <https://www.esv.org/verses/Philippians+3%3A2/>
 
 Q155. What does the speaker say proves that Old Testament sacrifices were a type and shadow (Hebrews 10:1)?
 A. They were eventually replaced by regular temple services and feasts
@@ -1522,7 +1522,7 @@ D. They were offered only by the priests of Israel at the temple
 ANSWER: B
 EXPLANATION: The speaker says the proof that they were a type and shadow was that they had to do it every year; if it was efficacious enough, one would be enough.
 REF: HERMENEUTICS (PART 2) II — [16:44]
-BIBLE: Confirmed in lesson and deck: Hebrews 10:1 <https://www.esv.org/verses/Hebrews+10%3A1/> | Also cited in lesson segment: Acts 7 <https://www.esv.org/verses/Acts+7/>; Hebrews 1:1, 1–3 <https://www.esv.org/verses/Hebrews+1%3A1%2C+1%E2%80%933/>
+BIBLE: Confirmed in lesson and deck: Hebrews 10:1 <https://www.esv.org/verses/Hebrews+10%3A1/>
 
 Q156. What criterion does the speaker give for identifying a type in the Old Testament?
 A. It must resemble the life and ministry of Christ closely
