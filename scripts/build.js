@@ -33,12 +33,16 @@ function normalizeTextFiles(directory) {
   }
 }
 
+normalizeTextFile(path.join(root, 'js/supabase.bundle.js'));
+
 html = replaceOnce(html, '<link rel="stylesheet" href="style.css">', `<style>\n${read('style.css')}\n</style>`);
 html = replaceOnce(html, '<script type="application/json" id="starter-fallback">""</script>', `<script type="application/json" id="starter-fallback">${inlineJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="devotionals-fallback">[]</script>', `<script type="application/json" id="devotionals-fallback">${devotionalsJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="sermons-fallback">{"schemaVersion":1,"sermons":[]}</script>', `<script type="application/json" id="sermons-fallback">${sermonsJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="lesson-videos-fallback">{"schemaVersion":1,"videos":[]}</script>', `<script type="application/json" id="lesson-videos-fallback">${lessonVideosJson}</script>`);
 html = replaceOnce(html, '<script src="js/native-bridge.bundle.js"></script>', `<script>\n${read('js/native-bridge.bundle.js')}\n</script>`);
+html = replaceOnce(html, '<script src="js/progress-sync.js"></script>', `<script>\n${read('js/progress-sync.js')}\n</script>`);
+html = replaceOnce(html, '<script src="js/account.js"></script>', `<script>\n${read('js/account.js')}\n</script>`);
 html = replaceOnce(html, '<script src="js/parser.js"></script>', `<script>\n${read('js/parser.js')}\n</script>`);
 html = replaceOnce(html, '<script src="js/study.js"></script>', `<script>\n${read('js/study.js')}\n</script>`);
 html = replaceOnce(html, '<script src="js/storage.js"></script>', `<script>\n${read('js/storage.js')}\n</script>`);

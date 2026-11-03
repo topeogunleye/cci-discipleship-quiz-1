@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v45';
+const CACHE_NAME = CACHE_PREFIX + 'v46';
 const SERMON_AUDIO_CACHE = 'cci-sermon-downloads-v1';
 const CORE_FILES = [
   './',
@@ -16,7 +16,10 @@ const CORE_FILES = [
   'js/study.js',
   'js/storage.js',
   'js/native-bridge.bundle.js',
+  'js/supabase.bundle.js',
   'js/mobile-study.js',
+  'js/progress-sync.js',
+  'js/account.js',
   'js/sermons.js',
   'js/sermons-ui.js',
   'js/app.js',
@@ -109,9 +112,17 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
   const esvPreviewPath = new URL('api/esv-passage', self.registration.scope).pathname;
+  const apiBasePath = new URL('./api/', self.registration.scope).pathname;
   if (url.pathname === esvPreviewPath) {
     event.respondWith(fetch(request, { cache: 'no-store' }).catch(() => new Response(
       JSON.stringify({ error: 'The ESV passage service is temporarily unavailable.' }),
+      { status: 503, headers: { 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8' } }
+    )));
+    return;
+  }
+  if (url.pathname.startsWith(apiBasePath)) {
+    event.respondWith(fetch(request, { cache: 'no-store' }).catch(() => new Response(
+      JSON.stringify({ error: 'The account or lesson video service is unavailable offline.' }),
       { status: 503, headers: { 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8' } }
     )));
     return;

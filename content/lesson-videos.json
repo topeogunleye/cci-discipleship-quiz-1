@@ -1,4 +1,659 @@
 {
   "schemaVersion": 1,
-  "videos": []
+  "videos": [
+    {
+      "id": "section-01-born-again",
+      "deckId": "d-discipleship-experience-section-1-soteriology",
+      "title": "BORN AGAIN",
+      "objectKey": "Section 1 Sotoriology/BORN AGAIN – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-01-justification",
+      "deckId": "d-discipleship-experience-section-1-soteriology",
+      "title": "JUSTIFICATION",
+      "objectKey": "Section 1 Sotoriology/JUSTIFICATION – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-01-original-sin",
+      "deckId": "d-discipleship-experience-section-1-soteriology",
+      "title": "ORIGINAL SIN",
+      "objectKey": "Section 1 Sotoriology/ORIGINAL SIN – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-01-repentance",
+      "deckId": "d-discipleship-experience-section-1-soteriology",
+      "title": "REPENTANCE",
+      "objectKey": "Section 1 Sotoriology/REPENTANCE – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-01-righteousness",
+      "deckId": "d-discipleship-experience-section-1-soteriology",
+      "title": "RIGHTEOUSNESS",
+      "objectKey": "Section 1 Sotoriology/RIGHTEOUSNESS – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-10-did-jesus-rise-from-the-dead-i",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "DID JESUS RISE FROM THE DEAD. I",
+      "objectKey": "Section 10 Apologetics/DID JESUS RISE FROM THE DEAD. I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-10-did-jesus-rise-from-the-dead-ii",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "DID JESUS RISE FROM THE DEAD. II",
+      "objectKey": "Section 10 Apologetics/DID JESUS RISE FROM THE DEAD. II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-10-did-jesus-rise-from-the-dead-iii",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "DID JESUS RISE FROM THE DEAD. III",
+      "objectKey": "Section 10 Apologetics/DID JESUS RISE FROM THE DEAD. III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-10-did-jesus-rise-from-the-dead-iv",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "DID JESUS RISE FROM THE DEAD. IV",
+      "objectKey": "Section 10 Apologetics/DID JESUS RISE FROM THE DEAD. IV – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-10-did-jesus-rise-from-the-dead-v",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "DID JESUS RISE FROM THE DEAD. V",
+      "objectKey": "Section 10 Apologetics/DID JESUS RISE FROM THE DEAD. V – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-10-is-the-bible-true-i",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "IS THE BIBLE TRUE. I",
+      "objectKey": "Section 10 Apologetics/IS THE BIBLE TRUE. I – Celebration Church International - LMS_2.mp4"
+    },
+    {
+      "id": "section-10-is-the-bible-true-ii",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "IS THE BIBLE TRUE. II",
+      "objectKey": "Section 10 Apologetics/IS THE BIBLE TRUE. II – Celebration Church International - LMS_2.mp4"
+    },
+    {
+      "id": "section-10-is-there-a-god-i",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "IS THERE A GOD. I",
+      "objectKey": "Section 10 Apologetics/IS THERE A GOD. I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-10-is-there-a-god-ii",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "IS THERE A GOD. II",
+      "objectKey": "Section 10 Apologetics/IS THERE A GOD. II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-10-is-there-a-god-iii",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "IS THERE A GOD. III",
+      "objectKey": "Section 10 Apologetics/IS THERE A GOD. III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-10-theodicy-i",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "THEODICY I",
+      "objectKey": "Section 10 Apologetics/THEODICY I – Celebration Church International - LMS_2.mp4"
+    },
+    {
+      "id": "section-10-theodicy-ii",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "THEODICY II",
+      "objectKey": "Section 10 Apologetics/THEODICY II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-10-theodicy-iii",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "THEODICY III",
+      "objectKey": "Section 10 Apologetics/THEODICY III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-10-theodicy-iv",
+      "deckId": "d-discipleship-experience-section-10-apologetics",
+      "title": "THEODICY IV",
+      "objectKey": "Section 10 Apologetics/THEODICY IV – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-how-to-cast-out-demons-i",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "HOW TO CAST OUT DEMONS I",
+      "objectKey": "Section 11  Believers Authority Charisma/HOW TO CAST OUT DEMONS I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-how-to-cast-out-demons-ii",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "HOW TO CAST OUT DEMONS II",
+      "objectKey": "Section 11  Believers Authority Charisma/HOW TO CAST OUT DEMONS II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-how-to-cast-out-demons-iii",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "HOW TO CAST OUT DEMONS III",
+      "objectKey": "Section 11  Believers Authority Charisma/HOW TO CAST OUT DEMONS III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-how-to-cast-out-demons-iv",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "HOW TO CAST OUT DEMONS IV",
+      "objectKey": "Section 11  Believers Authority Charisma/HOW TO CAST OUT DEMONS IV – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-manifesting-the-presence-of-god-i",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "MANIFESTING THE PRESENCE OF GOD I",
+      "objectKey": "Section 11  Believers Authority Charisma/MANIFESTING THE PRESENCE OF GOD I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-manifesting-the-presence-of-god-ii",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "MANIFESTING THE PRESENCE OF GOD II",
+      "objectKey": "Section 11  Believers Authority Charisma/MANIFESTING THE PRESENCE OF GOD II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-manifesting-the-presence-of-god-iii",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "MANIFESTING THE PRESENCE OF GOD III",
+      "objectKey": "Section 11  Believers Authority Charisma/MANIFESTING THE PRESENCE OF GOD III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-power-in-the-blood-i",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "POWER IN THE BLOOD I",
+      "objectKey": "Section 11  Believers Authority Charisma/POWER IN THE BLOOD I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-power-in-the-blood-ii",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "POWER IN THE BLOOD II",
+      "objectKey": "Section 11  Believers Authority Charisma/POWER IN THE BLOOD II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-power-in-the-blood-iii",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "POWER IN THE BLOOD III",
+      "objectKey": "Section 11  Believers Authority Charisma/POWER IN THE BLOOD III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-power-in-the-blood-iv",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "POWER IN THE BLOOD IV",
+      "objectKey": "Section 11  Believers Authority Charisma/POWER IN THE BLOOD IV – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-who-are-you-i",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "WHO ARE YOU. I",
+      "objectKey": "Section 11  Believers Authority Charisma/WHO ARE YOU. I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-who-are-you-ii",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "WHO ARE YOU. II",
+      "objectKey": "Section 11  Believers Authority Charisma/WHO ARE YOU. II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-who-are-you-iii",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "WHO ARE YOU. III",
+      "objectKey": "Section 11  Believers Authority Charisma/WHO ARE YOU. III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-11-who-are-you-iv",
+      "deckId": "d-discipleship-experience-section-11-believers-authority-charisma",
+      "title": "WHO ARE YOU. IV",
+      "objectKey": "Section 11  Believers Authority Charisma/WHO ARE YOU. IV – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-baptism-i",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "BAPTISM I",
+      "objectKey": "Section 12 Church History/BAPTISM I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-baptism-ii",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "BAPTISM II",
+      "objectKey": "Section 12 Church History/BAPTISM II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-baptism-iii",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "BAPTISM III",
+      "objectKey": "Section 12 Church History/BAPTISM III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-baptism-iv",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "BAPTISM IV",
+      "objectKey": "Section 12 Church History/BAPTISM IV – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-baptism-v",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "BAPTISM V",
+      "objectKey": "Section 12 Church History/BAPTISM V – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-early-church-i",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "EARLY CHURCH I",
+      "objectKey": "Section 12 Church History/EARLY CHURCH I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-early-church-ii",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "EARLY CHURCH II",
+      "objectKey": "Section 12 Church History/EARLY CHURCH II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-early-church-iii",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "EARLY CHURCH III",
+      "objectKey": "Section 12 Church History/EARLY CHURCH III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-early-church-iv",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "EARLY CHURCH IV",
+      "objectKey": "Section 12 Church History/EARLY CHURCH IV – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-how-to-attract-angels-i",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "HOW TO ATTRACT ANGELS I",
+      "objectKey": "Section 12 Church History/HOW TO ATTRACT ANGELS I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-how-to-attract-angels-ii",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "HOW TO ATTRACT ANGELS II",
+      "objectKey": "Section 12 Church History/HOW TO ATTRACT ANGELS II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-how-to-attract-angels-iii",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "HOW TO ATTRACT ANGELS III",
+      "objectKey": "Section 12 Church History/HOW TO ATTRACT ANGELS III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-how-to-attract-angels-iv",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "HOW TO ATTRACT ANGELS IV",
+      "objectKey": "Section 12 Church History/HOW TO ATTRACT ANGELS IV – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-12-how-to-attract-angels-v",
+      "deckId": "d-discipleship-experience-section-12-church-history",
+      "title": "HOW TO ATTRACT ANGELS V",
+      "objectKey": "Section 12 Church History/HOW TO ATTRACT ANGELS V – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-02-assurance",
+      "deckId": "d-discipleship-experience-section-2-soteriology-ii",
+      "title": "ASSURANCE",
+      "objectKey": "Section 2 Sotoriology II/ASSURANCE – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-02-atonement",
+      "deckId": "d-discipleship-experience-section-2-soteriology-ii",
+      "title": "ATONEMENT",
+      "objectKey": "Section 2 Sotoriology II/ATONEMENT – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-02-propitiation",
+      "deckId": "d-discipleship-experience-section-2-soteriology-ii",
+      "title": "PROPITIATION",
+      "objectKey": "Section 2 Sotoriology II/PROPITIATION – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-02-redemption",
+      "deckId": "d-discipleship-experience-section-2-soteriology-ii",
+      "title": "REDEMPTION",
+      "objectKey": "Section 2 Sotoriology II/REDEMPTION – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-02-those-who-never-heard-the-gospel",
+      "deckId": "d-discipleship-experience-section-2-soteriology-ii",
+      "title": "THOSE WHO NEVER HEARD THE GOSPEL",
+      "objectKey": "Section 2 Sotoriology II/THOSE WHO NEVER HEARD THE GOSPEL – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-03-predestination-i",
+      "deckId": "d-discipleship-experience-section-3-predestination-trinity",
+      "title": "PREDESTINATION I",
+      "objectKey": "Section 3 Propitiation and Trinity/PREDESTINATION I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-03-predestination-ii",
+      "deckId": "d-discipleship-experience-section-3-predestination-trinity",
+      "title": "PREDESTINATION II",
+      "objectKey": "Section 3 Propitiation and Trinity/PREDESTINATION II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-03-trinity-i",
+      "deckId": "d-discipleship-experience-section-3-predestination-trinity",
+      "title": "TRINITY I",
+      "objectKey": "Section 3 Propitiation and Trinity/TRINITY I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-03-trinity-ii",
+      "deckId": "d-discipleship-experience-section-3-predestination-trinity",
+      "title": "TRINITY II",
+      "objectKey": "Section 3 Propitiation and Trinity/TRINITY II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-03-trinity-iii",
+      "deckId": "d-discipleship-experience-section-3-predestination-trinity",
+      "title": "TRINITY III",
+      "objectKey": "Section 3 Propitiation and Trinity/TRINITY III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-04-jesus-son-of-god-i",
+      "deckId": "d-discipleship-experience-section-4-christology",
+      "title": "JESUS- SON OF GOD I",
+      "objectKey": "Section 4 Christology/JESUS- SON OF GOD I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-04-jesus-son-of-god-ii",
+      "deckId": "d-discipleship-experience-section-4-christology",
+      "title": "JESUS- SON OF GOD II",
+      "objectKey": "Section 4 Christology/JESUS- SON OF GOD II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-04-jesus-son-of-god-iii",
+      "deckId": "d-discipleship-experience-section-4-christology",
+      "title": "JESUS- SON OF GOD III",
+      "objectKey": "Section 4 Christology/JESUS- SON OF GOD III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-04-jesus-son-of-man-i",
+      "deckId": "d-discipleship-experience-section-4-christology",
+      "title": "JESUS- SON OF MAN I",
+      "objectKey": "Section 4 Christology/JESUS- SON OF MAN I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-04-jesus-son-of-man-ii",
+      "deckId": "d-discipleship-experience-section-4-christology",
+      "title": "JESUS- SON OF MAN II",
+      "objectKey": "Section 4 Christology/JESUS- SON OF MAN II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-04-jesus-son-of-man-iii",
+      "deckId": "d-discipleship-experience-section-4-christology",
+      "title": "JESUS- SON OF MAN III",
+      "objectKey": "Section 4 Christology/JESUS- SON OF MAN III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-05-how-to-overcome-habits-i",
+      "deckId": "d-discipleship-experience-section-5-christian-conduct",
+      "title": "HOW TO OVERCOME HABITS I",
+      "objectKey": "Section 5 Christian Conduct/HOW TO OVERCOME HABITS I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-05-how-to-overcome-habits-ii",
+      "deckId": "d-discipleship-experience-section-5-christian-conduct",
+      "title": "HOW TO OVERCOME HABITS II",
+      "objectKey": "Section 5 Christian Conduct/HOW TO OVERCOME HABITS II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-05-how-to-overcome-habits-iii",
+      "deckId": "d-discipleship-experience-section-5-christian-conduct",
+      "title": "HOW TO OVERCOME HABITS III",
+      "objectKey": "Section 5 Christian Conduct/HOW TO OVERCOME HABITS III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-05-how-to-overcome-habits-iv",
+      "deckId": "d-discipleship-experience-section-5-christian-conduct",
+      "title": "HOW TO OVERCOME HABITS IV",
+      "objectKey": "Section 5 Christian Conduct/HOW TO OVERCOME HABITS IV – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-05-that-old-man",
+      "deckId": "d-discipleship-experience-section-5-christian-conduct",
+      "title": "THAT OLD MAN",
+      "objectKey": "Section 5 Christian Conduct/THAT OLD MAN – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-06-school-of-prayer-i",
+      "deckId": "d-discipleship-experience-section-6-prayer",
+      "title": "SCHOOL OF PRAYER I",
+      "objectKey": "Section 6 Prayer/SCHOOL OF PRAYER I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-06-school-of-prayer-ii",
+      "deckId": "d-discipleship-experience-section-6-prayer",
+      "title": "SCHOOL OF PRAYER II",
+      "objectKey": "Section 6 Prayer/SCHOOL OF PRAYER II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-06-school-of-prayer-iii",
+      "deckId": "d-discipleship-experience-section-6-prayer",
+      "title": "SCHOOL OF PRAYER III",
+      "objectKey": "Section 6 Prayer/SCHOOL OF PRAYER III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-06-school-of-prayer-iv",
+      "deckId": "d-discipleship-experience-section-6-prayer",
+      "title": "SCHOOL OF PRAYER IV",
+      "objectKey": "Section 6 Prayer/SCHOOL OF PRAYER IV – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-06-school-of-prayer-ix",
+      "deckId": "d-discipleship-experience-section-6-prayer",
+      "title": "SCHOOL OF PRAYER IX",
+      "objectKey": "Section 6 Prayer/SCHOOL OF PRAYER IX – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-06-school-of-prayer-v",
+      "deckId": "d-discipleship-experience-section-6-prayer",
+      "title": "SCHOOL OF PRAYER V",
+      "objectKey": "Section 6 Prayer/SCHOOL OF PRAYER V – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-06-school-of-prayer-vi",
+      "deckId": "d-discipleship-experience-section-6-prayer",
+      "title": "SCHOOL OF PRAYER VI",
+      "objectKey": "Section 6 Prayer/SCHOOL OF PRAYER VI – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-06-school-of-prayer-vii",
+      "deckId": "d-discipleship-experience-section-6-prayer",
+      "title": "SCHOOL OF PRAYER VII",
+      "objectKey": "Section 6 Prayer/SCHOOL OF PRAYER VII – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-06-school-of-prayer-viii",
+      "deckId": "d-discipleship-experience-section-6-prayer",
+      "title": "SCHOOL OF PRAYER VIII",
+      "objectKey": "Section 6 Prayer/SCHOOL OF PRAYER VIII – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-06-school-of-prayer-x",
+      "deckId": "d-discipleship-experience-section-6-prayer",
+      "title": "SCHOOL OF PRAYER X",
+      "objectKey": "Section 6 Prayer/SCHOOL OF PRAYER X – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-07-having-a-biblical-worldview-i",
+      "deckId": "d-discipleship-experience-section-7-bible-experience-i",
+      "title": "HAVING A BIBLICAL WORLDVIEW I",
+      "objectKey": "Section 7 Bible Experience I/HAVING A BIBLICAL WORLDVIEW I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-07-having-a-biblical-worldview-ii",
+      "deckId": "d-discipleship-experience-section-7-bible-experience-i",
+      "title": "HAVING A BIBLICAL WORLDVIEW II",
+      "objectKey": "Section 7 Bible Experience I/HAVING A BIBLICAL WORLDVIEW II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-07-hermeneutics-part-1-i",
+      "deckId": "d-discipleship-experience-section-7-bible-experience-i",
+      "title": "HERMENEUTICS (PART 1) I",
+      "objectKey": "Section 7 Bible Experience I/HERMENEUTICS (PART 1) I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-07-hermeneutics-part-1-ii",
+      "deckId": "d-discipleship-experience-section-7-bible-experience-i",
+      "title": "HERMENEUTICS (PART 1) II",
+      "objectKey": "Section 7 Bible Experience I/HERMENEUTICS (PART 1) II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-07-hermeneutics-part-2-i",
+      "deckId": "d-discipleship-experience-section-7-bible-experience-i",
+      "title": "HERMENEUTICS (PART 2) I",
+      "objectKey": "Section 7 Bible Experience I/HERMENEUTICS (PART 2) I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-07-hermeneutics-part-2-ii",
+      "deckId": "d-discipleship-experience-section-7-bible-experience-i",
+      "title": "HERMENEUTICS (PART 2) II",
+      "objectKey": "Section 7 Bible Experience I/HERMENEUTICS (PART 2) II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-07-introduction-to-biblical-interpretation-i",
+      "deckId": "d-discipleship-experience-section-7-bible-experience-i",
+      "title": "INTRODUCTION TO BIBLICAL INTERPRETATION I",
+      "objectKey": "Section 7 Bible Experience I/INTRODUCTION TO BIBLICAL INTERPRETATION I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-07-introduction-to-biblical-interpretation-ii",
+      "deckId": "d-discipleship-experience-section-7-bible-experience-i",
+      "title": "INTRODUCTION TO BIBLICAL INTERPRETATION II",
+      "objectKey": "Section 7 Bible Experience I/INTRODUCTION TO BIBLICAL INTERPRETATION II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-07-introduction-to-biblical-interpretation-iii",
+      "deckId": "d-discipleship-experience-section-7-bible-experience-i",
+      "title": "INTRODUCTION TO BIBLICAL INTERPRETATION III",
+      "objectKey": "Section 7 Bible Experience I/INTRODUCTION TO BIBLICAL INTERPRETATION III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-08-can-i-understand-the-bible-on-my-own",
+      "deckId": "d-discipleship-experience-section-8-bible-experience-ii",
+      "title": "CAN I UNDERSTAND THE BIBLE ON MY OWN.",
+      "objectKey": "Section 8 Bible Expeirence II/CAN I UNDERSTAND THE BIBLE ON MY OWN. – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-08-did-old-testament-authors-know-jesus",
+      "deckId": "d-discipleship-experience-section-8-bible-experience-ii",
+      "title": "DID OLD TESTAMENT AUTHORS KNOW JESUS.",
+      "objectKey": "Section 8 Bible Expeirence II/DID OLD TESTAMENT AUTHORS KNOW JESUS. – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-08-jesus-and-women",
+      "deckId": "d-discipleship-experience-section-8-bible-experience-ii",
+      "title": "JESUS AND WOMEN",
+      "objectKey": "Section 8 Bible Expeirence II/JESUS AND WOMEN – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-08-the-inspiration-of-scriptures",
+      "deckId": "d-discipleship-experience-section-8-bible-experience-ii",
+      "title": "THE INSPIRATION OF SCRIPTURES",
+      "objectKey": "Section 8 Bible Expeirence II/THE INSPIRATION OF SCRIPTURES – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-how-to-evangelize",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "HOW TO EVANGELIZE",
+      "objectKey": "Section 9 Evangelism/HOW TO EVANGELIZE – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-jehova-s-witness-i",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "JEHOVA’S WITNESS I",
+      "objectKey": "Section 9 Evangelism/JEHOVA’S WITNESS I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-jehova-s-witness-ii",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "JEHOVA’S WITNESS II",
+      "objectKey": "Section 9 Evangelism/JEHOVA’S WITNESS II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-jehova-s-witness-iii",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "JEHOVA’S WITNESS III",
+      "objectKey": "Section 9 Evangelism/JEHOVA’S WITNESS III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-jehova-s-witness-iv",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "JEHOVA’S WITNESS IV",
+      "objectKey": "Section 9 Evangelism/JEHOVA’S WITNESS IV – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-mormons-i",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "MORMONS I",
+      "objectKey": "Section 9 Evangelism/MORMONS I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-mormons-ii",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "MORMONS II",
+      "objectKey": "Section 9 Evangelism/MORMONS II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-mormons-iii",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "MORMONS III",
+      "objectKey": "Section 9 Evangelism/MORMONS III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-muslims-i",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "MUSLIMS I",
+      "objectKey": "Section 9 Evangelism/MUSLIMS I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-muslims-ii",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "MUSLIMS II",
+      "objectKey": "Section 9 Evangelism/MUSLIMS II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-muslims-iii",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "MUSLIMS III",
+      "objectKey": "Section 9 Evangelism/MUSLIMS III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-new-age-spirituality-i",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "NEW AGE SPIRITUALITY I",
+      "objectKey": "Section 9 Evangelism/NEW AGE SPIRITUALITY I – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-new-age-spirituality-ii",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "NEW AGE SPIRITUALITY II",
+      "objectKey": "Section 9 Evangelism/NEW AGE SPIRITUALITY II – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-new-age-spirituality-iii",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "NEW AGE SPIRITUALITY III",
+      "objectKey": "Section 9 Evangelism/NEW AGE SPIRITUALITY III – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-new-age-spirituality-iv",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "NEW AGE SPIRITUALITY IV",
+      "objectKey": "Section 9 Evangelism/NEW AGE SPIRITUALITY IV – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-new-age-spirituality-v",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "NEW AGE SPIRITUALITY V",
+      "objectKey": "Section 9 Evangelism/NEW AGE SPIRITUALITY V – Celebration Church International - LMS.mp4"
+    },
+    {
+      "id": "section-09-new-age-spirituality-vi",
+      "deckId": "d-discipleship-experience-section-9-evangelism",
+      "title": "NEW AGE SPIRITUALITY VI",
+      "objectKey": "Section 9 Evangelism/NEW AGE SPIRITUALITY VI – Celebration Church International - LMS.mp4"
+    }
+  ]
 }

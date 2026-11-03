@@ -12,13 +12,13 @@ python3 -m http.server 8000
 
 Then visit <http://localhost:8000>.
 
-To create a standalone offline copy, run:
+To build the offline app package, run:
 
 ```bash
-node scripts/build.js
+npm run build
 ```
 
-Open `dist/index.html` directly or share that single file. The build script uses only Node.js built-ins; no package installation, account, or backend is required.
+Open `dist/index.html` directly or share the complete `dist/` folder. The Supabase client bundle is loaded from `dist/js/`; guest study works without an account or backend.
 
 ## Build for iPhone and Android
 
@@ -98,7 +98,11 @@ Question numbers may also use `1.` instead of `Q1.`. Blank lines are optional be
 
 ## Data and privacy
 
-Decks, preferences, and study progress are stored locally in IndexedDB, with local storage as a fallback. Existing `flashdecks.v1` data is copied automatically and that key is kept until the IndexedDB copy is confirmed. The app reminds you to back up after 14 days or 50 cards studied; the reminder can be dismissed. There is no server-side account or progress sync. When online ESV previews are configured, the app sends the selected passage reference to the ESV API through a Cloudflare Pages Function; it does not send learner progress or the API key. The app keeps only the currently open passage in memory and falls back to the ESV.org link when the service is unavailable. Browser storage can be cleared by the browser, so export or back up anything you want to keep.
+Guest decks, preferences, and study progress are stored locally in IndexedDB, with local storage as a fallback. Existing `flashdecks.v1` data is copied automatically and that key is kept until the IndexedDB copy is confirmed. Guest progress remains available offline and is kept separate from each signed-in account. Learners can create an account without CCI approval to sync progress and watch private lesson videos. Importing guest progress into an account is explicit; signing out returns to the guest profile without deleting either copy. Browser storage can be cleared by the browser, so export or back up anything you want to keep. See [account, sync, and private video setup](docs/accounts-sync-and-private-videos.md).
+
+Lesson video files stay in the private Cloudflare R2 bucket. The client catalog contains object keys only; authenticated Cloudflare Pages Functions validate the learner session and stream requested video ranges. The app does not expose public R2 URLs. Pages requires the `LESSON_VIDEOS` bucket binding and Supabase project variables before sign-in, sync, or playback can work.
+
+When online ESV previews are configured, the app sends the selected passage reference to the ESV API through a Cloudflare Pages Function; it does not send learner progress or the API key. The app keeps only the currently open passage in memory and falls back to the ESV.org link when the service is unavailable.
 
 ### ESV passage previews
 
