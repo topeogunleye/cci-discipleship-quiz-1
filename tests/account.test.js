@@ -5,6 +5,38 @@ const test = require('node:test');
 const { create } = require('../js/account.js');
 const Sync = require('../js/progress-sync.js');
 
+test('browser account discovers the Supabase global without dependency injection', async () => {
+  const fs = require('node:fs');
+  const vm = require('node:vm');
+  let clientCreated = false, configRequested = false;
+  const browser = {
+    Supabase: { createClient(url, key) {
+      assert.equal(url, 'https://project.supabase.co');
+      assert.equal(key, 'public-key');
+      clientCreated = true;
+      return { auth: {
+        onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; },
+        async getSession() { return { data: { session: null } }; }
+      } };
+    } },
+    location: { protocol: 'https:', origin: 'https://study.example' }
+  };
+  const context = {
+    self: browser, window: browser, setTimeout, clearTimeout,
+    fetch: async url => {
+      assert.equal(url, 'https://study.example/api/auth/config');
+      configRequested = true;
+      return new Response(JSON.stringify({ configured: true, url: 'https://project.supabase.co', publishableKey: 'public-key' }));
+    }
+  };
+  vm.runInNewContext(fs.readFileSync(require.resolve('../js/account.js'), 'utf8'), context);
+  const service = browser.CCIAccount.create();
+  assert.equal((await service.init()).configured, true);
+  assert.equal(configRequested, true);
+  assert.equal(clientCreated, true);
+  service.destroy();
+});
+
 function localStore() {
   const values = new Map();
   return { getItem: key => values.get(key) || null, setItem: (key, value) => values.set(key, String(value)), values };

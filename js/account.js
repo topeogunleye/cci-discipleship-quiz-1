@@ -1,7 +1,7 @@
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.CCIAccount = factory();
-})(typeof self !== 'undefined' ? self : this, function () {
+  if (typeof module === 'object' && module.exports) module.exports = factory(root);
+  else root.CCIAccount = factory(root);
+})(typeof self !== 'undefined' ? self : this, function (root) {
   'use strict';
 
   var DEFAULT_API_BASE = 'https://cci-discipleship-quiz.pages.dev';
