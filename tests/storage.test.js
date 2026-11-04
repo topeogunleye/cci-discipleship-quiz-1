@@ -159,3 +159,30 @@ test('storage preserves onboarding and streak data', async () => {
   assert.equal(parsed.streak.lastStreakDate, '2026-10-20');
   assert.equal(parsed.dataVersion, 9);
 });
+
+test('keeps guest and account study data in separate IndexedDB and localStorage records', async () => {
+  const idb = fakeIndexedDB();
+  const localStorage = mockLocalStorage();
+  const storage = createStorage({ indexedDB: idb.indexedDB, localStorage });
+  await storage.save('{"owner":"guest"}');
+  await storage.save('{"owner":"alice"}', 'user-alice');
+  await storage.save('{"owner":"bob"}', 'user-bob');
+
+  assert.equal((await storage.load()).raw, '{"owner":"guest"}');
+  assert.equal((await storage.load('user-alice')).raw, '{"owner":"alice"}');
+  assert.equal((await storage.load('user-bob')).raw, '{"owner":"bob"}');
+  assert.equal(idb.values.get('current'), '{"owner":"guest"}');
+  assert.equal(idb.values.get('account:user-alice'), '{"owner":"alice"}');
+  assert.equal(idb.values.get('account:user-bob'), '{"owner":"bob"}');
+});
+
+test('keeps account namespaces separate in the localStorage fallback too', async () => {
+  const localStorage = mockLocalStorage();
+  const storage = createStorage({ indexedDB: null, localStorage });
+  await storage.save('{"owner":"guest"}');
+  await storage.save('{"owner":"alice"}', 'user-alice');
+  assert.equal((await storage.load()).raw, '{"owner":"guest"}');
+  assert.equal((await storage.load('user-alice')).raw, '{"owner":"alice"}');
+  assert.equal(localStorage.getItem('flashdecks.v1'), '{"owner":"guest"}');
+  assert.equal(localStorage.getItem('flashdecks.v1.account.user-alice'), '{"owner":"alice"}');
+});

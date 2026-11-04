@@ -51,7 +51,8 @@ test('offline build inlines the bridge and the mobile study helper before app st
   assert.ok(page.indexOf('js/mobile-study.js') < page.indexOf('js/app.js'));
   assert.match(build, /native-bridge\.bundle\.js/);
   assert.match(build, /mobile-study\.js/);
-  assert.doesNotMatch(bundled, /<script src=/i);
+  assert.doesNotMatch(bundled, /<script src=(?!"js\/supabase\.bundle\.js")/i);
+  assert.match(bundled, /<script src="js\/supabase\.bundle\.js"><\/script>/);
   assert.match(bundled, /CciNative/);
   assert.match(bundled, /Today’s Study/);
 });

@@ -470,11 +470,12 @@ test('HTTP loads split decks with fetch and file URLs use the embedded fallback'
     fetched.push(url);
     if (url === 'decks/manifest.json') return Promise.resolve({ ok: true, json: () => Promise.resolve(deckFiles) });
     if (url === 'content/sermons.json') return Promise.resolve({ ok: true, json: () => Promise.resolve({ schemaVersion: 1, sermons: [] }) });
+    if (url === 'content/lesson-videos.json') return Promise.resolve({ ok: true, json: () => Promise.resolve({ schemaVersion: 1, videos: [] }) });
     return Promise.resolve({ ok: true, text: () => Promise.resolve(fs.readFileSync(path.join(root, url), 'utf8')) });
   }, '');
   const httpState = httpResult.state;
   assert.deepEqual(httpResult.registrations, ['service-worker.js']);
-  assert.deepEqual(fetched, ['decks/manifest.json', 'content/sermons.json', ...deckFiles.map(file => `decks/${file}`)]);
+  assert.deepEqual(fetched, ['decks/manifest.json', 'content/sermons.json', 'content/lesson-videos.json', ...deckFiles.map(file => `decks/${file}`)]);
   const expectedDeckCount = parsed.decks.length;
   const expectedCardCount = parsed.decks.reduce((count, deck) => count + deck.questions.length, 0);
   assert.equal(httpState.decks.length, expectedDeckCount);

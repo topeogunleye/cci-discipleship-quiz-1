@@ -1,11 +1,12 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 14;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, ProgressSync = window.CCIProgressSync, Account = window.CCIAccount, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 14;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
-  var S = { decks: [], progress: {}, sermons: SermonStudy ? SermonStudy.createState() : {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, seeded: false, dataVersion: 0, pausedSession: null };
-  var STARTER_DECKS = [], DEVOTIONALS = [], SERMONS = [], sermonDownloadControllers = {};
+  function defaultStudyState() { return { decks: [], progress: {}, sermons: SermonStudy ? SermonStudy.createState() : {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, cloudSyncDeviceId: null, seeded: false, dataVersion: 0, pausedSession: null }; }
+  var S = defaultStudyState();
+  var STARTER_DECKS = [], DEVOTIONALS = [], SERMONS = [], LESSON_VIDEOS = [], sermonDownloadControllers = {};
   var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, biblePreviewCache = null, suppressBiblePreviewFocus = null;
-  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null }, sermonAudioElement = null, sermonDownloadProgress = {}, lastAudioSaveBucket = -1;
+  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), activeStorageOwnerId = null, requestedStorageOwnerId = null, guestProgressForImport = null, account = Account ? Account.create() : null, accountStatus = { configured: false, user: null, videoReady: false }, accountBootReady = false, accountMessage = '', accountBusy = false, accountSwitchQueue = Promise.resolve(), cloudSyncQueue = Promise.resolve(), cloudSyncTimer = null, V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null }, sermonAudioElement = null, sermonDownloadProgress = {}, lastAudioSaveBucket = -1;
   var browserLocalStorage = null, browserIndexedDB = null;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
   if (!browserLocalStorage) { try { if (typeof localStorage !== 'undefined') browserLocalStorage = localStorage; } catch (e) {} }
@@ -320,6 +321,54 @@
       .catch(function () { return normalizeSermons(fallback); });
   }
 
+  function inlineLessonVideosData() {
+    var el = document.getElementById('lesson-videos-fallback');
+    if (!el) return { schemaVersion: 1, videos: [] };
+    try { return JSON.parse(el.textContent || '{"schemaVersion":1,"videos":[]}'); } catch (e) { return { schemaVersion: 1, videos: [] }; }
+  }
+  function normalizeLessonVideos(data) {
+    if (!data || data.schemaVersion !== 1 || !Array.isArray(data.videos)) return [];
+    function mediaUrl(value) {
+      if (typeof value !== 'string' || !value.trim()) return '';
+      try {
+      var parsed = new URL(value.trim(), window.location && window.location.href || 'http://localhost/');
+        if (parsed.protocol !== 'https:' && !(window.location && parsed.origin === window.location.origin && parsed.protocol === 'http:')) return '';
+        return value.trim();
+      } catch (e) { return ''; }
+    }
+    return data.videos.filter(function (item) {
+      return item && /^[a-zA-Z0-9._-]{1,120}$/.test(item.id || '') && /^d-[a-z0-9-]{1,120}$/.test(item.deckId || '') && typeof item.title === 'string';
+    }).map(function (item) {
+      var objectKey = typeof item.objectKey === 'string' && item.objectKey.length <= 1024 && !item.objectKey.startsWith('/') && item.objectKey.split('/').every(function (part) { return part && part !== '.' && part !== '..'; }) && /\.mp4$/i.test(item.objectKey) ? item.objectKey : '';
+      var apiBase = account ? account.apiBase : (window.CCI_API_BASE || (Account && Account.DEFAULT_API_BASE) || '');
+      return {
+        id: item.id,
+        deckId: item.deckId,
+        title: item.title.trim(),
+        videoUrl: objectKey ? apiBase + '/api/videos?key=' + encodeURIComponent(objectKey) : '',
+        objectKey: objectKey,
+        posterUrl: mediaUrl(item.posterUrl),
+        captionsUrl: mediaUrl(item.captionsUrl),
+        captionsLanguage: typeof item.captionsLanguage === 'string' && /^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,8})*$/.test(item.captionsLanguage) ? item.captionsLanguage : 'en',
+        captionsLabel: typeof item.captionsLabel === 'string' && item.captionsLabel.trim() ? item.captionsLabel.trim() : 'English'
+      };
+    }).filter(function (item) { return !!item.objectKey && !!item.videoUrl; });
+  }
+  function loadLessonVideos() {
+    var fallback = inlineLessonVideosData();
+    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(normalizeLessonVideos(fallback));
+    return window.fetch('content/lesson-videos.json').then(function (response) {
+      if (!response.ok) throw new Error('Could not load lesson videos');
+      return response.json();
+    }).then(function (data) {
+      var normalized = normalizeLessonVideos(data);
+      return normalized.length || (data && Array.isArray(data.videos) && data.videos.length === 0) ? normalized : normalizeLessonVideos(fallback);
+    }).catch(function () { return normalizeLessonVideos(fallback); });
+  }
+  function lessonVideosForDeck(deckId) {
+    return LESSON_VIDEOS.filter(function (item) { return item.deckId === deckId; });
+  }
+
   function sermonState() { return SermonStudy.normalizeState(S.sermons); }
   function sermonRecord(id) {
     return (SERMONS || []).filter(function (item) { return item && item.id === id; })[0] || null;
@@ -351,6 +400,7 @@
 
   /* ---------- storage ---------- */
   function loadSavedState(raw) {
+    S = defaultStudyState();
     try {
       if (raw === null || raw === undefined) return;
       var o = JSON.parse(raw);
@@ -391,6 +441,7 @@
         carouselHiddenOn: typeof o.devotions.carouselHiddenOn === 'string' ? o.devotions.carouselHiddenOn : null
       } : { read: {}, saved: {}, carouselHiddenOn: null };
       S.completedToday = (o.completedToday && typeof o.completedToday === 'object' && !Array.isArray(o.completedToday)) ? o.completedToday : {};
+      S.cloudSyncDeviceId = typeof o.cloudSyncDeviceId === 'string' && /^[a-zA-Z0-9._-]{16,120}$/.test(o.cloudSyncDeviceId) ? o.cloudSyncDeviceId : null;
       S.seeded = !!o.seeded;
       S.dataVersion = Number.isInteger(o.dataVersion) && o.dataVersion >= 0 ? o.dataVersion : 0;
       S.backupReminder = o.backupReminder;
@@ -405,7 +456,7 @@
     if (changed && app.innerHTML) render(true);
   }
   function load() {
-    return storageAdapter.load().then(function (result) {
+    return storageAdapter.load(activeStorageOwnerId).then(function (result) {
       storageOk = result.ok;
       storageBackend = result.backend;
       storageMessage = result.notice || '';
@@ -415,11 +466,12 @@
       storageMessage = 'Study data could not be loaded. Export a backup before continuing.';
     });
   }
-  function save() {
+  function save(skipCloudSchedule) {
     if (preserveStorage) return Promise.resolve({ ok: false, backend: storageBackend, notice: storageMessage });
-    var raw = JSON.stringify(S);
-    saveQueue = saveQueue.catch(function () {}).then(function () { return storageAdapter.save(raw); }).then(function (result) {
+    var raw = JSON.stringify(S), owner = activeStorageOwnerId;
+    saveQueue = saveQueue.catch(function () {}).then(function () { return storageAdapter.save(raw, owner); }).then(function (result) {
       applyStorageResult(result);
+      if (!skipCloudSchedule && owner && accountStatus.user && accountStatus.user.id === owner && !preserveStorage) scheduleCloudProgressSync();
       return result;
     }).catch(function () {
       var result = { ok: false, backend: 'unavailable', notice: 'Study data could not be saved. Export a backup before closing this page.' };
@@ -427,6 +479,169 @@
       return result;
     });
     return saveQueue;
+  }
+  function progressSnapshot(state) {
+    state = state || S;
+    var currentDeckIds = new Set((state.decks || []).map(function (item) { return item.id; }));
+    var starterIds = STARTER_DECKS.map(function (item) { return 'd-' + slug(item.title); }).filter(function (id) { return currentDeckIds.has(id); });
+    return ProgressSync ? ProgressSync.extract(state, starterIds) : null;
+  }
+  function scheduleCloudProgressSync() {
+    if (!account || !accountStatus.user || !navigator.onLine || preserveStorage) return;
+    if (cloudSyncTimer) window.clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = window.setTimeout(function () { cloudSyncTimer = null; syncCloudProgress(); }, 1400);
+  }
+  function syncCloudProgress(importSnapshot) {
+    if (!account || !accountStatus.user || !ProgressSync) return Promise.resolve(false);
+    if (!navigator.onLine) { accountMessage = 'You are offline. Progress is saved on this device and will sync when you reconnect.'; if (V.name === 'settings') render(true); return Promise.resolve(false); }
+    if (cloudSyncTimer) { window.clearTimeout(cloudSyncTimer); cloudSyncTimer = null; }
+    var owner = accountStatus.user.id, current = null;
+    accountMessage = 'Syncing study progress…';
+    if (V.name === 'settings') render(true);
+    cloudSyncQueue = cloudSyncQueue.catch(function () {}).then(function () {
+      if (!accountStatus.user || accountStatus.user.id !== owner) return false;
+      current = progressSnapshot();
+      return account.syncProgress(current, ProgressSync, importSnapshot || null, S.cloudSyncDeviceId);
+    }).then(function (result) {
+      if (!result || !accountStatus.user || accountStatus.user.id !== owner) return false;
+      var currentDeckIds = new Set(S.decks.map(function (item) { return item.id; }));
+      var starterIds = STARTER_DECKS.map(function (item) { return 'd-' + slug(item.title); }).filter(function (id) { return currentDeckIds.has(id); });
+      var latest = progressSnapshot(), changedDuringSync = JSON.stringify(latest) !== JSON.stringify(current);
+      var mergedSnapshot = changedDuringSync ? ProgressSync.merge(current, latest, result.snapshot) : result.snapshot;
+      S = ProgressSync.apply(S, mergedSnapshot, starterIds);
+      S.cloudSyncDeviceId = result.deviceId || S.cloudSyncDeviceId || null;
+      accountMessage = result.checkpointSaved === false
+        ? 'Progress synced, but this device could not save its sync checkpoint. Local progress is preserved; reconnect to storage before syncing again.'
+        : 'Progress synced. Your study data is also saved on this device.';
+      if (importSnapshot) guestProgressForImport = null;
+      save(true);
+      render(true);
+      if (changedDuringSync) scheduleCloudProgressSync();
+      return true;
+    }).catch(function (error) {
+      accountMessage = navigator.onLine ? (error && error.message || 'Progress could not sync. Your local progress is safe; try again.') : 'You are offline. Progress is saved on this device and will sync when you reconnect.';
+      if (V.name === 'settings') render(true);
+      return false;
+    });
+    return cloudSyncQueue;
+  }
+  function switchStorageOwner(owner) {
+    owner = typeof owner === 'string' && owner ? owner : null;
+    if (owner === requestedStorageOwnerId) return accountSwitchQueue;
+    requestedStorageOwnerId = owner;
+    accountSwitchQueue = accountSwitchQueue.catch(function () {}).then(function () {
+      if (owner === activeStorageOwnerId) return;
+      return saveQueue.catch(function () {}).then(function () {
+        if (!activeStorageOwnerId && owner) {
+          var guest = progressSnapshot();
+          guestProgressForImport = ProgressSync && ProgressSync.hasProgress(guest) ? guest : null;
+        }
+        activeStorageOwnerId = owner;
+        preserveStorage = false;
+        loadSavedState(null);
+        return storageAdapter.load(owner).then(function (result) {
+          storageOk = result.ok; storageBackend = result.backend; storageMessage = result.notice || '';
+          loadSavedState(result.raw);
+          seed();
+          var reconcile = S.seeded && S.dataVersion >= DATA_VERSION - 3;
+          if (reconcile && syncStarterDecks()) save();
+          return applyDataMigrations().then(function () {
+            S.sermons = SermonStudy.normalizeState(S.sermons);
+            S.sermons.audio.playing = false;
+            if (S.pausedSession) {
+              var restoredSession = MobileStudy.restore(S.pausedSession, S.decks);
+              S.pausedSession = restoredSession ? MobileStudy.snapshot(restoredSession) : null;
+            }
+            applyTheme();
+          });
+        });
+      });
+    }).then(function () {
+      if (owner && accountStatus.user && accountStatus.user.id === owner) {
+        save();
+        syncCloudProgress();
+      } else if (!owner) {
+        guestProgressForImport = null;
+        save();
+      }
+      render(true);
+    }).catch(function (error) {
+      accountMessage = 'This device’s saved study data could not be opened. It has been left untouched.';
+      if (typeof console !== 'undefined' && console.error) console.error('Account storage switch failed:', error);
+      render(true);
+    });
+    return accountSwitchQueue;
+  }
+  function initializeAccount() {
+    if (!account) return Promise.resolve(accountStatus);
+    return account.init(function (status) {
+      accountStatus = status;
+      if (!accountBootReady) return;
+      var nextOwner = status.user && status.user.id || null;
+      if (nextOwner !== requestedStorageOwnerId) switchStorageOwner(nextOwner);
+      else if (nextOwner && nextOwner === activeStorageOwnerId && status.videoReady && !cloudSyncTimer) scheduleCloudProgressSync();
+      else if (V.name === 'settings') render(true);
+    }).catch(function () {});
+  }
+  function accountAction(action) {
+    if (!account) { accountMessage = 'Account support is not available in this app build.'; render(true); return; }
+    if (action === 'account-signup' || action === 'account-signin') {
+      var emailInput = document.getElementById('account-email'), passwordInput = document.getElementById('account-password');
+      var email = emailInput ? emailInput.value : '', password = passwordInput ? passwordInput.value : '';
+      if (!email.trim() || !password) { accountMessage = 'Enter your email and password to continue.'; render(true); return; }
+      accountBusy = true; accountMessage = action === 'account-signup' ? 'Creating your account…' : 'Signing in…'; render(true);
+      (action === 'account-signup' ? account.signUp(email, password) : account.signIn(email, password)).then(function (result) {
+        accountBusy = false;
+        if (result.error) accountMessage = result.error;
+        else if (result.confirmationRequired) accountMessage = 'Check your email to confirm the account, then sign in. Ask the app administrator to disable email confirmation if instant access is required.';
+        else accountMessage = result.videoReady ? 'Signed in. Your lesson videos are ready.' : 'Signed in. Video access is being prepared; local study and progress sync are available.';
+        render(true);
+      }).catch(function () { accountBusy = false; accountMessage = 'The account request failed. Check your connection and try again.'; render(true); });
+      return;
+    }
+    if (action === 'account-sync') { syncCloudProgress(); return; }
+    if (action === 'account-import') {
+      if (!guestProgressForImport || !accountStatus.user) return;
+      ask('Merge this device’s study progress into your account? Existing account progress and this device’s progress will be combined. Nothing on this device will be erased.', 'Import and merge', function () {
+        var source = guestProgressForImport;
+        syncCloudProgress(source).then(function (ok) {
+          if (ok) toast('This device’s progress was merged into your account.');
+        });
+      });
+      return;
+    }
+    if (action === 'account-video-session') {
+      accountBusy = true; render(true);
+      account.syncVideoSession(accountStatus.session, true).then(function (ready) {
+        accountBusy = false; accountStatus = account.status(); accountMessage = ready ? 'Video access is ready.' : 'Video access could not be prepared. Try again.'; render(true);
+      });
+      return;
+    }
+    if (action === 'account-signout') {
+      accountBusy = true; render(true);
+      account.signOut().then(function (result) {
+        accountBusy = false; accountMessage = result.error || 'Signed out. Guest progress remains on this device.'; render(true);
+      }).catch(function () { accountBusy = false; accountMessage = 'Sign out could not be completed. Try again.'; render(true); });
+    }
+  }
+  function accountSettingsSection() {
+    var user = accountStatus && accountStatus.user, configured = !!(accountStatus && accountStatus.configured);
+    var message = accountMessage || (configured ? (user ? 'CCI lesson progress syncs when you are online. Custom decks remain local.' : 'Create an account or sign in to sync CCI lesson progress and watch lesson videos.') : 'Account services are not configured yet. Guest study remains available on this device.');
+    var controls;
+    if (!configured) controls = '<p class="meta">A maintainer must connect the private account and video services before sign-in is available.</p>';
+    else if (user) {
+      controls = '<p><strong>Signed in as</strong> ' + esc(user.email || 'CCI Study learner') + '</p>' +
+        (!accountStatus.videoReady ? '<p class="meta">Lesson-video access is not ready on this device yet.</p><button type="button" class="btn sm" data-act="account-video-session"' + (accountBusy ? ' disabled' : '') + '>Prepare video access</button>' : '<p class="meta">Private lesson videos are available to your account.</p>') +
+        (guestProgressForImport ? '<div class="note"><strong>CCI lesson progress from this device is available.</strong><p>Import explicitly to merge it with your account. Your guest copy will remain on this device.</p><button type="button" class="btn sm primary" data-act="account-import"' + (accountBusy ? ' disabled' : '') + '>Import this device’s progress</button></div>' : '') +
+        '<div class="row"><button type="button" class="btn sm" data-act="account-sync"' + (accountBusy ? ' disabled' : '') + '>Sync now</button><button type="button" class="btn sm ghost" data-act="account-signout"' + (accountBusy ? ' disabled' : '') + '>Sign out</button></div>';
+    } else {
+      controls = '<label class="field"><span>Email</span><input id="account-email" type="email" autocomplete="username" inputmode="email" required maxlength="254"></label>' +
+        '<label class="field"><span>Password</span><input id="account-password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></label>' +
+        '<div class="row"><button type="button" class="btn primary sm" data-act="account-signin"' + (accountBusy ? ' disabled' : '') + '>Sign in</button><button type="button" class="btn sm" data-act="account-signup"' + (accountBusy ? ' disabled' : '') + '>Create account</button></div>';
+    }
+    return '<div class="settings-group account-settings-group"><h2 class="settings-group-title">Account &amp; Sync</h2>' +
+      '<p class="meta">Accounts are self-service. No CCI approval is required. Guests can keep studying on this device. Custom decks remain local.</p>' + controls +
+      '<p class="meta" role="status" aria-live="polite">' + esc(message) + '</p></div>';
   }
   function isStudySession(name) { return name === 'flash' || name === 'quiz' || name === 'exam'; }
   function saveActiveSession() {
@@ -1477,6 +1692,10 @@
       '</div>' +
       chapterSvgIllustration(secNum) +
     '</header>' +
+    '<section class="chapter-video-entry" aria-labelledby="chapter-video-title">' +
+      '<div class="chapter-video-copy"><span class="eyebrow">VIDEO LESSON</span><h2 id="chapter-video-title">Watch this chapter</h2><p>' + (lessonVideosForDeck(d.id).length ? plural(lessonVideosForDeck(d.id).length, 'recording') + ' available. Watch, then reinforce the lesson with flashcards or a quiz.' : 'No recording is linked yet. You can still study with flashcards or take the chapter quiz.') + '</p></div>' +
+      '<button type="button" class="btn primary" data-act="open-lesson-video" data-id="' + esc(d.id) + '">Open video lesson</button>' +
+    '</section>' +
     '<section class="chapter-timeline-section" aria-label="Study Steps">' +
       '<div class="timeline-intro">' +
         '<h2>Study Timeline</h2>' +
@@ -1484,6 +1703,30 @@
       '</div>' +
       '<div class="chapter-timeline">' + timelineHtml + '</div>' +
     '</section>';
+  };
+
+  views['lesson-video'] = function () {
+    var d = deck(V.id);
+    if (!d) return '<div class="lesson-video-page"><p class="lesson-video-alert" role="status">This lesson is unavailable.</p><button type="button" class="btn" data-act="nav-tab" data-tab="journey">Back to Journey</button></div>';
+    var parsed = MobileStudy.parseChapterTitle(d.title), section = parsed.sectionNum || 1;
+    var videos = lessonVideosForDeck(d.id), index = Math.max(0, Math.min(Number.isInteger(V.videoIndex) ? V.videoIndex : 0, videos.length - 1));
+    var video = videos[index] || null, title = video ? video.title : parsed.topic + ' video lesson';
+    var canWatchVideo = !!(accountStatus.user && accountStatus.videoReady);
+    var player = video
+      ? (canWatchVideo
+          ? '<video class="lesson-video-player" id="lesson-video-player" controls playsinline preload="metadata" crossorigin="use-credentials"' + (video.posterUrl ? ' poster="' + esc(video.posterUrl) + '"' : '') + ' aria-label="Video lesson: ' + esc(title) + '"><source src="' + esc(video.videoUrl) + '" type="video/mp4">' + (video.captionsUrl ? '<track kind="captions" src="' + esc(video.captionsUrl) + '" srclang="' + esc(video.captionsLanguage) + '" label="' + esc(video.captionsLabel) + '" default>' : '') + '<span>Your browser does not support video playback.</span></video>'
+          : '<div class="lesson-video-unavailable lesson-video-auth-required" role="status"><strong>' + (accountStatus.user ? 'Preparing secure video access' : 'Sign in to watch this lesson') + '</strong><p>' + (accountStatus.user ? 'Your lesson files stay private. Video access is being prepared for your account.' : 'Create a free account or sign in to watch. You can continue studying locally without an account.') + '</p><button type="button" class="btn primary" data-act="nav-tab" data-tab="settings">' + (accountStatus.user ? 'Account settings' : 'Sign in or create account') + '</button></div>')
+      : '<div class="lesson-video-unavailable" role="status"><strong>Lesson video not available yet</strong><p>The ' + esc(parsed.topic) + ' video has not been added yet. Use Flashcards or Take quiz below.</p></div>';
+    var videoNav = videos.length > 1
+      ? '<nav class="lesson-video-segments" aria-label="Videos in this chapter">' + videos.map(function (item, itemIndex) { return '<button type="button" class="lesson-video-segment' + (itemIndex === index ? ' is-active' : '') + '" data-act="lesson-video-select" data-index="' + itemIndex + '" aria-current="' + (itemIndex === index ? 'true' : 'false') + '">' + (itemIndex + 1) + '. ' + esc(item.title) + '</button>'; }).join('') + '</nav>'
+      : '<div class="lesson-video-progress" aria-label="Chapter ' + section + ' of ' + S.decks.length + '"><span>Chapter ' + section + ' of ' + S.decks.length + '</span><progress value="' + section + '" max="' + S.decks.length + '">Chapter ' + section + ' of ' + S.decks.length + '</progress></div>';
+    return '<main class="lesson-video-page" aria-labelledby="lesson-video-title">' +
+      '<header class="lesson-video-topbar"><button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button><div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong></div><span class="lesson-video-section-count">' + section + ' / ' + S.decks.length + '</span></header>' +
+      '<section class="lesson-video-frame' + (video && canWatchVideo ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
+      '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title">' + esc(title) + '</h1><p>' + (canWatchVideo ? 'Watch the lesson, then reinforce what you learned with a quick study activity.' : 'Study this lesson locally with flashcards or a quiz. Sign in to watch its video.') + '</p></div>' + (video && canWatchVideo ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">Continue lesson</button>' : '') + '</section>' +
+      '<div class="lesson-video-study-actions" role="group" aria-label="Study this lesson"><button type="button" class="btn" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '">Flashcards</button><button type="button" class="btn" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '">Take quiz</button></div>' +
+      videoNav +
+    '</main>';
   };
 
 
@@ -1600,6 +1843,7 @@
       '<h1>Settings</h1>' +
       '<p class="view-sub">Preferences, backups, and app information</p>' +
     '</header>' +
+    accountSettingsSection() +
     '<div class="settings-group">' +
       '<h2 class="settings-group-title">Appearance</h2>' +
       '<div class="settings-row">' +
@@ -2527,7 +2771,7 @@
     var tabBarHtml = isMainTab ? renderTabBar(V.name) : '';
     var showRocket = S.settings.experience !== 'sermons' && (V.name === 'home' || V.name === 'journey');
     var rocketHtml = showRocket ? renderRocketFab() : '';
-    var reminderHtml = V.reminder && SermonUI ? SermonUI.renderReminder(sermonContext(), V.reminder) : '';
+    var reminderHtml = V.name !== 'lesson-video' && V.reminder && SermonUI ? SermonUI.renderReminder(sermonContext(), V.reminder) : '';
     var miniPlayerHtml = S.settings.experience === 'sermons' ? renderSermonMiniPlayer() : '';
     var priorAudio = app.querySelector('.sermon-audio');
     var priorWasPlaying = false;
@@ -2545,7 +2789,7 @@
     app.innerHTML = banner() +
       '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + (isSermon || (S.settings.experience === 'sermons' && V.name === 'settings') ? ' desktop-shell-sermons' : '') + '">' +
         (hasDesktopSidebar ? renderDesktopSidebar(V.name === 'devotional' ? 'home' : V.name) : '') +
-        '<main class="desktop-main">' + renderExperienceToggle() + reminderHtml + view() + miniPlayerHtml + tabBarHtml + rocketHtml + '</main>' +
+        '<main class="desktop-main">' + (V.name === 'lesson-video' ? '' : renderExperienceToggle()) + reminderHtml + view() + miniPlayerHtml + tabBarHtml + rocketHtml + '</main>' +
       '</div>';
     var activeAudio = Array.prototype.slice.call(app.querySelectorAll('.sermon-audio'))[0];
     if (priorAudio && activeAudio && priorAudio.dataset.id === activeAudio.dataset.id && activeAudio.parentNode) {
@@ -2592,6 +2836,7 @@
         if (replace) {
           window.history.replaceState(stateObj, '', window.location.href);
         } else if (!prev || prev.name !== V.name || prev.id !== V.id) {
+          stateObj.videoIndex = Number.isInteger(V.videoIndex) ? V.videoIndex : 0;
           window.history.pushState(stateObj, '', window.location.href);
         }
       }
@@ -2606,7 +2851,7 @@
           pauseStudySession();
         }
         rocketMenuOpen = false;
-        V = { name: e.state.name, id: e.state.id };
+        V = { name: e.state.name, id: e.state.id, videoIndex: Number.isInteger(e.state.videoIndex) ? e.state.videoIndex : 0 };
         render();
       }
     });
@@ -3058,6 +3303,22 @@
         closeModal();
         go({ name: 'chapter', id: t.dataset.id });
         break;
+      case 'open-lesson-video':
+        go({ name: 'lesson-video', id: t.dataset.id, videoIndex: 0 });
+        break;
+      case 'lesson-video-back':
+        go({ name: 'chapter', id: t.dataset.id || V.id });
+        break;
+      case 'lesson-video-select':
+        if (lessonVideosForDeck(V.id)[+t.dataset.index]) { V.videoIndex = +t.dataset.index; render(true); }
+        break;
+      case 'lesson-video-play':
+        var lessonVideoElement = document.getElementById('lesson-video-player');
+        if (lessonVideoElement && lessonVideoElement.play) {
+          var playbackAttempt = lessonVideoElement.play();
+          if (playbackAttempt && playbackAttempt.catch) playbackAttempt.catch(function () { toast('Video playback could not start. Check the video source and try again.'); });
+        }
+        break;
       case 'chapter-info':
         openLessonDetailSheet(t.dataset.id);
         break;
@@ -3092,6 +3353,12 @@
         break;
 
       case 'nav-tab': closeModal(); if (t.dataset.tab) go({ name: t.dataset.tab }); break;
+      case 'account-signup':
+      case 'account-signin':
+      case 'account-signout':
+      case 'account-sync':
+      case 'account-import':
+      case 'account-video-session': accountAction(a); break;
       case 'set-theme': if (t.dataset.theme) { S.settings.theme = t.dataset.theme; applyTheme(); save(); render(true); } break;
       case 'toggle-streak': S.settings.showStreak = S.settings.showStreak === false; save(); render(true); break;
       case 'toggle-shuffle': S.settings.shuffle = !S.settings.shuffle; save(); render(true); break;
@@ -3512,23 +3779,46 @@
   }
 
   function boot() {
-    return Promise.all([load(), loadStarterText(), loadDevotionals(), loadSermons()]).then(function (results) {
+    return Promise.all([load(), loadStarterText(), loadDevotionals(), loadSermons(), loadLessonVideos(), initializeAccount()]).then(function (results) {
       var text = results[1];
       DEVOTIONALS = results[2] || [];
       SERMONS = results[3] || [];
+      LESSON_VIDEOS = results[4] || [];
       STARTER_DECKS = P.parseDecks(text).decks;
-      var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION - 3;
-      var isFirstRun = !S.seeded && (!S.onboarding || !S.onboarding.completed);
-      seed();
-      if (reconcileStarters && syncStarterDecks()) save();
-      return applyDataMigrations().then(function () {
-        S.sermons = SermonStudy.normalizeState(S.sermons);
-        S.sermons.audio.playing = false;
-        if (S.pausedSession) {
-          var restoredSession = MobileStudy.restore(S.pausedSession, S.decks);
-          S.pausedSession = restoredSession ? MobileStudy.snapshot(restoredSession) : null;
-        }
-        applyTheme();
+      var owner = accountStatus.user && accountStatus.user.id || null;
+      function prepareLoadedState() {
+        var wasFirstRun = !S.seeded && (!S.onboarding || !S.onboarding.completed);
+        var reconcileStarters = S.seeded && S.dataVersion >= DATA_VERSION - 3;
+        seed();
+        if (reconcileStarters && syncStarterDecks()) save();
+        return applyDataMigrations().then(function () {
+          S.sermons = SermonStudy.normalizeState(S.sermons);
+          S.sermons.audio.playing = false;
+          if (S.pausedSession) {
+            var restoredSession = MobileStudy.restore(S.pausedSession, S.decks);
+            S.pausedSession = restoredSession ? MobileStudy.snapshot(restoredSession) : null;
+          }
+          applyTheme();
+          return wasFirstRun;
+        });
+      }
+      var isFirstRun = false;
+      return prepareLoadedState().then(function (firstRun) {
+        isFirstRun = firstRun;
+        if (!owner) return;
+        guestProgressForImport = progressSnapshot();
+        if (!ProgressSync.hasProgress(guestProgressForImport)) guestProgressForImport = null;
+        return saveQueue.catch(function () {}).then(function () { return storageAdapter.load(owner); }).then(function (result) {
+          preserveStorage = false;
+          activeStorageOwnerId = owner;
+          requestedStorageOwnerId = owner;
+          storageOk = result.ok; storageBackend = result.backend; storageMessage = result.notice || '';
+          loadSavedState(result.raw);
+          return prepareLoadedState().then(function (accountFirstRun) { isFirstRun = accountFirstRun; });
+        });
+      }).then(function () {
+        accountBootReady = true;
+        if (!activeStorageOwnerId) { requestedStorageOwnerId = null; }
         if (isFirstRun) {
           V = { name: 'onboarding', step: 0, answers: MobileStudy.defaultOnboarding(false) };
         } else if (S.settings.experience === 'sermons' && V.name === 'home') V = { name: 'sermons-home' };
@@ -3539,5 +3829,8 @@
       });
     });
   }
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('online', function () {
+    if (accountStatus.user) syncCloudProgress();
+  });
   boot();
 })();

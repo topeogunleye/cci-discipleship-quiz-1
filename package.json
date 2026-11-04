@@ -5,7 +5,8 @@
   "description": "Offline CCI discipleship study app for web, iOS and Android",
   "scripts": {
     "build:bridge": "esbuild js/native-bridge.mjs --bundle --minify --platform=browser --format=iife --outfile=js/native-bridge.bundle.js",
-    "build:web": "node scripts/build.js",
+    "build:supabase": "esbuild js/supabase-entry.js --bundle --minify --platform=browser --format=iife --global-name=Supabase --outfile=js/supabase.bundle.js",
+    "build:web": "npm run build:supabase && node scripts/build.js",
     "build": "npm run build:bridge && npm run build:web",
     "sync": "npm run build && cap sync",
     "sync:android": "npm run build && cap sync android",
@@ -13,7 +14,7 @@
     "android:open": "cap open android",
     "ios:open": "cap open ios",
     "test": "node --test",
-    "dev": "npm run build:bridge && python3 -m http.server 8000",
+    "dev": "npm run build:bridge && npm run build:supabase && python3 -m http.server 8000",
     "validate:sermons": "node scripts/validate-sermons.js"
   },
   "dependencies": {
@@ -22,7 +23,8 @@
     "@capacitor/core": "8.4.3",
     "@capacitor/filesystem": "8.1.5",
     "@capacitor/ios": "8.4.3",
-    "@capacitor/share": "8.0.3"
+    "@capacitor/share": "8.0.3",
+    "@supabase/supabase-js": "^2.118.0"
   },
   "devDependencies": {
     "@capacitor/cli": "8.4.3",

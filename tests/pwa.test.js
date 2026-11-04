@@ -26,11 +26,14 @@ test('web app manifest declares standalone install metadata and valid icon asset
 test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
   const serviceWorker = read('service-worker.js');
   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v37'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v46'/);
   assert.match(serviceWorker, /decks\/manifest\.json/);
   assert.match(serviceWorker, /content\/devotionals\.json/);
   assert.match(serviceWorker, /content\/sermons\.json/);
   assert.match(serviceWorker, /js\/native-bridge\.bundle\.js/);
+  assert.match(serviceWorker, /js\/supabase\.bundle\.js/);
+  assert.match(serviceWorker, /js\/progress-sync\.js/);
+  assert.match(serviceWorker, /js\/account\.js/);
   assert.match(serviceWorker, /js\/mobile-study\.js/);
   assert.match(serviceWorker, /js\/sermons\.js/);
   assert.match(serviceWorker, /js\/sermons-ui\.js/);
@@ -55,7 +58,7 @@ test('activation deletes previous app caches and deck assets absent from the cur
     [url('settings.json'), {}]
   ]);
   const cacheStore = new Map([
-    ['cci-study-pwa-v37', activeEntries],
+    ['cci-study-pwa-v46', activeEntries],
     ['cci-study-pwa-v36', new Map()],
     ['cci-study-pwa-v34', new Map()],
     ['cci-study-pwa-v33', new Map()],
@@ -250,10 +253,36 @@ test('PWA source and offline build contain their required registration/assets', 
   assert.match(app, /register\('service-worker\.js'\)/);
   assert.match(page, /js\/storage\.js/);
   assert.match(page, /js\/native-bridge\.bundle\.js/);
+  assert.match(page, /js\/supabase\.bundle\.js/);
+  assert.match(page, /js\/progress-sync\.js/);
+  assert.match(page, /js\/account\.js/);
   assert.match(page, /js\/mobile-study\.js/);
   assert.match(build, /service-worker\.js/);
   assert.match(build, /manifest\.webmanifest/);
   assert.match(build, /'icons'/);
+});
+
+test('protected account and video API requests bypass the offline cache', async () => {
+  const scope = 'https://example.test/app/';
+  const apiUrl = new URL('api/videos?key=lesson.mp4', scope).href;
+  let cacheReads = 0, cacheWrites = 0, networkCalls = 0;
+  const listeners = {};
+  const self = { location: new URL(scope), registration: { scope }, addEventListener: (name, handler) => { listeners[name] = handler; } };
+  vm.runInNewContext(read('service-worker.js'), {
+    self,
+    caches: { open: async () => ({ match: async () => { cacheReads++; return null; }, put: async () => { cacheWrites++; } }) },
+    URL,
+    Response,
+    fetch: async (_request, options) => { networkCalls++; assert.equal(options.cache, 'no-store'); return new Response('private bytes', { status: 206 }); }
+  });
+  let responsePromise;
+  listeners.fetch({ request: { method: 'GET', url: apiUrl, mode: 'cors', headers: new Headers() }, respondWith: promise => { responsePromise = promise; } });
+  const response = await responsePromise;
+  assert.equal(response.status, 206);
+  assert.equal(await response.text(), 'private bytes');
+  assert.equal(networkCalls, 1);
+  assert.equal(cacheReads, 0);
+  assert.equal(cacheWrites, 0);
 });
 
 test('standalone dist package includes all PWA runtime assets', () => {
@@ -262,10 +291,11 @@ test('standalone dist package includes all PWA runtime assets', () => {
     assert.ok(fs.existsSync(path.join(dist, file)), `Missing dist/${file}`);
   }
   const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
-  assert.doesNotMatch(html, /<script\s+src=|<link rel="stylesheet"/i);
+  assert.doesNotMatch(html, /<script\s+src=(?!"js\/supabase\.bundle\.js")|<link rel="stylesheet"/i);
+  assert.match(html, /<script src="js\/supabase\.bundle\.js"><\/script>/);
   assert.match(html, /rel="manifest" href="manifest\.webmanifest"/);
   const worker = fs.readFileSync(path.join(dist, 'service-worker.js'), 'utf8');
-  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v37'/);
+  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v46'/);
   assert.match(worker, /SERMON_AUDIO_CACHE/);
   const coreBlock = worker.match(/const CORE_FILES = \[([\s\S]*?)\];/);
   assert.ok(coreBlock, 'Service worker defines its core precache files');
