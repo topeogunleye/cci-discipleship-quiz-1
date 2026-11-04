@@ -96,3 +96,33 @@ test('repeating an explicit guest import does not add the same attempts twice', 
   assert.equal(second.deviceId, first.deviceId);
   assert.equal(second.snapshot.deviceCounters[second.deviceId].guestImport.progress.d1.cards.q1.attempts, 3);
 });
+
+test('browser account discovers the global Supabase client without injected options', async () => {
+  const vm = require('node:vm');
+  const fs = require('node:fs');
+  let initialized = false;
+  const browser = {
+    Supabase: { createClient(url, key) {
+      assert.equal(url, 'https://supabase.example');
+      assert.equal(key, 'public-key');
+      initialized = true;
+      return { auth: {
+        onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; },
+        async getSession() { return { data: { session: null } }; }
+      } };
+    } },
+    fetch: async () => ({ ok: true, json: async () => ({
+      configured: true, url: 'https://supabase.example', publishableKey: 'public-key'
+    }) }),
+    setTimeout, clearTimeout, AbortController,
+    location: { protocol: 'https:', origin: 'https://study.example' }
+  };
+  browser.self = browser;
+  browser.window = browser;
+  vm.runInNewContext(fs.readFileSync(require.resolve('../js/account.js'), 'utf8'), browser);
+  const account = browser.CCIAccount.create();
+  const status = await account.init();
+  assert.equal(initialized, true);
+  assert.equal(status.configured, true);
+  account.destroy();
+});
