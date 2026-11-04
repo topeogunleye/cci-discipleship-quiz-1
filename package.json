@@ -14,7 +14,7 @@
     "android:open": "cap open android",
     "ios:open": "cap open ios",
     "test": "node --test",
-    "dev": "npm run build:bridge && npm run build:supabase && python3 -m http.server 8000",
+    "dev": "npm run build && wrangler pages dev dist --port 8000",
     "validate:sermons": "node scripts/validate-sermons.js"
   },
   "dependencies": {
@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "8.4.3",
-    "esbuild": "0.25.12"
+    "esbuild": "0.25.12",
+    "wrangler": "4.157.0"
   }
 }

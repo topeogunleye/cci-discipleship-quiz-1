@@ -1,0 +1,4 @@
+# Copy to .dev.vars and replace these placeholders with your Supabase project values.
+# Use the publishable key only. Do not include an "Authorization: Bearer" prefix.
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_replace_with_your_key

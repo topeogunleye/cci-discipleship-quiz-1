@@ -30,6 +30,23 @@ test('account config exposes only the public Supabase URL and publishable key wi
   assert.deepEqual(await response.json(), { configured: true, url: 'https://project.supabase.co', publishableKey: 'sb_publishable_test_key' });
 });
 
+test('account config accepts the Pages publishable-key variable and rejects an Authorization header pasted as its value', async () => {
+  const request = new Request('https://study.example/api/auth/config');
+  const valid = config.onRequestGet({
+    request,
+    env: { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test_key' }
+  });
+  assert.equal(valid.status, 200);
+  assert.deepEqual(await valid.json(), { configured: true, url: 'https://project.supabase.co', publishableKey: 'sb_publishable_test_key' });
+
+  const prefixed = config.onRequestGet({
+    request,
+    env: { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'Authorization: Token sb_publishable_test_key' }
+  });
+  assert.equal(prefixed.status, 503);
+  assert.deepEqual(await prefixed.json(), { configured: false });
+});
+
 test('session endpoint rejects unapproved origins and sets an HttpOnly secure video cookie for a valid user', async () => {
   const env = { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_test_key', ALLOWED_APP_ORIGINS: 'capacitor://localhost' };
   const forbidden = await session.onRequestPost({
