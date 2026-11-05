@@ -3640,13 +3640,24 @@
   }
 
   async function removeRetiredLocalData() {
-    var result = await storageAdapter.removeRetiredSermonData();
-    if (!result.ok && window.console) window.console.warn('Some retired local data could not be cleaned; cleanup will retry next launch.');
+    function warn(message) {
+      if (window.console && typeof window.console.warn === 'function') window.console.warn(message);
+    }
+    try {
+      var result = await storageAdapter.removeRetiredSermonData();
+      if (!result.ok) warn('Some retired local data could not be cleaned; cleanup will retry next launch.');
+    } catch (error) {
+      warn('Some retired local data could not be cleaned; cleanup will retry next launch.');
+    }
     try {
       if (window.caches) await Promise.all(['cci-sermon-downloads-v1', 'cci-sermon-audio-v1'].map(function (name) { return window.caches.delete(name); }));
+    } catch (error) {
+      warn('Retired browser downloads could not be cleaned; cleanup will retry next launch.');
+    }
+    try {
       if (window.CciNative && window.CciNative.removeRetiredDownloads) await window.CciNative.removeRetiredDownloads();
     } catch (error) {
-      if (window.console) window.console.warn('Retired downloads could not be cleaned; cleanup will retry next launch.');
+      warn('Retired native downloads could not be cleaned; cleanup will retry next launch.');
     }
   }
 

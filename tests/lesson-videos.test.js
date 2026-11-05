@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const test = require('node:test');
 const vm = require('node:vm');
 const transcriptTools = require('../js/transcripts.js');
@@ -92,7 +93,7 @@ test('catalog maps all uploaded objects to manifest decks without publishing med
   }
 });
 
-test('only unambiguous English SRTs are mapped to videos and build into valid WebVTT', () => {
+test('only unambiguous, metadata-equivalent, or explicitly confirmed English SRTs are mapped', () => {
   const catalog = JSON.parse(fs.readFileSync(path.join(root, 'content/lesson-videos.json'), 'utf8'));
   const transcriptManifest = JSON.parse(fs.readFileSync(path.join(root, 'content/lesson-transcripts.json'), 'utf8'));
   const videosById = new Map(catalog.videos.map(video => [video.id, video]));
@@ -113,8 +114,16 @@ test('only unambiguous English SRTs are mapped to videos and build into valid We
   assert.equal(transcriptManifest.schemaVersion, 1);
   assert.equal(transcriptManifest.language, 'en');
   assert.equal(sourceFiles.length, 125);
-  assert.equal(transcriptManifest.transcripts.length, 83);
-  assert.equal(new Set(transcriptManifest.transcripts.map(item => item.videoId)).size, 83);
+  assert.equal(transcriptManifest.transcripts.length, 101);
+  assert.equal(new Set(transcriptManifest.transcripts.map(item => item.videoId)).size, 101);
+  const confirmed = transcriptManifest.transcripts.filter(item => item.selection && item.selection.basis === 'user-confirmed');
+  const metadataEquivalent = transcriptManifest.transcripts.filter(item => item.selection && item.selection.basis === 'metadata-only-duplicates');
+  assert.equal(metadataEquivalent.length, 17);
+  assert.equal(confirmed.length, 1, 'Only the user-selected Predestination II source is approved among differing candidates');
+  assert.equal(confirmed[0].videoId, 'section-03-predestination-ii');
+  assert.equal(confirmed[0].file, 'PREDESTINATION-II-Celebration-Church-International-LMS-mp4-a3c50da1-fa0b.srt');
+  assert.equal(confirmed[0].selection.basis, 'user-confirmed');
+  assert.equal(confirmed[0].selection.sourceSha256, '46d50c1c21e6e8e2cee1d1065400e2321d08191464002ecb8b2455dec9943f76');
 
   const mappedIds = new Set();
   const mappedFiles = new Set();
@@ -128,7 +137,18 @@ test('only unambiguous English SRTs are mapped to videos and build into valid We
     mappedFiles.add(item.file);
     const candidates = candidatesByTitle.get(normalize(video.title));
     const hashes = candidates.map(file => fs.readFileSync(path.join(root, 'transcript', file)));
-    assert.ok(candidates.length === 1 || hashes.every(contents => contents.equals(hashes[0])), `${video.title} has ambiguous transcript candidates`);
+    const unambiguous = candidates.length === 1 || hashes.every(contents => contents.equals(hashes[0]));
+    if (!unambiguous) {
+      if (item.selection && item.selection.basis === 'metadata-only-duplicates') {
+        assert.deepEqual([item.file, ...item.selection.equivalentFiles].sort(), candidates.slice().sort(), 'All known variants must be included in the equivalence check');
+        const payload = file => transcriptTools.parseSrt(fs.readFileSync(path.join(root, 'transcript', file), 'utf8')).map(({ start, end, text }) => ({ start, end, text }));
+        const selected = payload(item.file);
+        for (const candidate of candidates) assert.deepEqual(payload(candidate), selected, `${video.title} must have identical cue text and timing`);
+      } else {
+        assert.equal(item, confirmed[0], `${video.title} requires its own explicit source confirmation`);
+      }
+      assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'transcript', item.file), 'utf8').replace(/\r\n?/g, '\n')).digest('hex'), item.selection.sourceSha256);
+    }
     const vtt = transcriptTools.toWebVtt(fs.readFileSync(path.join(root, 'transcript', item.file), 'utf8'));
     assert.match(vtt, /^WEBVTT\n\n/);
     assert.doesNotMatch(vtt, /\d{2}:\d{2}:\d{2},\d{3} -->/);
@@ -147,5 +167,7 @@ test('only unambiguous English SRTs are mapped to videos and build into valid We
     }
   }
   assert.equal(ambiguous.length, 18);
+  assert.equal(ambiguous.filter(id => mappedIds.has(id)).length, 18);
+  assert.equal(ambiguous.filter(id => !mappedIds.has(id)).length, 0);
   assert.equal(missing.length, 8);
 });

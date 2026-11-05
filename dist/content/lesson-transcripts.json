@@ -67,6 +67,15 @@
     { "videoId": "section-09-new-age-spirituality-iv", "file": "NEW-AGE-SPIRITUALITY-IV-Celebration-Church-International-LMS-mp4-15f4dbf8-f76a.srt" },
     { "videoId": "section-09-new-age-spirituality-v", "file": "NEW-AGE-SPIRITUALITY-V-Celebration-Church-International-LMS-mp4-e465e282-2081.srt" },
     { "videoId": "section-09-new-age-spirituality-vi", "file": "NEW-AGE-SPIRITUALITY-VI-Celebration-Church-International-LMS-mp4-0b1e56bf-aca0.srt" },
+    {
+      "videoId": "section-03-predestination-ii",
+      "file": "PREDESTINATION-II-Celebration-Church-International-LMS-mp4-a3c50da1-fa0b.srt",
+      "selection": {
+        "basis": "user-confirmed",
+        "sourceSha256": "46d50c1c21e6e8e2cee1d1065400e2321d08191464002ecb8b2455dec9943f76",
+        "note": "User confirmed the PREDESTINATION II recording and original predestinated wording. The d07b009e-8526 source has identical timed cues; 657ce7bb-69c2 replaces that wording in six cues. Playback synchronization remains unverified."
+      }
+    },
     { "videoId": "section-02-propitiation", "file": "PROPITIATION-Celebration-Church-International-LMS-mp4-2825ab6a-b73a.srt" },
     { "videoId": "section-02-redemption", "file": "REDEMPTION-Celebration-Church-International-LMS-mp4-8e23c3a3-bda8.srt" },
     { "videoId": "section-01-righteousness", "file": "RIGHTEOUSNESS-Celebration-Church-International-LMS-mp4-294daf9a-f8d5.srt" },
@@ -84,6 +93,196 @@
     { "videoId": "section-10-theodicy-iii", "file": "THEODICY-III-Celebration-Church-International-LMS-mp4-872a4ffc-a1fa.srt" },
     { "videoId": "section-03-trinity-iii", "file": "TRINITY-III-Celebration-Church-International-LMS-mp4-cc7ddb32-f446.srt" },
     { "videoId": "section-11-who-are-you-iii", "file": "WHO-ARE-YOU-III-Celebration-Church-International-LMS-mp4-f79a5a7c-d28e.srt" },
-    { "videoId": "section-11-who-are-you-iv", "file": "WHO-ARE-YOU-IV-Celebration-Church-International-LMS-mp4-9fbb7e5e-7646.srt" }
+    { "videoId": "section-11-who-are-you-iv", "file": "WHO-ARE-YOU-IV-Celebration-Church-International-LMS-mp4-9fbb7e5e-7646.srt" },
+    {
+      "videoId": "section-10-theodicy-iv",
+      "file": "THEODICY-IV-Celebration-Church-International-LMS-mp4-4eb4a648-baa8.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "1f35c3c87a1b48d06d9893552b5a7a9c9d334e2256ba0a0e866eb73bd4e0eb16",
+        "equivalentFiles": [
+          "THEODICY-IV-Celebration-Church-International-LMS-mp4-52a78e8d-7d7e.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-11-how-to-cast-out-demons-i",
+      "file": "HOW-TO-CAST-OUT-DEMONS-I-Celebration-Church-International-LMS-mp4-314ab7e9-3369.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "6386ea44807de5b74f4d1e53628fa0b3414de2785ba6390a9f557cbc12ac7c84",
+        "equivalentFiles": [
+          "HOW-TO-CAST-OUT-DEMONS-I-Celebration-Church-International-LMS-mp4-4bc6185e-33e5.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-11-how-to-cast-out-demons-ii",
+      "file": "HOW-TO-CAST-OUT-DEMONS-II-Celebration-Church-International-LMS-mp4-ba1e7645-0e63.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "32d974251f62e78b6bc091fc9ee6128b333b0a5911a299e98bb645beae3d11e6",
+        "equivalentFiles": [
+          "HOW-TO-CAST-OUT-DEMONS-II-Celebration-Church-International-LMS-mp4-f29c0c02-64be.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-11-how-to-cast-out-demons-iii",
+      "file": "HOW-TO-CAST-OUT-DEMONS-III-Celebration-Church-International-LMS-mp4-28f4611f-4d5d.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "64535622cc971e09808425936f0666b10cf002463ca91002bd4e50e18606014d",
+        "equivalentFiles": [
+          "HOW-TO-CAST-OUT-DEMONS-III-Celebration-Church-International-LMS-mp4-55fb636c-237a.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-11-how-to-cast-out-demons-iv",
+      "file": "HOW-TO-CAST-OUT-DEMONS-IV-Celebration-Church-International-LMS-mp4-954a9c44-38c8.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "ac738fb9d4359e4fea7328834ba7980343eae910fc7513865c85320e916ba92e",
+        "equivalentFiles": [
+          "HOW-TO-CAST-OUT-DEMONS-IV-Celebration-Church-International-LMS-mp4-b80c9b08-93b1.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-11-manifesting-the-presence-of-god-i",
+      "file": "MANIFESTING-THE-PRESENCE-OF-GOD-I-Celebration-Church-International-LMS-mp4-4d3a3d43-9c76.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "63e9bb05a354a0848d98cb2c70c0e496ed968f1330f79eb1f19a7686adf89060",
+        "equivalentFiles": [
+          "MANIFESTING-THE-PRESENCE-OF-GOD-I-Celebration-Church-International-LMS-mp4-d2866eed-367e.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-11-manifesting-the-presence-of-god-ii",
+      "file": "MANIFESTING-THE-PRESENCE-OF-GOD-II-Celebration-Church-International-LMS-mp4-28b86953-f576.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "1bc89157bd86c4b28ae31795ee86aecf03146ec5924a2f8bd460c36f425f1f12",
+        "equivalentFiles": [
+          "MANIFESTING-THE-PRESENCE-OF-GOD-II-Celebration-Church-International-LMS-mp4-9fc45592-126d.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-11-manifesting-the-presence-of-god-iii",
+      "file": "MANIFESTING-THE-PRESENCE-OF-GOD-III-Celebration-Church-International-LMS-mp4-3df91cd7-0d62.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "538e402005342589f686acb977661e79ed6e5aa254aa7707267efbb08ff44f6e",
+        "equivalentFiles": [
+          "MANIFESTING-THE-PRESENCE-OF-GOD-III-Celebration-Church-International-LMS-mp4-bf96613e-6939.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-11-power-in-the-blood-i",
+      "file": "POWER-IN-THE-BLOOD-I-Celebration-Church-International-LMS-mp4-829ff16d-4124.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "95b83d53269d3ce5e6867ee5aa5bf4cdbefd5a5c8681c41e3765fc43c8aafc16",
+        "equivalentFiles": [
+          "POWER-IN-THE-BLOOD-I-Celebration-Church-International-LMS-mp4-b49d4288-cfaa.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-11-power-in-the-blood-ii",
+      "file": "POWER-IN-THE-BLOOD-II-Celebration-Church-International-LMS-mp4-c5692393-9e74.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "eaf0841f68e01b6dd6c2b994a4956cf98e2da6945d43bc63d2cbb30c3d50e9de",
+        "equivalentFiles": [
+          "POWER-IN-THE-BLOOD-II-Celebration-Church-International-LMS-mp4-c63f0fa8-bbeb.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-11-power-in-the-blood-iii",
+      "file": "POWER-IN-THE-BLOOD-III-Celebration-Church-International-LMS-mp4-6752449c-fc8c.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "c6e4c44602bc6688cd7db6da3731364fbac5652300e82eeb50e0857e834234ac",
+        "equivalentFiles": [
+          "POWER-IN-THE-BLOOD-III-Celebration-Church-International-LMS-mp4-e27f7473-85c3.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-11-power-in-the-blood-iv",
+      "file": "POWER-IN-THE-BLOOD-IV-Celebration-Church-International-LMS-mp4-278c703b-a17f.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "2d006f6c7d5de270d4235085cd41d746e7a9000acec976b658e71864698011bf",
+        "equivalentFiles": [
+          "POWER-IN-THE-BLOOD-IV-Celebration-Church-International-LMS-mp4-95e11f65-df59.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-11-who-are-you-i",
+      "file": "WHO-ARE-YOU-I-Celebration-Church-International-LMS-mp4-901157b0-d59d.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "784503bc316938e74409b4c7cc67b4a6a14df90df07837e8a8107bd603b5cd3d",
+        "equivalentFiles": [
+          "WHO-ARE-YOU-I-Celebration-Church-International-LMS-mp4-d8b74844-4316.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-11-who-are-you-ii",
+      "file": "WHO-ARE-YOU-II-Celebration-Church-International-LMS-mp4-184ae1c7-72e1.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "1d141a270402426a8d0e091fc37cc55f62cb1425f6752d6a5108941cfcb5869b",
+        "equivalentFiles": [
+          "WHO-ARE-YOU-II-Celebration-Church-International-LMS-mp4-82209d34-3bf8.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-03-predestination-i",
+      "file": "PREDESTINATION-I-Celebration-Church-International-LMS-mp4-22f4d580-a66a.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "d0f07adf32c37505a4caef0d8b51eef98e1d7cdfac6740da4025228397a5de1d",
+        "equivalentFiles": [
+          "PREDESTINATION-I-Celebration-Church-International-LMS-mp4-61ba1872-d440.srt",
+          "PREDESTINATION-I-Celebration-Church-International-LMS-mp4-db404d8d-9e1a.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-03-trinity-i",
+      "file": "TRINITY-I-Celebration-Church-International-LMS-mp4-30387173-b5d6.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "c0e8a0c59a3081be81ce8e047b88c0c9601d4ed95adbc3aa0e5c09ccaf2744db",
+        "equivalentFiles": [
+          "TRINITY-I-Celebration-Church-International-LMS-mp4-b6989801-f9bd.srt",
+          "TRINITY-I-Celebration-Church-International-LMS-mp4-da1c5a6e-a450.srt"
+        ]
+      }
+    },
+    {
+      "videoId": "section-03-trinity-ii",
+      "file": "TRINITY-II-Celebration-Church-International-LMS-mp4-477a16c1-0736.srt",
+      "selection": {
+        "basis": "metadata-only-duplicates",
+        "sourceSha256": "4d931bc287ec46b81f71d4f6a80be77c34f1d5740f8f3f9f26f57558edd11779",
+        "equivalentFiles": [
+          "TRINITY-II-Celebration-Church-International-LMS-mp4-6b0d06c1-a6bf.srt",
+          "TRINITY-II-Celebration-Church-International-LMS-mp4-84d84205-00ae.srt"
+        ]
+      }
+    }
   ]
 }
