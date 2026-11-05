@@ -26,10 +26,9 @@ test('web app manifest declares standalone install metadata and valid icon asset
 test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
   const serviceWorker = read('service-worker.js');
   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v49'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v50'/);
   assert.match(serviceWorker, /decks\/manifest\.json/);
   assert.match(serviceWorker, /content\/devotionals\.json/);
-  assert.match(serviceWorker, /content\/sermons\.json/);
   assert.match(serviceWorker, /content\/lesson-transcripts\.json/);
   assert.match(serviceWorker, /js\/transcripts\.js/);
   assert.match(serviceWorker, /js\/native-bridge\.bundle\.js/);
@@ -37,8 +36,6 @@ test('service worker uses versioned shell/deck caches and an offline navigation 
   assert.match(serviceWorker, /js\/progress-sync\.js/);
   assert.match(serviceWorker, /js\/account\.js/);
   assert.match(serviceWorker, /js\/mobile-study\.js/);
-  assert.match(serviceWorker, /js\/sermons\.js/);
-  assert.match(serviceWorker, /js\/sermons-ui\.js/);
   assert.match(serviceWorker, /cache\.addAll\(deckFiles\.map/);
   assert.match(serviceWorker, /offline\.html/);
   assert.match(serviceWorker, /SKIP_WAITING/);
@@ -60,7 +57,7 @@ test('activation deletes previous app caches and deck assets absent from the cur
     [url('settings.json'), {}]
   ]);
   const cacheStore = new Map([
-    ['cci-study-pwa-v49', activeEntries],
+    ['cci-study-pwa-v50', activeEntries],
     ['cci-study-pwa-v36', new Map()],
     ['cci-study-pwa-v34', new Map()],
     ['cci-study-pwa-v33', new Map()],
@@ -72,6 +69,7 @@ test('activation deletes previous app caches and deck assets absent from the cur
     ['cci-study-pwa-v26', new Map()],
     ['cci-study-pwa-v3', new Map()],
     ['cci-sermon-downloads-v1', new Map([['saved-audio.mp3', {}]])],
+    ['cci-sermon-audio-v1', new Map()],
     ['unrelated-app-cache', new Map()]
   ]);
   const caches = {
@@ -110,7 +108,8 @@ test('activation deletes previous app caches and deck assets absent from the cur
   assert.equal(cacheStore.has('cci-study-pwa-v27'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v26'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v3'), false);
-  assert.equal(cacheStore.has('cci-sermon-downloads-v1'), true);
+  assert.equal(cacheStore.has('cci-sermon-downloads-v1'), false);
+  assert.equal(cacheStore.has('cci-sermon-audio-v1'), false);
   assert.equal(cacheStore.has('unrelated-app-cache'), true);
   assert.equal(activeEntries.has(url('decks/manifest.json')), true);
   assert.equal(activeEntries.has(url('decks/current.txt')), true);
@@ -197,56 +196,6 @@ test('ESV passage preview requests bypass the offline shell cache', async () => 
   assert.equal(cacheWrites, 0);
 });
 
-test('downloaded sermon audio serves cached full and byte-range responses offline without automatic shell caching', async () => {
-  const scope = 'https://example.test/app/';
-  const savedUrl = new URL('media/sermon.mp3', scope).href;
-  const missingUrl = new URL('media/not-downloaded.mp3', scope).href;
-  const saved = new Response(new Uint8Array([1, 2, 3, 4, 5, 6]), { headers: { 'content-type': 'audio/mpeg', 'accept-ranges': 'bytes', 'content-length': '6' } });
-  const audioCache = { match: async key => (typeof key === 'string' ? key : key.url) === savedUrl ? saved.clone() : null };
-  let shellWrites = 0;
-  const shellCache = { match: async () => null, put: async () => { shellWrites++; } };
-  const listeners = {};
-  const self = { location: new URL(scope), registration: { scope }, addEventListener: (name, handler) => { listeners[name] = handler; } };
-  let online = false, networkCalls = 0;
-  vm.runInNewContext(read('service-worker.js'), {
-    self,
-    caches: { open: async name => name === 'cci-sermon-downloads-v1' ? audioCache : shellCache },
-    URL,
-    Headers,
-    Response,
-    Blob,
-    fetch: async () => { networkCalls++; if (!online) throw new Error('offline'); return new Response(new Uint8Array([9, 8]), { headers: { 'content-type': 'audio/mpeg' } }); }
-  });
-
-  async function mediaRequest(url, range, explicitDownload) {
-    const headers = new Headers();
-    if (range) headers.set('Range', range);
-    if (explicitDownload) headers.set('X-Sermon-Download', '1');
-    let responsePromise;
-    listeners.fetch({ request: { method: 'GET', url, mode: 'cors', destination: explicitDownload ? '' : 'audio', headers }, respondWith: promise => { responsePromise = promise; } });
-    return responsePromise;
-  }
-  const rangeResponse = await mediaRequest(savedUrl, 'bytes=2-4');
-  assert.equal(rangeResponse.status, 206);
-  assert.equal(rangeResponse.headers.get('content-range'), 'bytes 2-4/6');
-  assert.deepEqual(Array.from(new Uint8Array(await rangeResponse.arrayBuffer())), [3, 4, 5]);
-  const fullResponse = await mediaRequest(savedUrl);
-  assert.equal(fullResponse.status, 200);
-  assert.deepEqual(Array.from(new Uint8Array(await fullResponse.arrayBuffer())), [1, 2, 3, 4, 5, 6]);
-  const offlineResponse = await mediaRequest(missingUrl);
-  assert.equal(offlineResponse.status, 503);
-  assert.match(await offlineResponse.text(), /not been downloaded/i);
-  online = true;
-  const streamingResponse = await mediaRequest(missingUrl);
-  assert.equal(streamingResponse.status, 200);
-  assert.equal(streamingResponse.headers.get('content-type'), 'audio/mpeg');
-  const downloadResponse = await mediaRequest(missingUrl, null, true);
-  assert.equal(downloadResponse.status, 200);
-  assert.equal((await downloadResponse.headers.get('content-type')), 'audio/mpeg');
-  assert.equal(shellWrites, 0);
-  assert.equal(networkCalls, 3);
-});
-
 test('PWA source and offline build contain their required registration/assets', () => {
   const app = read('js/app.js');
   const page = read('index.html');
@@ -292,7 +241,7 @@ test('protected account, video, and transcript requests bypass the offline cache
 
 test('standalone dist package includes all PWA runtime assets', () => {
   const dist = path.join(root, 'dist');
-  for (const file of ['index.html', 'manifest.webmanifest', 'service-worker.js', 'offline.html', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'decks/manifest.json', 'content/devotionals.json', 'content/sermons.json', 'content/lesson-transcripts.json']) {
+  for (const file of ['index.html', 'manifest.webmanifest', 'service-worker.js', 'offline.html', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'decks/manifest.json', 'content/devotionals.json', 'content/lesson-transcripts.json']) {
     assert.ok(fs.existsSync(path.join(dist, file)), `Missing dist/${file}`);
   }
   const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
@@ -300,8 +249,7 @@ test('standalone dist package includes all PWA runtime assets', () => {
   assert.match(html, /<script src="js\/supabase\.bundle\.js"><\/script>/);
   assert.match(html, /rel="manifest" href="manifest\.webmanifest"/);
   const worker = fs.readFileSync(path.join(dist, 'service-worker.js'), 'utf8');
-  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v49'/);
-  assert.match(worker, /SERMON_AUDIO_CACHE/);
+  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v50'/);
   const coreBlock = worker.match(/const CORE_FILES = \[([\s\S]*?)\];/);
   assert.ok(coreBlock, 'Service worker defines its core precache files');
   const coreFiles = Array.from(coreBlock[1].matchAll(/'([^']+)'/g), match => match[1]);

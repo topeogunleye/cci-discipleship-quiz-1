@@ -96,6 +96,10 @@ Question numbers may also use `1.` instead of `Q1.`. Blank lines are optional be
 
 **Export all .txt** creates a portable text export of the decks. **Backup data** creates a versioned JSON backup that also preserves learning progress, best quiz scores, and preferences. To restore one, choose the `.json` file from **Add deck** and confirm replacement. Keep a backup before clearing browser data or moving to another browser/device.
 
+## Discipleship-only app
+
+The app provides Discipleship study, accounts, progress sync, and private lesson videos. The retired Sermons experience and its local downloads are removed on upgrade. Cleanup preserves Discipleship progress, custom decks, account data, and shared preferences. See the [ownership audit and scoped cleanup plan](docs/discipleship-only-cleanup.md).
+
 ## Data and privacy
 
 Guest decks, preferences, and study progress are stored locally in IndexedDB, with local storage as a fallback. Existing `flashdecks.v1` data is copied automatically and that key is kept until the IndexedDB copy is confirmed. Guest progress remains available offline and is kept separate from each signed-in account. Learners can create an account without CCI approval to sync progress and watch private lesson videos. Importing guest progress into an account is explicit; signing out returns to the guest profile without deleting either copy. Browser storage can be cleared by the browser, so export or back up anything you want to keep. See [account, sync, and private video setup](docs/accounts-sync-and-private-videos.md).

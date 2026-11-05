@@ -14,8 +14,7 @@
     "android:open": "cap open android",
     "ios:open": "cap open ios",
     "test": "node --test",
-    "dev": "npm run build && wrangler pages dev dist --port 8000",
-    "validate:sermons": "node scripts/validate-sermons.js"
+    "dev": "npm run build && wrangler pages dev dist --port 8000"
   },
   "dependencies": {
     "@capacitor/android": "8.4.3",
