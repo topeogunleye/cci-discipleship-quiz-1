@@ -2,6 +2,9 @@ name = "cci-discipleship-quiz"
 compatibility_date = "2026-11-03"
 pages_build_output_dir = "./dist"
 
+[vars]
+ALLOWED_APP_ORIGINS = "https://localhost,capacitor://localhost,http://localhost"
+
 [[r2_buckets]]
 binding = "LESSON_VIDEOS"
 bucket_name = "cci-lesson-videos"

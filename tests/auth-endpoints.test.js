@@ -20,6 +20,29 @@ function loadFunction(file, exportName) {
 const config = loadFunction('functions/api/auth/config.js', '({ onRequestGet, onRequestOptions })');
 const session = loadFunction('functions/api/auth/session.js', '({ onRequestPost, onRequestOptions })');
 
+test('configured current and legacy native origins can discover accounts and preflight sessions', () => {
+  const origins = ['https://localhost', 'capacitor://localhost', 'http://localhost'];
+  const env = {
+    SUPABASE_URL: 'https://project.supabase.co',
+    SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test_key',
+    ALLOWED_APP_ORIGINS: fs.readFileSync(path.join(root, 'wrangler.toml'), 'utf8').match(/^ALLOWED_APP_ORIGINS\s*=\s*"([^"]+)"/m)[1]
+  };
+  for (const origin of origins) {
+    const accountConfig = config.onRequestGet({ request: new Request('https://study.example/api/auth/config', { headers: { Origin: origin } }), env });
+    const preflight = session.onRequestOptions({ request: new Request('https://study.example/api/auth/session', { method: 'OPTIONS', headers: { Origin: origin, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type' } }), env });
+    assert.equal(accountConfig.status, 200);
+    assert.equal(preflight.status, 204);
+    for (const response of [accountConfig, preflight]) {
+      assert.equal(response.headers.get('access-control-allow-origin'), origin);
+      assert.equal(response.headers.get('access-control-allow-credentials'), 'true');
+      assert.match(response.headers.get('vary'), /Origin/);
+    }
+  }
+  const rejected = session.onRequestOptions({ request: new Request('https://study.example/api/auth/session', { method: 'OPTIONS', headers: { Origin: 'https://untrusted.example' } }), env });
+  assert.equal(rejected.status, 403);
+  assert.equal(rejected.headers.get('access-control-allow-origin'), null);
+});
+
 test('account config exposes only the public Supabase URL and publishable key with explicit native CORS', async () => {
   const response = config.onRequestGet({
     request: new Request('https://study.example/api/auth/config', { headers: { Origin: 'capacitor://localhost' } }),
