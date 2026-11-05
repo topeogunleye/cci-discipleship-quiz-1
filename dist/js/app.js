@@ -8,6 +8,7 @@
   var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, biblePreviewCache = null, suppressBiblePreviewFocus = null;
   var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), activeStorageOwnerId = null, requestedStorageOwnerId = null, guestProgressForImport = null, account = Account ? Account.create() : null, accountStatus = { configured: false, user: null, videoReady: false }, accountBootReady = false, accountMessage = '', accountEmailDraft = '', accountBusy = false, accountSwitchQueue = Promise.resolve(), cloudSyncQueue = Promise.resolve(), cloudSyncTimer = null, lessonTranscriptCache = Object.create(null), lessonTranscriptRequests = Object.create(null), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null }, sermonAudioElement = null, sermonDownloadProgress = {}, lastAudioSaveBucket = -1;
   var browserLocalStorage = null, browserIndexedDB = null;
+  var lessonTranscriptGeneration = 0;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
   if (!browserLocalStorage) { try { if (typeof localStorage !== 'undefined') browserLocalStorage = localStorage; } catch (e) {} }
   try { browserIndexedDB = window.indexedDB; } catch (e) {}
@@ -354,7 +355,7 @@
     }).map(function (item) {
       var objectKey = typeof item.objectKey === 'string' && item.objectKey.length <= 1024 && !item.objectKey.startsWith('/') && item.objectKey.split('/').every(function (part) { return part && part !== '.' && part !== '..'; }) && /\.mp4$/i.test(item.objectKey) ? item.objectKey : '';
       var apiBase = account ? account.apiBase : (window.CCI_API_BASE || (Account && Account.DEFAULT_API_BASE) || '');
-      var mappedTranscript = transcriptFiles[item.id] ? 'transcript/' + encodeURIComponent(transcriptFiles[item.id]) : '';
+      var mappedTranscript = transcriptFiles[item.id] ? apiBase + '/transcript/' + encodeURIComponent(transcriptFiles[item.id]) : '';
       var captionsUrl = mediaUrl(item.captionsUrl) || mappedTranscript;
       return {
         id: item.id,
@@ -393,19 +394,26 @@
     if (lessonTranscriptCache[url]) return Promise.resolve(lessonTranscriptCache[url]);
     if (lessonTranscriptRequests[url]) return lessonTranscriptRequests[url];
     if (!TranscriptTools || typeof TranscriptTools.parseWebVtt !== 'function') return Promise.reject(new Error('Transcript support is unavailable.'));
+    var generation = lessonTranscriptGeneration;
     lessonTranscriptRequests[url] = window.fetch(url, { credentials: 'include', cache: 'no-store' }).then(function (response) {
       if (!response.ok) throw new Error('Transcript could not be loaded.');
       return response.text();
     }).then(function (text) {
+      if (generation !== lessonTranscriptGeneration) throw new Error('The account changed. Reopen the transcript after signing in.');
       var cues = TranscriptTools.parseWebVtt(text);
       lessonTranscriptCache[url] = cues;
       delete lessonTranscriptRequests[url];
       return cues;
     }).catch(function (error) {
-      delete lessonTranscriptRequests[url];
+      if (generation === lessonTranscriptGeneration) delete lessonTranscriptRequests[url];
       throw error;
     });
     return lessonTranscriptRequests[url];
+  }
+  function clearLessonTranscriptCache() {
+    lessonTranscriptGeneration++;
+    lessonTranscriptCache = Object.create(null);
+    lessonTranscriptRequests = Object.create(null);
   }
   function updateLessonTranscript(details, cues, query) {
     var list = details.querySelector('.lesson-transcript-cues'), status = details.querySelector('.lesson-transcript-status');
@@ -581,6 +589,7 @@
   function switchStorageOwner(owner) {
     owner = typeof owner === 'string' && owner ? owner : null;
     if (owner === requestedStorageOwnerId) return accountSwitchQueue;
+    clearLessonTranscriptCache();
     requestedStorageOwnerId = owner;
     accountSwitchQueue = accountSwitchQueue.catch(function () {}).then(function () {
       if (owner === activeStorageOwnerId) return;
@@ -638,6 +647,22 @@
   }
   function accountAction(action, form) {
     if (!account) { accountMessage = 'Account support is not available in this app build.'; render(true); return; }
+    if (action === 'account-retry') {
+      if (accountBusy) return;
+      accountBusy = true;
+      accountMessage = '';
+      render(true);
+      account.retry().then(function (status) {
+        accountStatus = status;
+        accountBusy = false;
+        render(true);
+      }).catch(function () {
+        accountBusy = false;
+        accountMessage = 'Account services could not be reached. Check your connection and try again.';
+        render(true);
+      });
+      return;
+    }
     if (action === 'account-signup' || action === 'account-signin') {
       if (accountBusy) return;
       var emailInput = form && form.elements.email || document.getElementById('account-email');
@@ -645,13 +670,13 @@
       var email = emailInput ? emailInput.value.trim() : '', password = passwordInput ? passwordInput.value : '';
       if (!email.trim() || !password) { accountMessage = 'Enter your email and password to continue.'; render(true); return; }
       if (action === 'account-signup' && password.length < 8) {
-        if (passwordInput) { passwordInput.setCustomValidity('Use at least 8 characters for a new password.'); passwordInput.reportValidity(); }
+        if (passwordInput) { passwordInput.setAttribute('aria-invalid', 'true'); passwordInput.focus(); }
         accountMessage = 'Use at least 8 characters for a new password.';
         var shortPasswordStatus = document.getElementById('account-message');
         if (shortPasswordStatus) shortPasswordStatus.textContent = accountMessage;
         return;
       }
-      if (passwordInput) passwordInput.setCustomValidity('');
+      if (passwordInput) passwordInput.removeAttribute('aria-invalid');
       accountEmailDraft = email;
       accountBusy = true;
       accountMessage = action === 'account-signup' ? 'Creating your account…' : 'Signing in…';
@@ -717,9 +742,12 @@
   }
   function accountSettingsSection() {
     var user = accountStatus && accountStatus.user, configured = !!(accountStatus && accountStatus.configured);
-    var message = accountMessage || (configured ? (user ? 'CCI lesson progress syncs when you are online. Custom decks remain local.' : 'Create an account or sign in to sync CCI lesson progress and watch lesson videos.') : 'Account services are not configured yet. Guest study remains available on this device.');
+    var connectionState = accountStatus && accountStatus.initializationState;
+    var connectionMessage = connectionState === 'loading' || accountBusy ? 'Connecting to account services…' : (accountStatus && accountStatus.initializationError || 'Account services are not configured yet. Guest study remains available on this device.');
+    var message = accountMessage || (configured ? (user ? 'CCI lesson progress syncs when you are online. Custom decks remain local.' : 'Create an account or sign in to sync CCI lesson progress and watch lesson videos.') : connectionMessage);
     var controls;
-    if (!configured) controls = '<p class="meta">A maintainer must connect the private account and video services before sign-in is available.</p>';
+    if (!configured) controls = (connectionState === 'unconfigured' ? '<p class="meta">Account sign-in is not configured for this app deployment. You can keep studying as a guest.</p>' : '') +
+      (account && connectionState !== 'loading' ? '<button type="button" class="btn sm" data-act="account-retry"' + (accountBusy ? ' disabled' : '') + '>Retry account connection</button>' : '');
     else if (user) {
       controls = '<p><strong>Signed in as</strong> ' + esc(user.email || 'CCI Study learner') + '</p>' +
         (!accountStatus.videoReady ? '<p class="meta">Lesson-video access is not ready on this device yet.</p><button type="button" class="btn sm" data-act="account-video-session"' + (accountBusy ? ' disabled' : '') + '>Prepare video access</button>' : '<p class="meta">Private lesson videos are available to your account.</p>') +
@@ -728,8 +756,8 @@
     } else {
       controls = '<form class="account-auth-form" data-account-form aria-describedby="account-guidance account-message">' +
         '<label class="field"><span>Email address</span><input id="account-email" name="email" type="email" autocomplete="username" inputmode="email" required maxlength="254" value="' + esc(accountEmailDraft) + '"></label>' +
-        '<label class="field"><span>Password</span><input id="account-password" name="password" type="password" autocomplete="current-password" required maxlength="128"></label>' +
-        '<p class="account-guidance" id="account-guidance">Sign in is required to watch lesson videos. Guest study and custom decks stay on this device.</p>' +
+        '<label class="field"><span>Password</span><input id="account-password" name="password" type="password" autocomplete="current-password" required maxlength="128" aria-describedby="account-guidance account-message"></label>' +
+        '<p class="account-guidance" id="account-guidance">Use at least 8 characters for a new account’s password. Sign in to watch videos, or keep studying as a guest.</p>' +
         '<div class="account-auth-actions"><button type="submit" class="btn primary" name="account-action" value="account-signin">Sign in</button><button type="submit" class="btn" name="account-action" value="account-signup">Create account</button></div>' +
       '</form>';
     }
@@ -3468,6 +3496,7 @@
         }
         break;
       case 'account-signout':
+      case 'account-retry':
       case 'account-sync':
       case 'account-import':
       case 'account-video-session': accountAction(a); break;
@@ -3804,7 +3833,7 @@
   });
   document.addEventListener('input', function (e) {
     if (e.target.id === 'account-password') {
-      e.target.setCustomValidity('');
+      e.target.removeAttribute('aria-invalid');
     } else if (e.target.id === 'lesson-transcript-search') {
       var transcriptDetails = e.target.closest('.lesson-transcript');
       var transcriptCues = transcriptDetails && lessonTranscriptCache[transcriptDetails.dataset.transcriptUrl];

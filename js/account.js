@@ -11,13 +11,15 @@
     var fetcher = options.fetch || (typeof fetch === 'function' ? fetch.bind(globalThis) : null);
     var supabaseApi = options.Supabase || (typeof root !== 'undefined' ? root.Supabase : null);
     var localStorage = Object.prototype.hasOwnProperty.call(options, 'localStorage') ? options.localStorage : (typeof window !== 'undefined' ? window.localStorage : null);
-    var apiBase = String(options.apiBase || (typeof window !== 'undefined' && window.CCI_API_BASE) || (typeof window !== 'undefined' && /^https?:$/.test(window.location.protocol) ? window.location.origin : DEFAULT_API_BASE)).replace(/\/$/, '');
+    var isNativeApp = typeof window !== 'undefined' && window.CciNative && window.CciNative.isNative;
+    var apiBase = String(options.apiBase || (typeof window !== 'undefined' && window.CCI_API_BASE) || (typeof window !== 'undefined' && !isNativeApp && /^https?:$/.test(window.location.protocol) ? window.location.origin : DEFAULT_API_BASE)).replace(/\/$/, '');
     var client = null, authSubscription = null, onChange = null, currentSession = null, configured = false, videoReady = false;
     var cookieSync = Promise.resolve(), lastToken = null, lastUserId = null, cachedDeviceId = null, videoRefreshTimer = null;
     var resumeHandler = null;
+    var initializationState = 'idle', initializationError = '', initializationPromise = null, lifecycleId = 0;
 
     function status() {
-      return { configured: configured, user: currentSession && currentSession.user ? currentSession.user : null, session: currentSession, videoReady: videoReady, apiBase: apiBase };
+      return { configured: configured, user: currentSession && currentSession.user ? currentSession.user : null, session: currentSession, videoReady: videoReady, apiBase: apiBase, initializationState: initializationState, initializationError: initializationError };
     }
 
     function notify() {
@@ -113,46 +115,86 @@
       return generated;
     }
 
-    async function init(changeHandler) {
-      onChange = changeHandler || null;
+    function cleanUpClient() {
+      if (authSubscription && typeof authSubscription.unsubscribe === 'function') authSubscription.unsubscribe();
+      if (client && client.auth && typeof client.auth.stopAutoRefresh === 'function') client.auth.stopAutoRefresh();
+      clearVideoRefreshTimer();
+      if (resumeHandler && typeof window !== 'undefined' && window.removeEventListener) {
+        window.removeEventListener('focus', resumeHandler);
+        window.removeEventListener('online', resumeHandler);
+        if (typeof document !== 'undefined' && document.removeEventListener) document.removeEventListener('visibilitychange', resumeHandler);
+      }
+      resumeHandler = null;
+      authSubscription = null; client = null; currentSession = null; lastToken = null; lastUserId = null; configured = false; videoReady = false;
+    }
+
+    function init(changeHandler) {
+      if (typeof changeHandler === 'function') onChange = changeHandler;
+      if (initializationPromise) return initializationPromise;
+      if (configured && initializationState === 'ready') { notify(); return Promise.resolve(status()); }
+      cleanUpClient();
+      var requestId = ++lifecycleId;
+      initializationError = '';
       if (!fetcher || !supabaseApi || typeof supabaseApi.createClient !== 'function') {
-        configured = false; notify(); return status();
+        initializationState = 'unconfigured';
+        initializationError = 'Account support is not available in this app build.';
+        notify(); return Promise.resolve(status());
       }
-      try {
-        var controller = typeof AbortController === 'function' ? new AbortController() : null;
-        var timeout = setTimeout(function () { if (controller) controller.abort(); }, 2500);
-        var response;
-        try { response = await fetcher(apiBase + '/api/auth/config', { credentials: 'include', cache: 'no-store', signal: controller ? controller.signal : undefined }); }
-        finally { clearTimeout(timeout); }
-        if (!response.ok) throw new Error('Account service is not configured.');
-        var config = await response.json();
-        if (!config.configured || !config.url || !config.publishableKey) throw new Error('Account service is not configured.');
-        client = supabaseApi.createClient(config.url, config.publishableKey, {
-          auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }
-        });
-        configured = true;
-        var subscriptionResult = client.auth.onAuthStateChange(function (_event, session) { acceptSession(session); });
-        authSubscription = subscriptionResult && subscriptionResult.data && subscriptionResult.data.subscription || null;
-        var result = await client.auth.getSession();
-        if (result.error) throw result.error;
-        acceptSession(result.data && result.data.session || null);
-        resumeHandler = function () {
-          if (typeof document === 'undefined' || document.visibilityState === 'visible') {
-            if (currentSession) syncVideoSession(currentSession, true);
-          }
-        };
-        if (typeof window !== 'undefined' && window.addEventListener) {
-          window.addEventListener('focus', resumeHandler);
-          window.addEventListener('online', resumeHandler);
-          if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('visibilitychange', resumeHandler);
-        }
-      } catch (error) {
-        configured = false;
-        client = null;
-        if (typeof options.onError === 'function') options.onError(authError(error));
-      }
+      initializationState = 'loading';
       notify();
-      return status();
+      initializationPromise = (async function () {
+        try {
+          var controller = typeof AbortController === 'function' ? new AbortController() : null;
+          var timeout = setTimeout(function () { if (controller) controller.abort(); }, 2500);
+          var response;
+          try { response = await fetcher(apiBase + '/api/auth/config', { credentials: 'include', cache: 'no-store', signal: controller ? controller.signal : undefined }); }
+          finally { clearTimeout(timeout); }
+          if (requestId !== lifecycleId) return status();
+          var config = await response.json();
+          if (requestId !== lifecycleId) return status();
+          if (!response.ok || !config.configured || !config.url || !config.publishableKey) {
+            var configError = new Error('Account service is not configured.');
+            configError.unconfigured = (response.ok || response.status === 503) && config.configured === false;
+            throw configError;
+          }
+          client = supabaseApi.createClient(config.url, config.publishableKey, {
+            auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }
+          });
+          configured = true;
+          var subscriptionResult = client.auth.onAuthStateChange(function (_event, session) { if (requestId === lifecycleId) acceptSession(session); });
+          authSubscription = subscriptionResult && subscriptionResult.data && subscriptionResult.data.subscription || null;
+          var result = await client.auth.getSession();
+          if (requestId !== lifecycleId) return status();
+          if (result.error) throw result.error;
+          acceptSession(result.data && result.data.session || null);
+          resumeHandler = function () {
+            if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+              if (currentSession) syncVideoSession(currentSession, true);
+            }
+          };
+          if (typeof window !== 'undefined' && window.addEventListener) {
+            window.addEventListener('focus', resumeHandler);
+            window.addEventListener('online', resumeHandler);
+            if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('visibilitychange', resumeHandler);
+          }
+          initializationState = 'ready';
+        } catch (error) {
+          if (requestId !== lifecycleId) return status();
+          cleanUpClient();
+          initializationState = error && error.unconfigured ? 'unconfigured' : 'unavailable';
+          initializationError = initializationState === 'unconfigured'
+            ? 'Account services are not configured yet.'
+            : 'Account services could not be reached. Check your connection and try again.';
+          if (typeof options.onError === 'function') options.onError(authError(error));
+        }
+        notify();
+        return status();
+      })().finally(function () { if (requestId === lifecycleId) initializationPromise = null; });
+      return initializationPromise;
+    }
+
+    function retry() {
+      return init();
     }
 
     async function signUp(email, password) {
@@ -219,18 +261,14 @@
     }
 
     function destroy() {
-      if (authSubscription && typeof authSubscription.unsubscribe === 'function') authSubscription.unsubscribe();
-      clearVideoRefreshTimer();
-      if (resumeHandler && typeof window !== 'undefined' && window.removeEventListener) {
-        window.removeEventListener('focus', resumeHandler);
-        window.removeEventListener('online', resumeHandler);
-        if (typeof document !== 'undefined' && document.removeEventListener) document.removeEventListener('visibilitychange', resumeHandler);
-      }
-      resumeHandler = null;
-      authSubscription = null; client = null; currentSession = null; lastToken = null; lastUserId = null; configured = false; videoReady = false;
+      ++lifecycleId;
+      cleanUpClient();
+      initializationPromise = null;
+      initializationState = 'idle';
+      initializationError = '';
     }
 
-    return { init: init, status: status, signUp: signUp, signIn: signIn, signOut: signOut, syncProgress: syncProgress, syncVideoSession: syncVideoSession, destroy: destroy, apiBase: apiBase };
+    return { init: init, retry: retry, status: status, signUp: signUp, signIn: signIn, signOut: signOut, syncProgress: syncProgress, syncVideoSession: syncVideoSession, destroy: destroy, apiBase: apiBase };
   }
 
   return { create: createAccount, DEFAULT_API_BASE: DEFAULT_API_BASE };

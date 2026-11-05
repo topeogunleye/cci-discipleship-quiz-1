@@ -37,10 +37,125 @@ test('browser account discovers the Supabase global without dependency injection
   service.destroy();
 });
 
+test('native Android account requests use the hosted API while web development stays on localhost', async t => {
+  const fs = require('node:fs');
+  const vm = require('node:vm');
+  const source = fs.readFileSync(require.resolve('../js/account.js'), 'utf8');
+  for (const scenario of [
+    { name: 'Android native localhost', native: true, expected: 'https://cci-discipleship-quiz.pages.dev' },
+    { name: 'ordinary web localhost', native: false, expected: 'http://localhost' },
+    { name: 'native deployment override', native: true, globalBase: 'https://preview.example/', expected: 'https://preview.example' },
+    { name: 'explicit option takes priority', native: true, globalBase: 'https://preview.example', optionBase: 'https://test.example/', expected: 'https://test.example' }
+  ]) {
+    await t.test(scenario.name, async () => {
+      const requests = [];
+      const browser = {
+        CciNative: { isNative: scenario.native },
+        location: { protocol: 'http:', origin: 'http://localhost' },
+        Supabase: { createClient: () => ({ auth: {
+          onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; },
+          async getSession() { return { data: { session: null } }; }
+        } }) }
+      };
+      if (scenario.globalBase) browser.CCI_API_BASE = scenario.globalBase;
+      vm.runInNewContext(source, {
+        self: browser, window: browser, setTimeout, clearTimeout,
+        fetch: async url => {
+          requests.push(url);
+          return new Response(url.endsWith('/api/auth/config')
+            ? JSON.stringify({ configured: true, url: 'https://project.supabase.co', publishableKey: 'public-key' }) : '{}');
+        }
+      });
+      const service = browser.CCIAccount.create({ apiBase: scenario.optionBase });
+      assert.equal((await service.init()).configured, true);
+      assert.equal(service.apiBase, scenario.expected);
+      assert.equal(requests[0], scenario.expected + '/api/auth/config');
+      assert.ok(requests.every(url => url.startsWith(scenario.expected + '/api/')));
+      service.destroy();
+    });
+  }
+});
+
 function localStore() {
   const values = new Map();
   return { getItem: key => values.get(key) || null, setItem: (key, value) => values.set(key, String(value)), values };
 }
+
+test('account initialization distinguishes a lost connection from missing configuration and can retry', async () => {
+  let configRequests = 0, mode = 'offline';
+  const changes = [], storage = localStore();
+  storage.setItem('flashdecks.v1', '{"progress":"preserved"}');
+  const Supabase = { createClient: () => ({ auth: {
+    onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; },
+    async getSession() { return { data: { session: null } }; }
+  } }) };
+  const fetch = async url => {
+    if (!url.endsWith('/api/auth/config')) return new Response('{}');
+    configRequests++;
+    if (mode === 'offline') throw new TypeError('Network request failed');
+    if (mode === 'unconfigured') return new Response('{"configured":false}', { status: 503 });
+    return new Response(JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }));
+  };
+  const service = create({ fetch, Supabase, localStorage: storage });
+  assert.equal((await service.init(status => changes.push(status.initializationState))).initializationState, 'unavailable');
+  assert.match(service.status().initializationError, /connection.*try again/i);
+  mode = 'unconfigured';
+  assert.equal((await service.retry()).initializationState, 'unconfigured');
+  mode = 'ready';
+  const recovered = await service.retry();
+  assert.equal(recovered.initializationState, 'ready');
+  assert.equal(recovered.configured, true);
+  assert.equal(recovered.initializationError, '');
+  assert.equal(configRequests, 3);
+  assert.ok(changes.includes('unavailable'));
+  assert.ok(changes.includes('unconfigured'));
+  assert.equal(changes.at(-1), 'ready', 'retry retains the original status callback');
+  assert.equal(storage.getItem('flashdecks.v1'), '{"progress":"preserved"}');
+  service.destroy();
+});
+
+test('failed session initialization cleans up its subscription and retry creates only one active client', async () => {
+  let clients = 0, unsubscribed = 0, stopped = 0;
+  const Supabase = { createClient: () => {
+    const attempt = ++clients;
+    return { auth: {
+      onAuthStateChange() { return { data: { subscription: { unsubscribe() { unsubscribed++; } } } }; },
+      stopAutoRefresh() { stopped++; },
+      async getSession() { return attempt === 1 ? { error: new Error('Session storage unavailable') } : { data: { session: null } }; }
+    } };
+  } };
+  const fetch = async url => new Response(url.endsWith('/api/auth/config')
+    ? JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }) : '{}');
+  const service = create({ fetch, Supabase, localStorage: localStore() });
+  assert.equal((await service.init()).initializationState, 'unavailable');
+  assert.equal(unsubscribed, 1);
+  assert.equal(stopped, 1);
+  const retry = service.retry();
+  assert.equal(service.retry(), retry, 'concurrent retries share the same initialization');
+  assert.equal((await retry).initializationState, 'ready');
+  await service.init();
+  await service.retry();
+  assert.equal(clients, 2, 'an already connected service keeps its existing client');
+  assert.equal(unsubscribed, 1);
+  service.destroy();
+  assert.equal(unsubscribed, 2);
+  assert.equal(stopped, 2);
+});
+
+test('destroying a pending account initialization prevents stale setup from restoring it', async () => {
+  let resolveConfig, clients = 0;
+  const fetch = () => new Promise(resolve => { resolveConfig = resolve; });
+  const Supabase = { createClient() { clients++; throw new Error('stale configuration must not create a client'); } };
+  const service = create({ fetch, Supabase, localStorage: localStore() });
+  const pending = service.init();
+  assert.equal(service.status().initializationState, 'loading');
+  service.destroy();
+  resolveConfig(new Response(JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' })));
+  await pending;
+  assert.equal(clients, 0);
+  assert.equal(service.status().initializationState, 'idle');
+  assert.equal(service.status().configured, false);
+});
 
 test('account service prepares a private video session cookie without exposing the token in a URL', async () => {
   let change, session = null, posted, sessionRequests = 0;

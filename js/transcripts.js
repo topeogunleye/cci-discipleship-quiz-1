@@ -14,6 +14,10 @@
     var text = String(source || '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').trim();
     if (!text) throw new Error('Transcript is empty.');
     var blocks = text.split(/\n{2,}/), previousStart = -1;
+    // The uploaded SRT exporter appends a literal backslash-n as its own block.
+    // Ignore only that exact final marker; malformed cues must still fail.
+    if (separator === ',' && blocks[blocks.length - 1].trim() === '\\n') blocks.pop();
+    if (!blocks.length) throw new Error('Transcript is empty.');
     return blocks.map(function (block, index) {
       var lines = block.split('\n');
       var timingIndex = lines.findIndex(function (line) { return TIMING.test(line); });

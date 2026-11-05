@@ -62,25 +62,7 @@ for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html',
 for (const directory of ['decks', 'icons', 'content', 'js']) {
   fs.cpSync(path.join(root, directory), path.join(outputDir, directory), { recursive: true });
 }
-const { toWebVtt } = require('../js/transcripts.js');
-const transcriptManifest = JSON.parse(read('content/lesson-transcripts.json'));
-const videoCatalog = JSON.parse(read('content/lesson-videos.json'));
-const videoIds = new Set(videoCatalog.videos.map(video => video.id));
-const mappedVideos = new Set();
-const mappedFiles = new Set();
-for (const item of transcriptManifest.transcripts) {
-  if (!videoIds.has(item.videoId) || mappedVideos.has(item.videoId)) throw new Error(`Invalid or duplicate transcript video mapping: ${item.videoId}`);
-  if (typeof item.file !== 'string' || path.basename(item.file) !== item.file || !/^[A-Za-z0-9._-]+\.srt$/i.test(item.file) || mappedFiles.has(item.file)) {
-    throw new Error(`Invalid or duplicate transcript filename: ${item.file}`);
-  }
-  const source = path.join(root, 'transcript', item.file);
-  const destination = path.join(outputDir, 'transcript', item.file.replace(/\.srt$/i, '.vtt'));
-  if (!fs.existsSync(source)) throw new Error(`Mapped transcript is missing: ${item.file}`);
-  fs.mkdirSync(path.dirname(destination), { recursive: true });
-  fs.writeFileSync(destination, toWebVtt(fs.readFileSync(source, 'utf8')));
-  mappedVideos.add(item.videoId);
-  mappedFiles.add(item.file);
-}
+require('./lesson-transcripts.js').writeLessonTranscripts(root);
 normalizeTextFile(path.join(outputDir, 'style.css'));
 normalizeTextFiles(path.join(outputDir, 'js'));
 console.log(`Built dist/index.html (${Buffer.byteLength(html)} bytes)`);

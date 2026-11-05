@@ -9,23 +9,24 @@ const vm = require('node:vm');
 const root = path.join(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'functions/transcript/_middleware.js'), 'utf8')
   .replace("import auth from '../_lib/auth.cjs';", "const auth = require('../_lib/auth.cjs');")
+  .replace("import transcripts from '../_generated/lesson-transcripts.cjs';", "const transcripts = require('../_generated/lesson-transcripts.cjs');")
   .replace(/export async function /g, 'async function ');
+const passage = 'WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nA lesson cue.\n';
 const onRequest = vm.runInNewContext(source + '\n onRequest;', {
-  require: request => request === '../_lib/auth.cjs' ? require('../functions/_lib/auth.cjs') : require(request),
+  require: request => request === '../_lib/auth.cjs' ? require('../functions/_lib/auth.cjs') : { 'lesson.vtt': passage },
   URL,
   Response,
-  Headers
+  Headers,
+  TextEncoder
 });
 
 test('transcript assets require a valid video session and receive private no-store headers', async () => {
   const env = { SUPABASE_URL: 'https://auth.example', SUPABASE_ANON_KEY: 'sb_publishable_test_key' };
   let nextCalls = 0, originalFetch;
-  const next = async () => {
-    nextCalls++;
-    return new Response('WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nA lesson cue.\n', { headers: { 'Content-Type': 'text/vtt' } });
-  };
-  const request = cookie => new Request('https://study.example/transcript/lesson.vtt', {
-    headers: cookie ? { Cookie: '__Host-cci-video-session=' + cookie } : {}
+  const next = async () => { nextCalls++; throw new Error('Private transcripts must never fall through to static assets.'); };
+  const request = (cookie, method = 'GET', file = 'lesson.vtt', origin) => new Request('https://study.example/transcript/' + file, {
+    method,
+    headers: { ...(cookie ? { Cookie: '__Host-cci-video-session=' + cookie } : {}), ...(origin ? { Origin: origin } : {}) }
   });
 
   const denied = await onRequest({ request: request(''), env, next });
@@ -37,11 +38,28 @@ test('transcript assets require a valid video session and receive private no-sto
   try {
     const allowed = await onRequest({ request: request('header.payload.signature'), env, next });
     assert.equal(allowed.status, 200);
-    assert.equal(await allowed.text(), 'WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nA lesson cue.\n');
+    assert.equal(await allowed.text(), passage);
     assert.equal(allowed.headers.get('cache-control'), 'private, no-store');
-    assert.equal(allowed.headers.get('content-type'), 'text/vtt');
+    assert.equal(allowed.headers.get('content-type'), 'text/vtt; charset=utf-8');
+    assert.equal(allowed.headers.get('content-length'), String(Buffer.byteLength(passage)));
     assert.equal(allowed.headers.get('x-content-type-options'), 'nosniff');
-    assert.equal(nextCalls, 1);
+    const head = await onRequest({ request: request('header.payload.signature', 'HEAD'), env, next });
+    assert.equal(head.status, 200);
+    assert.equal(await head.text(), '');
+    assert.equal(head.headers.get('content-length'), allowed.headers.get('content-length'));
+    const missing = await onRequest({ request: request('header.payload.signature', 'GET', 'missing.vtt'), env, next });
+    assert.equal(missing.status, 404);
+    const deniedOrigin = await onRequest({ request: request('header.payload.signature', 'GET', 'lesson.vtt', 'https://other.example'), env, next });
+    assert.equal(deniedOrigin.status, 403);
+    const nativeEnv = { ...env, ALLOWED_APP_ORIGINS: 'capacitor://localhost' };
+    const native = await onRequest({ request: request('header.payload.signature', 'GET', 'lesson.vtt', 'capacitor://localhost'), env: nativeEnv, next });
+    assert.equal(native.status, 200);
+    assert.equal(native.headers.get('access-control-allow-origin'), 'capacitor://localhost');
+    assert.equal(native.headers.get('access-control-allow-credentials'), 'true');
+    const preflight = await onRequest({ request: request('', 'OPTIONS', 'lesson.vtt', 'capacitor://localhost'), env: nativeEnv, next });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get('access-control-allow-origin'), 'capacitor://localhost');
+    assert.equal(nextCalls, 0);
   } finally {
     globalThis.fetch = originalFetch;
   }
