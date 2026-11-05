@@ -71,6 +71,8 @@ const malformed = records.filter(record => record.error);
 const unmatched = records.filter(record => !videosByTitle.has(record.title));
 const duplicateGroups = [...groups.values()].filter(group => group.length > 1);
 const identicalGroups = duplicateGroups.filter(group => new Set(group.map(item => item.hash)).size === 1);
+const mappedPrefixCounts = mappings.map(item => recordsByFile.get(item.file).cues.reduce((count, cue) => count + (cue.text.match(/^[\t ]*Speaker[\t ]*\d+[\t ]*:[\t ]*/gim) || []).length, 0));
+const presentationPrefixCount = mappedPrefixCounts.reduce((count, value) => count + value, 0);
 const lines = [
   '# Lesson transcript review',
   '',
@@ -83,7 +85,8 @@ const lines = [
   `- ${differingCandidates.length} recordings have differing candidate SRTs; ${differingCandidates.length - unresolved.length} have explicit selections and ${unresolved.length} remain unmapped. ${missing.length} recordings have no matching timed SRT.`,
   `- ${duplicateGroups.length} titles have multiple source files; ${identicalGroups.length} groups are byte-identical duplicates. ${unmatched.length} source filenames have no catalog candidate.`,
   `- ${cueCount.toLocaleString('en-US')} source cues parsed, including repeated files; ${malformed.length} malformed files after handling the export footer. ${overlapCount} overlapping adjacent cues and ${invalidRangeCount} out-of-range minute/second fields observed.`,
-  `- All ${footerCount} files contain the exporter’s final literal \`\\n\` block. The parser ignores only that exact final marker; it continues rejecting malformed cue blocks. Meeting metadata before the first timing line is excluded from captions.`,
+  `- ${footerCount} of ${files.length} files contain the exporter’s final literal \`\\n\` block. The parser ignores only that exact final marker; it continues rejecting malformed cue blocks. Meeting metadata before the first timing line is excluded from captions.`,
+  `- Presentation removes ${presentationPrefixCount.toLocaleString('en-US')} generic numbered speaker prefixes across ${mappedPrefixCounts.filter(count => count > 0).length} mapped recordings. Raw SRT text remains unchanged; source review and duplicate comparisons still use the original cues.`,
   '',
   '## Language, fidelity, and suitability',
   '',
@@ -91,13 +94,13 @@ const lines = [
   '',
   'Mapped files have valid ordered cue timing and can supply both WebVTT captions and the searchable, time-linked transcript. Filename/title agreement and sampled subject matter support the unambiguous mappings; explicitly enabled metadata-only duplicates and the user-confirmed wording selection are recorded separately below. For metadata-only duplicates, the build verifies that all differences are confined to exporter metadata before the first cue; all spoken text and timestamps must match. No recording audio or media duration was available to this repository review, so exact synchronization and transcription accuracy still require playback checks. Matching timing alone does not resolve differing spoken text.',
   '',
-  'The theater-style player keeps the video primary, shows flashcards and quiz actions, and places the searchable transcript in a disclosure below the player. Source speaker text is preserved; no doctrine, Bible reference, or missing words have been guessed or rewritten.',
+  'The theater-style player keeps the video primary, shows flashcards and quiz actions, and places the searchable transcript in a disclosure below the player. Generated captions and browser transcript presentation remove only generic numbered speaker prefixes at the start of cue lines. Spoken mentions, real names, punctuation, cue order, and timestamps are preserved. Original SRTs and raw parsing retain source labels for review; no doctrine, Bible reference, or missing words have been guessed or rewritten.',
   '',
   '## Protected delivery',
   '',
   'The build converts only mapped source files into a server-only Pages Functions module at `functions/_generated/lesson-transcripts.cjs`. The generated module is ignored by Git and must be rebuilt before Wrangler/dev/deployment. `/transcript/<filename>.vtt` validates the learner’s video-session cookie and serves private, uncached WebVTT directly; it does not fall through to static assets. Caption bodies are excluded from `dist` and native app packages. The browser transcript cache is session memory only and is cleared on account changes. Legacy generated `dist/transcript/*.vtt` files are removed during build.',
   '',
-  'Raw source SRTs were already committed in the repository before this review. Server authentication protects deployed transcript responses; it cannot make existing Git history private. This review preserves those source files and does not rewrite repository history.',
+  'Raw source SRTs are repository source material, excluded from published build assets. Existing source files may also appear in Git history. Server authentication protects deployed transcript responses; it cannot make existing Git history private. This review preserves all source files as supplied and does not rewrite repository history.',
   '',
   '## User-confirmed selections',
   '',
@@ -133,13 +136,15 @@ lines.push(
 lines.push(
   '## Recordings with no SRT',
   '',
-  '| Video ID | Catalog title | Deck ID |',
-  '| --- | --- | --- |',
-  ...missing.map(video => `| \`${video.id}\` | ${video.title} | \`${video.deckId}\` |`),
+  ...(missing.length ? [
+    '| Video ID | Catalog title | Deck ID |',
+    '| --- | --- | --- |',
+    ...missing.map(video => `| \`${video.id}\` | ${video.title} | \`${video.deckId}\` |`)
+  ] : [`None. All ${videos.length} catalog recordings have an explicit timed transcript mapping.`]),
   '',
   '## Recordings with differing candidate transcripts',
   '',
-  unresolved.length ? 'The following unresolved recordings require the recording or the transcript producer to identify the intended version. No candidate is activated for these recordings.' : 'No unresolved candidate conflicts remain. Raw source differences are covered by the explicit wording selection or verified metadata-only selections above. The eight recordings with no timed source remain unmapped.',
+  unresolved.length ? 'The following unresolved recordings require the recording or the transcript producer to identify the intended version. No candidate is activated for these recordings.' : `No unresolved candidate conflicts remain. Raw source differences are covered by the explicit wording selection or verified metadata-only selections above. ${missing.length ? `${missing.length} recordings with no timed source remain unmapped.` : 'Every catalog recording now has an explicit timed transcript mapping.'}`,
   '',
   '| Video ID | Catalog title | Candidate files |',
   '| --- | --- | ---: |',

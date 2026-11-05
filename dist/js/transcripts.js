@@ -45,8 +45,21 @@
     return parseTimedBlocks(source, ',');
   }
 
+  function presentationCues(cues) {
+    return cues.map(function (cue, index) {
+      var text = cue.text.split('\n').map(function (line) {
+        var cleaned = line.replace(/^(?:[\t ]*Speaker[\t ]*\d+[\t ]*:[\t ]*)+/i, '');
+        // A label on its own line has no spoken content. Remove only that line,
+        // keeping other lines and every cue's original timing intact.
+        return cleaned !== line && !cleaned.trim() ? null : cleaned;
+      }).filter(function (line) { return line !== null; }).join('\n').trim();
+      if (!text) throw new Error('Transcript cue ' + (index + 1) + ' has no spoken text after removing a speaker label.');
+      return Object.assign({}, cue, { text: text });
+    });
+  }
+
   function toWebVtt(source) {
-    var cues = parseSrt(source);
+    var cues = presentationCues(parseSrt(source));
     return 'WEBVTT\n\n' + cues.map(function (cue) {
       return cue.startText + ' --> ' + cue.endText + '\n' + cue.text;
     }).join('\n\n') + '\n';
@@ -55,7 +68,7 @@
   function parseWebVtt(source) {
     var text = String(source || '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').replace(/^WEBVTT[^\n]*\n+/, '').trim();
     if (!text) throw new Error('Transcript is empty.');
-    return parseTimedBlocks(text, '.');
+    return presentationCues(parseTimedBlocks(text, '.'));
   }
 
   return { parseSrt: parseSrt, toWebVtt: toWebVtt, parseWebVtt: parseWebVtt };

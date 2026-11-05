@@ -15,8 +15,43 @@ test('every mapped transcript compiles for server delivery without adding unmapp
   const passages = compileLessonTranscripts(root);
   assert.equal(Object.keys(passages).length, manifest.transcripts.length);
   for (const item of manifest.transcripts) {
-    assert.ok(parseWebVtt(passages[item.file.replace(/\.srt$/i, '.vtt')]).length > 0);
+    const original = parseSrt(fs.readFileSync(path.join(root, 'transcript', item.file), 'utf8'));
+    const output = parseWebVtt(passages[item.file.replace(/\.srt$/i, '.vtt')]);
+    assert.equal(output.length, original.length, `${item.videoId} must retain every cue`);
+    for (let i = 0; i < original.length; i++) {
+      assert.equal(output[i].start, original[i].start);
+      assert.equal(output[i].end, original[i].end);
+      assert.equal(output[i].text, original[i].text.replace(/^(?:[\t ]*Speaker[\t ]*\d+[\t ]*:[\t ]*)+/gim, '').trim(), `${item.videoId} may remove only generic prefixes`);
+      assert.doesNotMatch(output[i].text, /^[\t ]*Speaker[\t ]*\d+[\t ]*:/im);
+    }
   }
+});
+
+test('the eight supplied transcripts preserve their label-free text and all 1305 cue timings', () => {
+  const root = path.join(__dirname, '..');
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'content/lesson-transcripts.json'), 'utf8')).transcripts;
+  const expected = {
+    'section-02-those-who-never-heard-the-gospel': 'THOSE-WHO-NEVER-HEARD-THE-GOSPEL-Celebration-Church-International-LMS-mp4-ecf98d9f-0d12.srt',
+    'section-01-justification': 'JUSTIFICATION-Celebration-Church-International-LMS-mp4-fe7e2c2f-38df.srt',
+    'section-01-repentance': 'REPENTANCE-Celebration-Church-International-LMS-mp4-433e43ad-170f.srt',
+    'section-01-original-sin': 'ORIGINAL-SIN-Celebration-Church-International-LMS-mp4-663d4876-bd10.srt',
+    'section-04-jesus-son-of-god-i': 'JESUS-SON-OF-GOD-I-Celebration-Church-International-LMS-mp4-ea9ba329-2f81.srt',
+    'section-06-school-of-prayer-vii': 'SCHOOL-OF-PRAYER-VII-Celebration-Church-International-LMS-mp4-02ce8b70-c085.srt',
+    'section-06-school-of-prayer-v': 'SCHOOL-OF-PRAYER-V-Celebration-Church-International-LMS-mp4-6c878e7f-952a.srt',
+    'section-06-school-of-prayer-i': 'SCHOOL-OF-PRAYER-I-Celebration-Church-International-LMS-mp4-58ccf5d8-b1d3.srt'
+  };
+  const passages = compileLessonTranscripts(root);
+  const payload = cues => cues.map(({ start, end, text }) => ({ start, end, text }));
+  let count = 0;
+  for (const [videoId, file] of Object.entries(expected)) {
+    assert.equal(manifest.find(item => item.videoId === videoId).file, file);
+    const source = parseSrt(fs.readFileSync(path.join(root, 'transcript', file), 'utf8'));
+    const output = parseWebVtt(passages[file.replace(/\.srt$/i, '.vtt')]);
+    assert.deepEqual(payload(output), payload(source), `${videoId} must preserve supplied wording and timings`);
+    for (const cue of output) assert.doesNotMatch(cue.text, /(?:^|\n)\s*Speaker\s*\d+\s*:/i);
+    count += output.length;
+  }
+  assert.equal(count, 1305);
 });
 
 test('Predestination II compiles the confirmed predestinated wording with all original timings', () => {
@@ -27,7 +62,7 @@ test('Predestination II compiles the confirmed predestinated wording with all or
   const output = parseWebVtt(passages[file.replace(/\.srt$/, '.vtt')]);
   const payload = cues => cues.map(({ start, end, text }) => ({ start, end, text }));
   assert.equal(output.length, 310);
-  assert.deepEqual(payload(output), payload(source));
+  assert.deepEqual(payload(output), payload(source).map(cue => ({ ...cue, text: cue.text.replace(/^Speaker \d+: /gm, '') })));
   assert.match(output[2].text, /has predestinated some unto salvation/);
   for (const variant of ['657ce7bb-69c2', 'd07b009e-8526']) {
     assert.equal(Object.hasOwn(passages, `PREDESTINATION-II-Celebration-Church-International-LMS-mp4-${variant}.vtt`), false);

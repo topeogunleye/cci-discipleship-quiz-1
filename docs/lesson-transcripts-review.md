@@ -4,12 +4,13 @@ Generated from the current repository with `node scripts/review-lesson-transcrip
 
 ## Coverage
 
-- 125 SRT files reviewed against 109 catalog recordings and 101 distinct normalized titles.
-- 101 recordings are mapped in `content/lesson-transcripts.json`: 83 unambiguous recordings, 17 metadata-only duplicate selections, and 1 explicit user-confirmed wording selection. Unambiguous means one candidate per title, or byte-identical duplicate candidates.
-- 18 recordings have differing candidate SRTs; 18 have explicit selections and 0 remain unmapped. 8 recordings have no matching timed SRT.
+- 133 SRT files reviewed against 109 catalog recordings and 109 distinct normalized titles.
+- 109 recordings are mapped in `content/lesson-transcripts.json`: 91 unambiguous recordings, 17 metadata-only duplicate selections, and 1 explicit user-confirmed wording selection. Unambiguous means one candidate per title, or byte-identical duplicate candidates.
+- 18 recordings have differing candidate SRTs; 18 have explicit selections and 0 remain unmapped. 0 recordings have no matching timed SRT.
 - 20 titles have multiple source files; 2 groups are byte-identical duplicates. 0 source filenames have no catalog candidate.
-- 26,660 source cues parsed, including repeated files; 0 malformed files after handling the export footer. 0 overlapping adjacent cues and 0 out-of-range minute/second fields observed.
-- All 125 files contain the exporter’s final literal `\n` block. The parser ignores only that exact final marker; it continues rejecting malformed cue blocks. Meeting metadata before the first timing line is excluded from captions.
+- 27,965 source cues parsed, including repeated files; 0 malformed files after handling the export footer. 0 overlapping adjacent cues and 0 out-of-range minute/second fields observed.
+- 125 of 133 files contain the exporter’s final literal `\n` block. The parser ignores only that exact final marker; it continues rejecting malformed cue blocks. Meeting metadata before the first timing line is excluded from captions.
+- Presentation removes 21,049 generic numbered speaker prefixes across 101 mapped recordings. Raw SRT text remains unchanged; source review and duplicate comparisons still use the original cues.
 
 ## Language, fidelity, and suitability
 
@@ -17,13 +18,13 @@ First, middle, and final cue text was sampled for every file. The language is En
 
 Mapped files have valid ordered cue timing and can supply both WebVTT captions and the searchable, time-linked transcript. Filename/title agreement and sampled subject matter support the unambiguous mappings; explicitly enabled metadata-only duplicates and the user-confirmed wording selection are recorded separately below. For metadata-only duplicates, the build verifies that all differences are confined to exporter metadata before the first cue; all spoken text and timestamps must match. No recording audio or media duration was available to this repository review, so exact synchronization and transcription accuracy still require playback checks. Matching timing alone does not resolve differing spoken text.
 
-The theater-style player keeps the video primary, shows flashcards and quiz actions, and places the searchable transcript in a disclosure below the player. Source speaker text is preserved; no doctrine, Bible reference, or missing words have been guessed or rewritten.
+The theater-style player keeps the video primary, shows flashcards and quiz actions, and places the searchable transcript in a disclosure below the player. Generated captions and browser transcript presentation remove only generic numbered speaker prefixes at the start of cue lines. Spoken mentions, real names, punctuation, cue order, and timestamps are preserved. Original SRTs and raw parsing retain source labels for review; no doctrine, Bible reference, or missing words have been guessed or rewritten.
 
 ## Protected delivery
 
 The build converts only mapped source files into a server-only Pages Functions module at `functions/_generated/lesson-transcripts.cjs`. The generated module is ignored by Git and must be rebuilt before Wrangler/dev/deployment. `/transcript/<filename>.vtt` validates the learner’s video-session cookie and serves private, uncached WebVTT directly; it does not fall through to static assets. Caption bodies are excluded from `dist` and native app packages. The browser transcript cache is session memory only and is cleared on account changes. Legacy generated `dist/transcript/*.vtt` files are removed during build.
 
-Raw source SRTs were already committed in the repository before this review. Server authentication protects deployed transcript responses; it cannot make existing Git history private. This review preserves those source files and does not rewrite repository history.
+Raw source SRTs are repository source material, excluded from published build assets. Existing source files may also appear in Git history. Server authentication protects deployed transcript responses; it cannot make existing Git history private. This review preserves all source files as supplied and does not rewrite repository history.
 
 ## User-confirmed selections
 
@@ -65,20 +66,11 @@ The user authorized enabling these recordings after comparison showed identical 
 
 ## Recordings with no SRT
 
-| Video ID | Catalog title | Deck ID |
-| --- | --- | --- |
-| `section-01-justification` | JUSTIFICATION | `d-discipleship-experience-section-1-soteriology` |
-| `section-01-original-sin` | ORIGINAL SIN | `d-discipleship-experience-section-1-soteriology` |
-| `section-01-repentance` | REPENTANCE | `d-discipleship-experience-section-1-soteriology` |
-| `section-02-those-who-never-heard-the-gospel` | THOSE WHO NEVER HEARD THE GOSPEL | `d-discipleship-experience-section-2-soteriology-ii` |
-| `section-04-jesus-son-of-god-i` | JESUS- SON OF GOD I | `d-discipleship-experience-section-4-christology` |
-| `section-06-school-of-prayer-i` | SCHOOL OF PRAYER I | `d-discipleship-experience-section-6-prayer` |
-| `section-06-school-of-prayer-v` | SCHOOL OF PRAYER V | `d-discipleship-experience-section-6-prayer` |
-| `section-06-school-of-prayer-vii` | SCHOOL OF PRAYER VII | `d-discipleship-experience-section-6-prayer` |
+None. All 109 catalog recordings have an explicit timed transcript mapping.
 
 ## Recordings with differing candidate transcripts
 
-No unresolved candidate conflicts remain. Raw source differences are covered by the explicit wording selection or verified metadata-only selections above. The eight recordings with no timed source remain unmapped.
+No unresolved candidate conflicts remain. Raw source differences are covered by the explicit wording selection or verified metadata-only selections above. Every catalog recording now has an explicit timed transcript mapping.
 
 | Video ID | Catalog title | Candidate files |
 | --- | --- | ---: |
@@ -146,11 +138,13 @@ All rows have English sampled text and SRT timestamps. “Mapped” means activa
 | `JEHOVA-S-WITNESS-III-Celebration-Church-International-LMS-mp4-a2438e5b-7e38.srt` | `section-09-jehova-s-witness-iii` | mapped | 198 | 00:12:12.510 |
 | `JEHOVA-S-WITNESS-IV-Celebration-Church-International-LMS-mp4-a6917780-ee91.srt` | `section-09-jehova-s-witness-iv` | mapped | 142 | 00:14:32.540 |
 | `JESUS-AND-WOMEN-Celebration-Church-International-LMS-mp4-ebfefe21-ba9d.srt` | `section-08-jesus-and-women` | mapped | 309 | 00:26:24.280 |
+| `JESUS-SON-OF-GOD-I-Celebration-Church-International-LMS-mp4-ea9ba329-2f81.srt` | `section-04-jesus-son-of-god-i` | mapped | 260 | 00:19:54.120 |
 | `JESUS-SON-OF-GOD-II-Celebration-Church-International-LMS-mp4-49fb331f-663b.srt` | `section-04-jesus-son-of-god-ii` | mapped | 251 | 00:16:27.550 |
 | `JESUS-SON-OF-GOD-III-Celebration-Church-International-LMS-mp4-cba1b32b-4979.srt` | `section-04-jesus-son-of-god-iii` | mapped | 384 | 00:26:46.230 |
 | `JESUS-SON-OF-MAN-I-Celebration-Church-International-LMS-mp4-2396254d-d48e.srt` | `section-04-jesus-son-of-man-i` | mapped | 260 | 00:19:50.850 |
 | `JESUS-SON-OF-MAN-II-Celebration-Church-International-LMS-mp4-479ecdd2-faaa.srt` | `section-04-jesus-son-of-man-ii` | mapped | 235 | 00:18:33.780 |
 | `JESUS-SON-OF-MAN-III-Celebration-Church-International-LMS-mp4-f44337f0-2be1.srt` | `section-04-jesus-son-of-man-iii` | mapped | 327 | 00:20:54.780 |
+| `JUSTIFICATION-Celebration-Church-International-LMS-mp4-fe7e2c2f-38df.srt` | `section-01-justification` | mapped | 142 | 00:10:50.170 |
 | `MANIFESTING-THE-PRESENCE-OF-GOD-I-Celebration-Church-International-LMS-mp4-4d3a3d43-9c76.srt` | `section-11-manifesting-the-presence-of-god-i` | mapped — metadata equivalent | 238 | 00:14:17.580 |
 | `MANIFESTING-THE-PRESENCE-OF-GOD-I-Celebration-Church-International-LMS-mp4-d2866eed-367e.srt` | `section-11-manifesting-the-presence-of-god-i` | unselected metadata duplicate | 238 | 00:14:17.580 |
 | `MANIFESTING-THE-PRESENCE-OF-GOD-II-Celebration-Church-International-LMS-mp4-28b86953-f576.srt` | `section-11-manifesting-the-presence-of-god-ii` | mapped — metadata equivalent | 240 | 00:11:51.470 |
@@ -169,6 +163,7 @@ All rows have English sampled text and SRT timestamps. “Mapped” means activa
 | `NEW-AGE-SPIRITUALITY-IV-Celebration-Church-International-LMS-mp4-15f4dbf8-f76a.srt` | `section-09-new-age-spirituality-iv` | mapped | 207 | 00:15:04.440 |
 | `NEW-AGE-SPIRITUALITY-V-Celebration-Church-International-LMS-mp4-e465e282-2081.srt` | `section-09-new-age-spirituality-v` | mapped | 191 | 00:14:55.580 |
 | `NEW-AGE-SPIRITUALITY-VI-Celebration-Church-International-LMS-mp4-0b1e56bf-aca0.srt` | `section-09-new-age-spirituality-vi` | mapped | 242 | 00:16:27.160 |
+| `ORIGINAL-SIN-Celebration-Church-International-LMS-mp4-663d4876-bd10.srt` | `section-01-original-sin` | mapped | 123 | 00:12:13.940 |
 | `POWER-IN-THE-BLOOD-I-Celebration-Church-International-LMS-mp4-829ff16d-4124.srt` | `section-11-power-in-the-blood-i` | mapped — metadata equivalent | 224 | 00:15:28.630 |
 | `POWER-IN-THE-BLOOD-I-Celebration-Church-International-LMS-mp4-b49d4288-cfaa.srt` | `section-11-power-in-the-blood-i` | unselected metadata duplicate | 224 | 00:15:28.630 |
 | `POWER-IN-THE-BLOOD-II-Celebration-Church-International-LMS-mp4-c5692393-9e74.srt` | `section-11-power-in-the-blood-ii` | mapped — metadata equivalent | 202 | 00:12:44.230 |
@@ -185,12 +180,16 @@ All rows have English sampled text and SRT timestamps. “Mapped” means activa
 | `PREDESTINATION-II-Celebration-Church-International-LMS-mp4-d07b009e-8526.srt` | `section-03-predestination-ii` | unselected variant | 310 | 00:19:59.480 |
 | `PROPITIATION-Celebration-Church-International-LMS-mp4-2825ab6a-b73a.srt` | `section-02-propitiation` | mapped | 51 | 00:04:08.600 |
 | `REDEMPTION-Celebration-Church-International-LMS-mp4-8e23c3a3-bda8.srt` | `section-02-redemption` | mapped | 151 | 00:12:15.420 |
+| `REPENTANCE-Celebration-Church-International-LMS-mp4-433e43ad-170f.srt` | `section-01-repentance` | mapped | 185 | 00:17:23.349 |
 | `RIGHTEOUSNESS-Celebration-Church-International-LMS-mp4-294daf9a-f8d5.srt` | `section-01-righteousness` | mapped | 90 | 00:07:15.310 |
+| `SCHOOL-OF-PRAYER-I-Celebration-Church-International-LMS-mp4-58ccf5d8-b1d3.srt` | `section-06-school-of-prayer-i` | mapped | 153 | 00:11:22.000 |
 | `SCHOOL-OF-PRAYER-II-Celebration-Church-International-LMS-mp4-1d17b178-cdb9.srt` | `section-06-school-of-prayer-ii` | mapped | 116 | 00:09:06.930 |
 | `SCHOOL-OF-PRAYER-III-Celebration-Church-International-LMS-mp4-806ee5c9-4957.srt` | `section-06-school-of-prayer-iii` | mapped | 240 | 00:17:17.020 |
 | `SCHOOL-OF-PRAYER-IV-Celebration-Church-International-LMS-mp4-6e69307a-fcd2.srt` | `section-06-school-of-prayer-iv` | mapped | 229 | 00:14:12.080 |
 | `SCHOOL-OF-PRAYER-IX-Celebration-Church-International-LMS-mp4-cb3f619a-146f.srt` | `section-06-school-of-prayer-ix` | mapped | 104 | 00:08:10.520 |
+| `SCHOOL-OF-PRAYER-V-Celebration-Church-International-LMS-mp4-6c878e7f-952a.srt` | `section-06-school-of-prayer-v` | mapped | 163 | 00:10:37.940 |
 | `SCHOOL-OF-PRAYER-VI-Celebration-Church-International-LMS-mp4-70de37a0-cd01.srt` | `section-06-school-of-prayer-vi` | mapped | 140 | 00:11:22.210 |
+| `SCHOOL-OF-PRAYER-VII-Celebration-Church-International-LMS-mp4-02ce8b70-c085.srt` | `section-06-school-of-prayer-vii` | mapped | 102 | 00:08:04.590 |
 | `SCHOOL-OF-PRAYER-VIII-Celebration-Church-International-LMS-mp4-f49e763c-468b.srt` | `section-06-school-of-prayer-viii` | mapped | 95 | 00:07:41.530 |
 | `SCHOOL-OF-PRAYER-X-Celebration-Church-International-LMS-mp4-9a679d6f-1ffb.srt` | `section-06-school-of-prayer-x` | mapped | 172 | 00:12:39.810 |
 | `THAT-OLD-MAN-Celebration-Church-International-LMS-mp4-58c24242-1809.srt` | `section-05-that-old-man` | mapped | 833 | 00:59:46.540 |
@@ -201,6 +200,7 @@ All rows have English sampled text and SRT timestamps. “Mapped” means activa
 | `THEODICY-III-Celebration-Church-International-LMS-mp4-872a4ffc-a1fa.srt` | `section-10-theodicy-iii` | mapped | 244 | 00:13:46.550 |
 | `THEODICY-IV-Celebration-Church-International-LMS-mp4-4eb4a648-baa8.srt` | `section-10-theodicy-iv` | mapped — metadata equivalent | 343 | 00:19:18.180 |
 | `THEODICY-IV-Celebration-Church-International-LMS-mp4-52a78e8d-7d7e.srt` | `section-10-theodicy-iv` | unselected metadata duplicate | 343 | 00:19:18.180 |
+| `THOSE-WHO-NEVER-HEARD-THE-GOSPEL-Celebration-Church-International-LMS-mp4-ecf98d9f-0d12.srt` | `section-02-those-who-never-heard-the-gospel` | mapped | 177 | 00:19:15.890 |
 | `TRINITY-I-Celebration-Church-International-LMS-mp4-30387173-b5d6.srt` | `section-03-trinity-i` | mapped — metadata equivalent | 269 | 00:18:49.660 |
 | `TRINITY-I-Celebration-Church-International-LMS-mp4-b6989801-f9bd.srt` | `section-03-trinity-i` | unselected metadata duplicate | 269 | 00:18:49.660 |
 | `TRINITY-I-Celebration-Church-International-LMS-mp4-da1c5a6e-a450.srt` | `section-03-trinity-i` | unselected metadata duplicate | 269 | 00:18:49.660 |

@@ -113,9 +113,9 @@ test('only unambiguous, metadata-equivalent, or explicitly confirmed English SRT
 
   assert.equal(transcriptManifest.schemaVersion, 1);
   assert.equal(transcriptManifest.language, 'en');
-  assert.equal(sourceFiles.length, 125);
-  assert.equal(transcriptManifest.transcripts.length, 101);
-  assert.equal(new Set(transcriptManifest.transcripts.map(item => item.videoId)).size, 101);
+  assert.equal(sourceFiles.length, 133);
+  assert.equal(transcriptManifest.transcripts.length, catalog.videos.length);
+  assert.equal(new Set(transcriptManifest.transcripts.map(item => item.videoId)).size, catalog.videos.length);
   const confirmed = transcriptManifest.transcripts.filter(item => item.selection && item.selection.basis === 'user-confirmed');
   const metadataEquivalent = transcriptManifest.transcripts.filter(item => item.selection && item.selection.basis === 'metadata-only-duplicates');
   assert.equal(metadataEquivalent.length, 17);
@@ -169,5 +169,6 @@ test('only unambiguous, metadata-equivalent, or explicitly confirmed English SRT
   assert.equal(ambiguous.length, 18);
   assert.equal(ambiguous.filter(id => mappedIds.has(id)).length, 18);
   assert.equal(ambiguous.filter(id => !mappedIds.has(id)).length, 0);
-  assert.equal(missing.length, 8);
+  assert.deepEqual(missing, []);
+  assert.deepEqual(catalog.videos.filter(video => !mappedIds.has(video.id)), [], 'Every recording must have an explicit transcript mapping');
 });
