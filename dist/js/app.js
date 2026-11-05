@@ -1,12 +1,12 @@
 (function () {
   'use strict';
-  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, ProgressSync = window.CCIProgressSync, Account = window.CCIAccount, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 14;
+  var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, SermonStudy = window.SermonStudy, SermonUI = window.SermonUI, ProgressSync = window.CCIProgressSync, Account = window.CCIAccount, TranscriptTools = window.CCITranscripts, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 14;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
   function defaultStudyState() { return { decks: [], progress: {}, sermons: SermonStudy ? SermonStudy.createState() : {}, settings: { theme: 'auto', shuffle: false, showStreak: true, showDraftDevotionals: false, showDraftSermons: false, experience: 'discipleship' }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, cloudSyncDeviceId: null, seeded: false, dataVersion: 0, pausedSession: null }; }
   var S = defaultStudyState();
   var STARTER_DECKS = [], DEVOTIONALS = [], SERMONS = [], LESSON_VIDEOS = [], sermonDownloadControllers = {};
   var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, biblePreviewCache = null, suppressBiblePreviewFocus = null;
-  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), activeStorageOwnerId = null, requestedStorageOwnerId = null, guestProgressForImport = null, account = Account ? Account.create() : null, accountStatus = { configured: false, user: null, videoReady: false }, accountBootReady = false, accountMessage = '', accountBusy = false, accountSwitchQueue = Promise.resolve(), cloudSyncQueue = Promise.resolve(), cloudSyncTimer = null, V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null }, sermonAudioElement = null, sermonDownloadProgress = {}, lastAudioSaveBucket = -1;
+  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), activeStorageOwnerId = null, requestedStorageOwnerId = null, guestProgressForImport = null, account = Account ? Account.create() : null, accountStatus = { configured: false, user: null, videoReady: false }, accountBootReady = false, accountMessage = '', accountEmailDraft = '', accountBusy = false, accountSwitchQueue = Promise.resolve(), cloudSyncQueue = Promise.resolve(), cloudSyncTimer = null, lessonTranscriptCache = Object.create(null), lessonTranscriptRequests = Object.create(null), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null }, sermonAudioElement = null, sermonDownloadProgress = {}, lastAudioSaveBucket = -1;
   var browserLocalStorage = null, browserIndexedDB = null;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
   if (!browserLocalStorage) { try { if (typeof localStorage !== 'undefined') browserLocalStorage = localStorage; } catch (e) {} }
@@ -326,12 +326,25 @@
     if (!el) return { schemaVersion: 1, videos: [] };
     try { return JSON.parse(el.textContent || '{"schemaVersion":1,"videos":[]}'); } catch (e) { return { schemaVersion: 1, videos: [] }; }
   }
-  function normalizeLessonVideos(data) {
+  function inlineLessonTranscriptsData() {
+    var el = document.getElementById('lesson-transcripts-fallback');
+    if (!el) return { schemaVersion: 1, transcripts: [] };
+    try { return JSON.parse(el.textContent || '{"schemaVersion":1,"transcripts":[]}'); } catch (e) { return { schemaVersion: 1, transcripts: [] }; }
+  }
+  function normalizeLessonVideos(data, transcriptData) {
     if (!data || data.schemaVersion !== 1 || !Array.isArray(data.videos)) return [];
+    var transcriptFiles = Object.create(null);
+    if (transcriptData && transcriptData.schemaVersion === 1 && Array.isArray(transcriptData.transcripts)) {
+      transcriptData.transcripts.forEach(function (item) {
+        if (item && /^[a-zA-Z0-9._-]{1,120}$/.test(item.videoId || '') && typeof item.file === 'string' && /^[a-zA-Z0-9._-]{1,240}\.srt$/i.test(item.file)) {
+          transcriptFiles[item.videoId] = item.file.replace(/\.srt$/i, '.vtt');
+        }
+      });
+    }
     function mediaUrl(value) {
       if (typeof value !== 'string' || !value.trim()) return '';
       try {
-      var parsed = new URL(value.trim(), window.location && window.location.href || 'http://localhost/');
+        var parsed = new URL(value.trim(), window.location && window.location.href || 'http://localhost/');
         if (parsed.protocol !== 'https:' && !(window.location && parsed.origin === window.location.origin && parsed.protocol === 'http:')) return '';
         return value.trim();
       } catch (e) { return ''; }
@@ -341,6 +354,8 @@
     }).map(function (item) {
       var objectKey = typeof item.objectKey === 'string' && item.objectKey.length <= 1024 && !item.objectKey.startsWith('/') && item.objectKey.split('/').every(function (part) { return part && part !== '.' && part !== '..'; }) && /\.mp4$/i.test(item.objectKey) ? item.objectKey : '';
       var apiBase = account ? account.apiBase : (window.CCI_API_BASE || (Account && Account.DEFAULT_API_BASE) || '');
+      var mappedTranscript = transcriptFiles[item.id] ? 'transcript/' + encodeURIComponent(transcriptFiles[item.id]) : '';
+      var captionsUrl = mediaUrl(item.captionsUrl) || mappedTranscript;
       return {
         id: item.id,
         deckId: item.deckId,
@@ -348,25 +363,63 @@
         videoUrl: objectKey ? apiBase + '/api/videos?key=' + encodeURIComponent(objectKey) : '',
         objectKey: objectKey,
         posterUrl: mediaUrl(item.posterUrl),
-        captionsUrl: mediaUrl(item.captionsUrl),
-        captionsLanguage: typeof item.captionsLanguage === 'string' && /^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,8})*$/.test(item.captionsLanguage) ? item.captionsLanguage : 'en',
+        captionsUrl: captionsUrl,
+        transcriptUrl: mediaUrl(item.transcriptUrl) || captionsUrl,
+        captionsLanguage: typeof item.captionsLanguage === 'string' && /^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,8})*$/.test(item.captionsLanguage) ? item.captionsLanguage : (transcriptData && /^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,8})*$/.test(transcriptData.language || '') ? transcriptData.language : 'en'),
         captionsLabel: typeof item.captionsLabel === 'string' && item.captionsLabel.trim() ? item.captionsLabel.trim() : 'English'
       };
     }).filter(function (item) { return !!item.objectKey && !!item.videoUrl; });
   }
   function loadLessonVideos() {
-    var fallback = inlineLessonVideosData();
-    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(normalizeLessonVideos(fallback));
-    return window.fetch('content/lesson-videos.json').then(function (response) {
+    var fallback = inlineLessonVideosData(), transcriptFallback = inlineLessonTranscriptsData();
+    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(normalizeLessonVideos(fallback, transcriptFallback));
+    var videosRequest = window.fetch('content/lesson-videos.json').then(function (response) {
       if (!response.ok) throw new Error('Could not load lesson videos');
       return response.json();
-    }).then(function (data) {
-      var normalized = normalizeLessonVideos(data);
-      return normalized.length || (data && Array.isArray(data.videos) && data.videos.length === 0) ? normalized : normalizeLessonVideos(fallback);
-    }).catch(function () { return normalizeLessonVideos(fallback); });
+    }).catch(function () { return fallback; });
+    var transcriptsRequest = window.fetch('content/lesson-transcripts.json').then(function (response) {
+      if (!response.ok) throw new Error('Could not load lesson transcripts');
+      return response.json();
+    }).catch(function () { return transcriptFallback; });
+    return Promise.all([videosRequest, transcriptsRequest]).then(function (results) {
+      var data = results[0], transcripts = results[1], normalized = normalizeLessonVideos(data, transcripts);
+      return normalized.length || (data && Array.isArray(data.videos) && data.videos.length === 0) ? normalized : normalizeLessonVideos(fallback, transcriptFallback);
+    }).catch(function () { return normalizeLessonVideos(fallback, transcriptFallback); });
   }
   function lessonVideosForDeck(deckId) {
     return LESSON_VIDEOS.filter(function (item) { return item.deckId === deckId; });
+  }
+  function loadLessonTranscript(url) {
+    if (lessonTranscriptCache[url]) return Promise.resolve(lessonTranscriptCache[url]);
+    if (lessonTranscriptRequests[url]) return lessonTranscriptRequests[url];
+    if (!TranscriptTools || typeof TranscriptTools.parseWebVtt !== 'function') return Promise.reject(new Error('Transcript support is unavailable.'));
+    lessonTranscriptRequests[url] = window.fetch(url, { credentials: 'include', cache: 'no-store' }).then(function (response) {
+      if (!response.ok) throw new Error('Transcript could not be loaded.');
+      return response.text();
+    }).then(function (text) {
+      var cues = TranscriptTools.parseWebVtt(text);
+      lessonTranscriptCache[url] = cues;
+      delete lessonTranscriptRequests[url];
+      return cues;
+    }).catch(function (error) {
+      delete lessonTranscriptRequests[url];
+      throw error;
+    });
+    return lessonTranscriptRequests[url];
+  }
+  function updateLessonTranscript(details, cues, query) {
+    var list = details.querySelector('.lesson-transcript-cues'), status = details.querySelector('.lesson-transcript-status');
+    if (!list || !status) return;
+    var normalizedQuery = String(query || '').trim().toLowerCase();
+    var visible = cues.filter(function (cue) { return !normalizedQuery || cue.text.toLowerCase().indexOf(normalizedQuery) >= 0; });
+    list.innerHTML = visible.map(function (cue) {
+      var time = cue.startText.slice(0, 8);
+      return '<li><button type="button" class="lesson-transcript-cue" data-act="lesson-transcript-seek" data-time="' + (cue.start / 1000) + '" aria-label="Jump to ' + esc(time) + ': ' + esc(cue.text.replace(/\s+/g, ' ')) + '"><time>' + esc(time) + '</time><span>' + esc(cue.text.replace(/\s+/g, ' ')) + '</span></button></li>';
+    }).join('');
+    list.hidden = visible.length === 0;
+    status.textContent = visible.length
+      ? (normalizedQuery ? 'Showing ' + visible.length + ' matching transcript ' + (visible.length === 1 ? 'segment.' : 'segments.') : 'Showing all ' + visible.length + ' transcript segments.')
+      : 'No transcript segments match that search.';
   }
 
   function sermonState() { return SermonStudy.normalizeState(S.sermons); }
@@ -583,20 +636,58 @@
       else if (V.name === 'settings') render(true);
     }).catch(function () {});
   }
-  function accountAction(action) {
+  function accountAction(action, form) {
     if (!account) { accountMessage = 'Account support is not available in this app build.'; render(true); return; }
     if (action === 'account-signup' || action === 'account-signin') {
-      var emailInput = document.getElementById('account-email'), passwordInput = document.getElementById('account-password');
-      var email = emailInput ? emailInput.value : '', password = passwordInput ? passwordInput.value : '';
+      if (accountBusy) return;
+      var emailInput = form && form.elements.email || document.getElementById('account-email');
+      var passwordInput = form && form.elements.password || document.getElementById('account-password');
+      var email = emailInput ? emailInput.value.trim() : '', password = passwordInput ? passwordInput.value : '';
       if (!email.trim() || !password) { accountMessage = 'Enter your email and password to continue.'; render(true); return; }
-      accountBusy = true; accountMessage = action === 'account-signup' ? 'Creating your account…' : 'Signing in…'; render(true);
-      (action === 'account-signup' ? account.signUp(email, password) : account.signIn(email, password)).then(function (result) {
+      if (action === 'account-signup' && password.length < 8) {
+        if (passwordInput) { passwordInput.setCustomValidity('Use at least 8 characters for a new password.'); passwordInput.reportValidity(); }
+        accountMessage = 'Use at least 8 characters for a new password.';
+        var shortPasswordStatus = document.getElementById('account-message');
+        if (shortPasswordStatus) shortPasswordStatus.textContent = accountMessage;
+        return;
+      }
+      if (passwordInput) passwordInput.setCustomValidity('');
+      accountEmailDraft = email;
+      accountBusy = true;
+      accountMessage = action === 'account-signup' ? 'Creating your account…' : 'Signing in…';
+      var statusNode = document.getElementById('account-message');
+      if (statusNode) statusNode.textContent = accountMessage;
+      if (form) {
+        form.setAttribute('aria-busy', 'true');
+        Array.prototype.forEach.call(form.querySelectorAll('input'), function (input) { input.disabled = true; });
+        Array.prototype.forEach.call(form.querySelectorAll('button[type="submit"]'), function (button) {
+          if (button.value === action) {
+            button.setAttribute('aria-disabled', 'true');
+            button.textContent = action === 'account-signup' ? 'Creating account…' : 'Signing in…';
+          } else button.disabled = true;
+        });
+      }
+      function finishAccountRequest(message, failed, result) {
         accountBusy = false;
-        if (result.error) accountMessage = result.error;
-        else if (result.confirmationRequired) accountMessage = 'Check your email to confirm the account, then sign in. Ask the app administrator to disable email confirmation if instant access is required.';
-        else accountMessage = result.videoReady ? 'Signed in. Your lesson videos are ready.' : 'Signed in. Video access is being prepared; local study and progress sync are available.';
+        accountMessage = message;
+        if (!failed && result && !result.confirmationRequired && V.name === 'settings' && V.returnToVideoId) {
+          var returnId = V.returnToVideoId, returnIndex = Number.isInteger(V.returnVideoIndex) ? V.returnVideoIndex : 0;
+          accountEmailDraft = '';
+          accountMessage = '';
+          go({ name: 'lesson-video', id: returnId, videoIndex: returnIndex });
+          return;
+        }
         render(true);
-      }).catch(function () { accountBusy = false; accountMessage = 'The account request failed. Check your connection and try again.'; render(true); });
+        if (failed) {
+          var retryPassword = document.getElementById('account-password');
+          if (retryPassword) retryPassword.focus();
+        }
+      }
+      (action === 'account-signup' ? account.signUp(email, password) : account.signIn(email, password)).then(function (result) {
+        if (result.error) finishAccountRequest(result.error, true, result);
+        else if (result.confirmationRequired) finishAccountRequest('Check your email for a confirmation link, then return here to sign in.', false, result);
+        else finishAccountRequest(result.videoReady ? 'Signed in. Your lesson videos are ready.' : 'Signed in. Video access is being prepared; local study and progress sync are available.', false, result);
+      }).catch(function () { finishAccountRequest('The account request failed. Check your connection and try again.', true); });
       return;
     }
     if (action === 'account-sync') { syncCloudProgress(); return; }
@@ -635,13 +726,16 @@
         (guestProgressForImport ? '<div class="note"><strong>CCI lesson progress from this device is available.</strong><p>Import explicitly to merge it with your account. Your guest copy will remain on this device.</p><button type="button" class="btn sm primary" data-act="account-import"' + (accountBusy ? ' disabled' : '') + '>Import this device’s progress</button></div>' : '') +
         '<div class="row"><button type="button" class="btn sm" data-act="account-sync"' + (accountBusy ? ' disabled' : '') + '>Sync now</button><button type="button" class="btn sm ghost" data-act="account-signout"' + (accountBusy ? ' disabled' : '') + '>Sign out</button></div>';
     } else {
-      controls = '<label class="field"><span>Email</span><input id="account-email" type="email" autocomplete="username" inputmode="email" required maxlength="254"></label>' +
-        '<label class="field"><span>Password</span><input id="account-password" type="password" autocomplete="current-password" required minlength="8" maxlength="128"></label>' +
-        '<div class="row"><button type="button" class="btn primary sm" data-act="account-signin"' + (accountBusy ? ' disabled' : '') + '>Sign in</button><button type="button" class="btn sm" data-act="account-signup"' + (accountBusy ? ' disabled' : '') + '>Create account</button></div>';
+      controls = '<form class="account-auth-form" data-account-form aria-describedby="account-guidance account-message">' +
+        '<label class="field"><span>Email address</span><input id="account-email" name="email" type="email" autocomplete="username" inputmode="email" required maxlength="254" value="' + esc(accountEmailDraft) + '"></label>' +
+        '<label class="field"><span>Password</span><input id="account-password" name="password" type="password" autocomplete="current-password" required maxlength="128"></label>' +
+        '<p class="account-guidance" id="account-guidance">Sign in is required to watch lesson videos. Guest study and custom decks stay on this device.</p>' +
+        '<div class="account-auth-actions"><button type="submit" class="btn primary" name="account-action" value="account-signin">Sign in</button><button type="submit" class="btn" name="account-action" value="account-signup">Create account</button></div>' +
+      '</form>';
     }
     return '<div class="settings-group account-settings-group"><h2 class="settings-group-title">Account &amp; Sync</h2>' +
-      '<p class="meta">Accounts are self-service. No CCI approval is required. Guests can keep studying on this device. Custom decks remain local.</p>' + controls +
-      '<p class="meta" role="status" aria-live="polite">' + esc(message) + '</p></div>';
+      '<p class="meta">A free account syncs CCI lesson progress across devices. Custom decks remain local, and you can keep studying without an account.</p>' + controls +
+      '<p class="account-message meta" id="account-message" role="status" aria-live="polite">' + esc(message) + '</p></div>';
   }
   function isStudySession(name) { return name === 'flash' || name === 'quiz' || name === 'exam'; }
   function saveActiveSession() {
@@ -1715,8 +1809,13 @@
     var player = video
       ? (canWatchVideo
           ? '<video class="lesson-video-player" id="lesson-video-player" controls playsinline preload="metadata" crossorigin="use-credentials"' + (video.posterUrl ? ' poster="' + esc(video.posterUrl) + '"' : '') + ' aria-label="Video lesson: ' + esc(title) + '"><source src="' + esc(video.videoUrl) + '" type="video/mp4">' + (video.captionsUrl ? '<track kind="captions" src="' + esc(video.captionsUrl) + '" srclang="' + esc(video.captionsLanguage) + '" label="' + esc(video.captionsLabel) + '" default>' : '') + '<span>Your browser does not support video playback.</span></video>'
-          : '<div class="lesson-video-unavailable lesson-video-auth-required" role="status"><strong>' + (accountStatus.user ? 'Preparing secure video access' : 'Sign in to watch this lesson') + '</strong><p>' + (accountStatus.user ? 'Your lesson files stay private. Video access is being prepared for your account.' : 'Create a free account or sign in to watch. You can continue studying locally without an account.') + '</p><button type="button" class="btn primary" data-act="nav-tab" data-tab="settings">' + (accountStatus.user ? 'Account settings' : 'Sign in or create account') + '</button></div>')
+          : '<div class="lesson-video-unavailable lesson-video-auth-required" role="status"><strong>' + (accountStatus.user ? 'Preparing secure video access' : 'Sign in to watch this lesson') + '</strong><p>' + (accountStatus.user ? 'Your lesson files stay private. Video access is being prepared for your account.' : 'Create a free account or sign in to watch. You can continue studying locally without an account.') + '</p><button type="button" class="btn primary" data-act="nav-tab" data-tab="settings" data-return-video="' + esc(d.id) + '" data-return-video-index="' + index + '">' + (accountStatus.user ? 'Account settings' : 'Sign in or create account') + '</button></div>')
       : '<div class="lesson-video-unavailable" role="status"><strong>Lesson video not available yet</strong><p>The ' + esc(parsed.topic) + ' video has not been added yet. Use Flashcards or Take quiz below.</p></div>';
+    var transcriptPanel = video && video.transcriptUrl
+      ? (canWatchVideo
+          ? '<details class="lesson-transcript" data-video-id="' + esc(video.id) + '" data-transcript-url="' + esc(video.transcriptUrl) + '"><summary>Search transcript</summary><div class="lesson-transcript-body"><label for="lesson-transcript-search">Find a word or phrase</label><input id="lesson-transcript-search" type="search" autocomplete="off" aria-controls="lesson-transcript-cues"><p class="lesson-transcript-status" role="status" aria-live="polite">Open to load transcript segments.</p><ol class="lesson-transcript-cues" id="lesson-transcript-cues" hidden></ol></div></details>'
+          : '<p class="lesson-transcript-note">English captions and a searchable transcript are available after you sign in to watch.</p>')
+      : (video && canWatchVideo ? '<p class="lesson-transcript-note">Captions and a searchable transcript are not available for this recording yet.</p>' : '');
     var videoNav = videos.length > 1
       ? '<nav class="lesson-video-segments" aria-label="Videos in this chapter">' + videos.map(function (item, itemIndex) { return '<button type="button" class="lesson-video-segment' + (itemIndex === index ? ' is-active' : '') + '" data-act="lesson-video-select" data-index="' + itemIndex + '" aria-current="' + (itemIndex === index ? 'true' : 'false') + '">' + (itemIndex + 1) + '. ' + esc(item.title) + '</button>'; }).join('') + '</nav>'
       : '<div class="lesson-video-progress" aria-label="Chapter ' + section + ' of ' + S.decks.length + '"><span>Chapter ' + section + ' of ' + S.decks.length + '</span><progress value="' + section + '" max="' + S.decks.length + '">Chapter ' + section + ' of ' + S.decks.length + '</progress></div>';
@@ -1725,6 +1824,7 @@
       '<section class="lesson-video-frame' + (video && canWatchVideo ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
       '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title">' + esc(title) + '</h1><p>' + (canWatchVideo ? 'Watch the lesson, then reinforce what you learned with a quick study activity.' : 'Study this lesson locally with flashcards or a quiz. Sign in to watch its video.') + '</p></div>' + (video && canWatchVideo ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">Continue lesson</button>' : '') + '</section>' +
       '<div class="lesson-video-study-actions" role="group" aria-label="Study this lesson"><button type="button" class="btn" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '">Flashcards</button><button type="button" class="btn" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '">Take quiz</button></div>' +
+      transcriptPanel +
       videoNav +
     '</main>';
   };
@@ -3319,6 +3419,10 @@
           if (playbackAttempt && playbackAttempt.catch) playbackAttempt.catch(function () { toast('Video playback could not start. Check the video source and try again.'); });
         }
         break;
+      case 'lesson-transcript-seek':
+        var transcriptVideo = document.getElementById('lesson-video-player'), seekTime = Number(t.dataset.time);
+        if (transcriptVideo && Number.isFinite(seekTime) && seekTime >= 0) transcriptVideo.currentTime = seekTime;
+        break;
       case 'chapter-info':
         openLessonDetailSheet(t.dataset.id);
         break;
@@ -3352,9 +3456,17 @@
         if (ceDeck) setupExam([ceDeck.id], false, 20, 15);
         break;
 
-      case 'nav-tab': closeModal(); if (t.dataset.tab) go({ name: t.dataset.tab }); break;
-      case 'account-signup':
-      case 'account-signin':
+      case 'nav-tab':
+        closeModal();
+        if (t.dataset.tab) {
+          var nextRoute = { name: t.dataset.tab };
+          if (nextRoute.name === 'settings' && t.dataset.returnVideo) {
+            nextRoute.returnToVideoId = t.dataset.returnVideo;
+            nextRoute.returnVideoIndex = Number(t.dataset.returnVideoIndex) || 0;
+          }
+          go(nextRoute);
+        }
+        break;
       case 'account-signout':
       case 'account-sync':
       case 'account-import':
@@ -3682,9 +3794,22 @@
       var speedState = sermonState(); speedState.audio.playbackRate = Number(t.value) || 1; S.sermons = speedState; save();
     }
   });
-  document.addEventListener('submit', function (e) { e.preventDefault(); });
+  document.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var form = e.target && e.target.matches && e.target.matches('[data-account-form]') ? e.target : null;
+    if (!form) return;
+    var submitter = e.submitter, action = submitter && submitter.value;
+    if (action !== 'account-signin' && action !== 'account-signup') return;
+    accountAction(action, form);
+  });
   document.addEventListener('input', function (e) {
-    if (e.target.id === 'filter') {
+    if (e.target.id === 'account-password') {
+      e.target.setCustomValidity('');
+    } else if (e.target.id === 'lesson-transcript-search') {
+      var transcriptDetails = e.target.closest('.lesson-transcript');
+      var transcriptCues = transcriptDetails && lessonTranscriptCache[transcriptDetails.dataset.transcriptUrl];
+      if (transcriptDetails && transcriptCues) updateLessonTranscript(transcriptDetails, transcriptCues, e.target.value);
+    } else if (e.target.id === 'filter') {
       V.filter = e.target.value; var f = V.filter.toLowerCase();
       app.querySelectorAll('.crow').forEach(function (r) { r.hidden = !!f && r.dataset.text.indexOf(f) < 0; });
     } else if (e.target.id === 'sermon-search') {
@@ -3705,6 +3830,21 @@
       if (none) none.classList.toggle('on', visible === 0);
     }
   });
+  document.addEventListener('toggle', function (e) {
+    var details = e.target && e.target.matches && e.target.matches('.lesson-transcript') ? e.target : null;
+    if (!details || !details.open || details.dataset.loading === 'true' || details.dataset.loaded === 'true') return;
+    details.dataset.loading = 'true';
+    var status = details.querySelector('.lesson-transcript-status');
+    if (status) status.textContent = 'Loading searchable transcript…';
+    loadLessonTranscript(details.dataset.transcriptUrl).then(function (cues) {
+      details.dataset.loading = 'false';
+      details.dataset.loaded = 'true';
+      updateLessonTranscript(details, cues, '');
+    }).catch(function () {
+      details.dataset.loading = 'false';
+      if (status) status.textContent = 'The transcript could not be loaded. Close and reopen this section to try again.';
+    });
+  }, true);
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && activeBiblePreview) {
       e.preventDefault(); closeBiblePreview(activeBiblePreview.wrapper.contains(document.activeElement)); return;
