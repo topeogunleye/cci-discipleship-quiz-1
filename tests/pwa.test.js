@@ -26,10 +26,12 @@ test('web app manifest declares standalone install metadata and valid icon asset
 test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
   const serviceWorker = read('service-worker.js');
   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v47'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v49'/);
   assert.match(serviceWorker, /decks\/manifest\.json/);
   assert.match(serviceWorker, /content\/devotionals\.json/);
   assert.match(serviceWorker, /content\/sermons\.json/);
+  assert.match(serviceWorker, /content\/lesson-transcripts\.json/);
+  assert.match(serviceWorker, /js\/transcripts\.js/);
   assert.match(serviceWorker, /js\/native-bridge\.bundle\.js/);
   assert.match(serviceWorker, /js\/supabase\.bundle\.js/);
   assert.match(serviceWorker, /js\/progress-sync\.js/);
@@ -58,7 +60,7 @@ test('activation deletes previous app caches and deck assets absent from the cur
     [url('settings.json'), {}]
   ]);
   const cacheStore = new Map([
-    ['cci-study-pwa-v47', activeEntries],
+    ['cci-study-pwa-v49', activeEntries],
     ['cci-study-pwa-v36', new Map()],
     ['cci-study-pwa-v34', new Map()],
     ['cci-study-pwa-v33', new Map()],
@@ -257,14 +259,15 @@ test('PWA source and offline build contain their required registration/assets', 
   assert.match(page, /js\/progress-sync\.js/);
   assert.match(page, /js\/account\.js/);
   assert.match(page, /js\/mobile-study\.js/);
+  assert.match(page, /js\/transcripts\.js/);
   assert.match(build, /service-worker\.js/);
   assert.match(build, /manifest\.webmanifest/);
   assert.match(build, /'icons'/);
 });
 
-test('protected account and video API requests bypass the offline cache', async () => {
+test('protected account, video, and transcript requests bypass the offline cache', async () => {
   const scope = 'https://example.test/app/';
-  const apiUrl = new URL('api/videos?key=lesson.mp4', scope).href;
+  const protectedUrls = [new URL('api/videos?key=lesson.mp4', scope).href, new URL('transcript/lesson.vtt', scope).href];
   let cacheReads = 0, cacheWrites = 0, networkCalls = 0;
   const listeners = {};
   const self = { location: new URL(scope), registration: { scope }, addEventListener: (name, handler) => { listeners[name] = handler; } };
@@ -275,19 +278,21 @@ test('protected account and video API requests bypass the offline cache', async 
     Response,
     fetch: async (_request, options) => { networkCalls++; assert.equal(options.cache, 'no-store'); return new Response('private bytes', { status: 206 }); }
   });
-  let responsePromise;
-  listeners.fetch({ request: { method: 'GET', url: apiUrl, mode: 'cors', headers: new Headers() }, respondWith: promise => { responsePromise = promise; } });
-  const response = await responsePromise;
-  assert.equal(response.status, 206);
-  assert.equal(await response.text(), 'private bytes');
-  assert.equal(networkCalls, 1);
+  for (const url of protectedUrls) {
+    let responsePromise;
+    listeners.fetch({ request: { method: 'GET', url, mode: 'cors', headers: new Headers() }, respondWith: promise => { responsePromise = promise; } });
+    const response = await responsePromise;
+    assert.ok([200, 206].includes(response.status));
+    assert.equal(await response.text(), 'private bytes');
+  }
+  assert.equal(networkCalls, 2);
   assert.equal(cacheReads, 0);
   assert.equal(cacheWrites, 0);
 });
 
 test('standalone dist package includes all PWA runtime assets', () => {
   const dist = path.join(root, 'dist');
-  for (const file of ['index.html', 'manifest.webmanifest', 'service-worker.js', 'offline.html', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'decks/manifest.json', 'content/devotionals.json', 'content/sermons.json']) {
+  for (const file of ['index.html', 'manifest.webmanifest', 'service-worker.js', 'offline.html', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'decks/manifest.json', 'content/devotionals.json', 'content/sermons.json', 'content/lesson-transcripts.json']) {
     assert.ok(fs.existsSync(path.join(dist, file)), `Missing dist/${file}`);
   }
   const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
@@ -295,7 +300,7 @@ test('standalone dist package includes all PWA runtime assets', () => {
   assert.match(html, /<script src="js\/supabase\.bundle\.js"><\/script>/);
   assert.match(html, /rel="manifest" href="manifest\.webmanifest"/);
   const worker = fs.readFileSync(path.join(dist, 'service-worker.js'), 'utf8');
-  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v47'/);
+  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v49'/);
   assert.match(worker, /SERMON_AUDIO_CACHE/);
   const coreBlock = worker.match(/const CORE_FILES = \[([\s\S]*?)\];/);
   assert.ok(coreBlock, 'Service worker defines its core precache files');

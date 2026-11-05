@@ -1,5 +1,6 @@
 node_modules/
 .wrangler/
+functions/_generated/
 .DS_Store
 .dev.vars*
 !.dev.vars.example

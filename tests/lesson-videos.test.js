@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const transcriptTools = require('../js/transcripts.js');
 
 const root = path.join(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'functions/api/videos.js'), 'utf8')
@@ -89,4 +90,62 @@ test('catalog maps all uploaded objects to manifest decks without publishing med
     assert.equal(keys.size, 109);
     for (const item of catalog.videos) assert.ok(keys.has(item.objectKey), `${item.id} must map to a local R2 object key`);
   }
+});
+
+test('only unambiguous English SRTs are mapped to videos and build into valid WebVTT', () => {
+  const catalog = JSON.parse(fs.readFileSync(path.join(root, 'content/lesson-videos.json'), 'utf8'));
+  const transcriptManifest = JSON.parse(fs.readFileSync(path.join(root, 'content/lesson-transcripts.json'), 'utf8'));
+  const videosById = new Map(catalog.videos.map(video => [video.id, video]));
+  const normalize = value => value.toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+  const transcriptTitle = file => file.replace(/\.srt$/i, '')
+    .replace(/-Celebration-Church-International-LMS(?:-2)?-mp4-[a-f0-9-]+$/i, '')
+    .replace(/-mp4-[a-f0-9-]+$/i, '');
+  const sourceFiles = fs.readdirSync(path.join(root, 'transcript')).filter(file => /\.srt$/i.test(file)).sort();
+  const candidatesByTitle = new Map();
+  for (const file of sourceFiles) {
+    const key = normalize(transcriptTitle(file));
+    if (!candidatesByTitle.has(key)) candidatesByTitle.set(key, []);
+    candidatesByTitle.get(key).push(file);
+    const source = fs.readFileSync(path.join(root, 'transcript', file), 'utf8');
+    assert.ok(transcriptTools.parseSrt(source).length > 0, `${file} must contain valid timed cues`);
+  }
+
+  assert.equal(transcriptManifest.schemaVersion, 1);
+  assert.equal(transcriptManifest.language, 'en');
+  assert.equal(sourceFiles.length, 125);
+  assert.equal(transcriptManifest.transcripts.length, 83);
+  assert.equal(new Set(transcriptManifest.transcripts.map(item => item.videoId)).size, 83);
+
+  const mappedIds = new Set();
+  const mappedFiles = new Set();
+  for (const item of transcriptManifest.transcripts) {
+    const video = videosById.get(item.videoId);
+    assert.ok(video, `${item.videoId} must exist in the video catalog`);
+    assert.equal(normalize(video.title), normalize(transcriptTitle(item.file)));
+    assert.ok(sourceFiles.includes(item.file), `${item.file} must exist`);
+    assert.equal(mappedFiles.has(item.file), false, `${item.file} must be mapped only once`);
+    mappedIds.add(item.videoId);
+    mappedFiles.add(item.file);
+    const candidates = candidatesByTitle.get(normalize(video.title));
+    const hashes = candidates.map(file => fs.readFileSync(path.join(root, 'transcript', file)));
+    assert.ok(candidates.length === 1 || hashes.every(contents => contents.equals(hashes[0])), `${video.title} has ambiguous transcript candidates`);
+    const vtt = transcriptTools.toWebVtt(fs.readFileSync(path.join(root, 'transcript', item.file), 'utf8'));
+    assert.match(vtt, /^WEBVTT\n\n/);
+    assert.doesNotMatch(vtt, /\d{2}:\d{2}:\d{2},\d{3} -->/);
+  }
+
+  const missing = [];
+  const ambiguous = [];
+  for (const video of catalog.videos) {
+    const candidates = candidatesByTitle.get(normalize(video.title)) || [];
+    if (!candidates.length) missing.push(video.id);
+    else {
+      const hashes = candidates.map(file => fs.readFileSync(path.join(root, 'transcript', file)));
+      const identical = hashes.every(contents => contents.equals(hashes[0]));
+      if (candidates.length > 1 && !identical) ambiguous.push(video.id);
+      else assert.ok(mappedIds.has(video.id), `${video.id} has one confirmed transcript and must be mapped`);
+    }
+  }
+  assert.equal(ambiguous.length, 18);
+  assert.equal(missing.length, 8);
 });

@@ -12,6 +12,7 @@ const inlineJson = JSON.stringify(deckText).replace(/</g, '\\u003c');
 const devotionalsJson = JSON.stringify(JSON.parse(read('content/devotionals.json'))).replace(/</g, '\\u003c');
 const sermonsJson = JSON.stringify(JSON.parse(read('content/sermons.json'))).replace(/</g, '\\u003c');
 const lessonVideosJson = JSON.stringify(JSON.parse(read('content/lesson-videos.json'))).replace(/</g, '\\u003c');
+const lessonTranscriptsJson = JSON.stringify(JSON.parse(read('content/lesson-transcripts.json'))).replace(/</g, '\\u003c');
 let html = read('index.html');
 
 function replaceOnce(source, search, replacement) {
@@ -40,6 +41,7 @@ html = replaceOnce(html, '<script type="application/json" id="starter-fallback">
 html = replaceOnce(html, '<script type="application/json" id="devotionals-fallback">[]</script>', `<script type="application/json" id="devotionals-fallback">${devotionalsJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="sermons-fallback">{"schemaVersion":1,"sermons":[]}</script>', `<script type="application/json" id="sermons-fallback">${sermonsJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="lesson-videos-fallback">{"schemaVersion":1,"videos":[]}</script>', `<script type="application/json" id="lesson-videos-fallback">${lessonVideosJson}</script>`);
+html = replaceOnce(html, '<script type="application/json" id="lesson-transcripts-fallback">{"schemaVersion":1,"transcripts":[]}</script>', `<script type="application/json" id="lesson-transcripts-fallback">${lessonTranscriptsJson}</script>`);
 html = replaceOnce(html, '<script src="js/native-bridge.bundle.js"></script>', `<script>\n${read('js/native-bridge.bundle.js')}\n</script>`);
 html = replaceOnce(html, '<script src="js/progress-sync.js"></script>', `<script>\n${read('js/progress-sync.js')}\n</script>`);
 html = replaceOnce(html, '<script src="js/account.js"></script>', `<script>\n${read('js/account.js')}\n</script>`);
@@ -47,6 +49,7 @@ html = replaceOnce(html, '<script src="js/parser.js"></script>', `<script>\n${re
 html = replaceOnce(html, '<script src="js/study.js"></script>', `<script>\n${read('js/study.js')}\n</script>`);
 html = replaceOnce(html, '<script src="js/storage.js"></script>', `<script>\n${read('js/storage.js')}\n</script>`);
 html = replaceOnce(html, '<script src="js/mobile-study.js"></script>', `<script>\n${read('js/mobile-study.js')}\n</script>`);
+html = replaceOnce(html, '<script src="js/transcripts.js"></script>', `<script>\n${read('js/transcripts.js')}\n</script>`);
 html = replaceOnce(html, '<script src="js/sermons.js"></script>', `<script>\n${read('js/sermons.js')}\n</script>`);
 html = replaceOnce(html, '<script src="js/sermons-ui.js"></script>', `<script>\n${read('js/sermons-ui.js')}\n</script>`);
 html = replaceOnce(html, '<script src="js/app.js"></script>', `<script>\n${read('js/app.js')}\n</script>`);
@@ -59,6 +62,7 @@ for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html',
 for (const directory of ['decks', 'icons', 'content', 'js']) {
   fs.cpSync(path.join(root, directory), path.join(outputDir, directory), { recursive: true });
 }
+require('./lesson-transcripts.js').writeLessonTranscripts(root);
 normalizeTextFile(path.join(outputDir, 'style.css'));
 normalizeTextFiles(path.join(outputDir, 'js'));
 console.log(`Built dist/index.html (${Buffer.byteLength(html)} bytes)`);

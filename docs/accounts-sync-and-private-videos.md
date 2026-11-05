@@ -6,6 +6,8 @@ Progress is written locally first. When online, the app merges progress for the 
 
 Lesson recordings remain in the private R2 bucket. The client catalog contains only R2 object keys. Pages Functions validate the Supabase access token, set an HttpOnly video-session cookie, and stream R2 objects with byte-range support. The bucket must stay private and must not receive a public domain. Signed-out guests can still study locally but cannot retrieve video bytes.
 
+The lesson player also supports English captions and a searchable, time-linked transcript. `content/lesson-transcripts.json` explicitly maps unambiguous source SRTs to catalog video IDs; the build converts only those files to WebVTT. The generated payload lives in ignored, server-only `functions/_generated/lesson-transcripts.cjs`, bundled by Pages Functions. It is excluded from `dist` and native app packages. The `/transcript/<filename>.vtt` middleware serves it directly after validating the same video-session cookie and disables caching. The build removes legacy generated `.vtt` assets from `dist/transcript`; no R2 transcript upload or credentials are needed. Run the build before starting Wrangler or deploying so the server module exists. Do not add a transcript mapping based on a title alone when multiple non-identical SRTs exist; confirm the correct source first. See `docs/lesson-transcripts-review.md` for the complete file inventory and unresolved mappings.
+
 ## One-time setup
 
 1. Create a Supabase project and enable email/password sign-in and public self-registration. No CCI approval workflow is used. Disable email confirmation if newly registered learners must be able to watch immediately; if confirmation stays enabled, learners must confirm their email before signing in.
