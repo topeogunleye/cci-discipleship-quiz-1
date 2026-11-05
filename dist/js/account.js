@@ -78,7 +78,16 @@
 
     function authError(error) {
       if (!error) return 'The account request could not be completed.';
-      var message = String(error.message || error);
+      var message = typeof error === 'string' ? error : String(error.message || error);
+      message = String(message || '').trim();
+      if (!message) return 'The account request could not be completed.';
+      if (/^(load failed|failed to fetch|network request failed|networkerror)$/i.test(message)
+        || /fetch(?:ing)? failed|load failed|network.*failed/i.test(message)) {
+        return 'Account services could not be reached. Check your connection and try again.';
+      }
+      if (/cors|cross[- ]origin|blocked by cors|origin.*not allowed|not allowed.*origin/i.test(message)) {
+        return 'The account service is temporarily unavailable. Please try again.';
+      }
       return message.length > 240 ? message.slice(0, 237) + '…' : message;
     }
 
