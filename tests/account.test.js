@@ -37,6 +37,24 @@ test('browser account discovers the Supabase global without dependency injection
   service.destroy();
 });
 
+test('browser network and CORS failures are normalized before surfacing to learners', async () => {
+  const Supabase = { createClient: () => ({ auth: {
+    onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; },
+    async getSession() { return { data: { session: null } }; },
+    async signInWithPassword() { return { error: new Error('Load failed') }; },
+    async signUp() { return { error: new Error('Request has been blocked by CORS policy') }; }
+  } }) };
+  const fetch = async url => new Response(url.endsWith('/api/auth/config')
+    ? JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }) : '{}');
+  const service = create({ apiBase: 'https://study.example', fetch, Supabase, localStorage: localStore() });
+  await service.init();
+  assert.equal((await service.signIn('learner@example.com', 'very-long-password')).error,
+    'Account services could not be reached. Check your connection and try again.');
+  assert.equal((await service.signUp('learner@example.com', 'very-long-password')).error,
+    'The account service is temporarily unavailable. Please try again.');
+  service.destroy();
+});
+
 test('native Android account requests use the hosted API while web development stays on localhost', async t => {
   const fs = require('node:fs');
   const vm = require('node:vm');

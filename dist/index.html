@@ -5011,7 +5011,7 @@ button.opt.wrong .opt-badge {
   pointer-events: none;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 767px) {
   /* The bottom Practice tab exposes the same study modes at compact sizes. */
   .rocket-container,
   .rocket-backdrop {
@@ -5912,6 +5912,25 @@ html[data-theme="dark"] .picker-selection-footer {
     gap: 28px;
     padding: 22px 12px;
     background: var(--bg);
+  }
+
+  .desktop-shell-home .rocket-container {
+    position: fixed;
+    inset: 0;
+    display: block;
+    pointer-events: none;
+  }
+
+  .desktop-shell-home .rocket-fab-btn {
+    display: none;
+  }
+
+  .desktop-shell-home .rocket-pills {
+    position: fixed;
+    top: 88px;
+    right: 28px;
+    z-index: 120;
+    margin: 0;
   }
 
   .desktop-shell-home .desktop-logo {
@@ -10214,7 +10233,16 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 
     function authError(error) {
       if (!error) return 'The account request could not be completed.';
-      var message = String(error.message || error);
+      var message = typeof error === 'string' ? error : String(error.message || error);
+      message = String(message || '').trim();
+      if (!message) return 'The account request could not be completed.';
+      if (/^(load failed|failed to fetch|network request failed|networkerror)$/i.test(message)
+        || /fetch(?:ing)? failed|load failed|network.*failed/i.test(message)) {
+        return 'Account services could not be reached. Check your connection and try again.';
+      }
+      if (/cors|cross[- ]origin|blocked by cors|origin.*not allowed|not allowed.*origin/i.test(message)) {
+        return 'The account service is temporarily unavailable. Please try again.';
+      }
       return message.length > 240 ? message.slice(0, 237) + '…' : message;
     }
 
