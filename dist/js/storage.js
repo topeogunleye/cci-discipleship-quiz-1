@@ -2,6 +2,25 @@
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.StudyStorage = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
+  // Retire only fields owned by the removed Sermons experience. Never infer
+  // ownership from deck titles, IDs, or the contents of shared progress maps.
+  function withoutRetiredSermonData(raw) {
+    try {
+      var value = JSON.parse(raw);
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return raw;
+      var changed = Object.prototype.hasOwnProperty.call(value, 'sermons');
+      delete value.sermons;
+      if (value.settings && typeof value.settings === 'object' && !Array.isArray(value.settings)) {
+        ['showDraftSermons', 'experience'].forEach(function (key) {
+          if (Object.prototype.hasOwnProperty.call(value.settings, key)) {
+            delete value.settings[key]; changed = true;
+          }
+        });
+      }
+      return changed ? JSON.stringify(value) : raw;
+    } catch (error) { return raw; }
+  }
+
   function createStorage(options) {
     options = options || {};
     var indexedDB = Object.prototype.hasOwnProperty.call(options, 'indexedDB') ? options.indexedDB : (typeof window !== 'undefined' ? window.indexedDB : null);
@@ -122,6 +141,7 @@
     }
 
     function save(raw, owner) {
+      raw = withoutRetiredSermonData(raw);
       var key = storageKey(owner);
       return openDatabase().then(function (db) {
         return writeDatabase(db, raw, key).then(function () {
@@ -142,8 +162,45 @@
       });
     }
 
-    return { load: load, save: save };
+    async function removeRetiredSermonData() {
+      var ok = true;
+      // Include inactive accounts, but leave auth tokens and sync baselines alone.
+      try {
+        if (localStorage) {
+          for (var index = 0; index < localStorage.length; index++) {
+            var key = localStorage.key(index);
+            if (key !== legacyKey && !(typeof key === 'string' && key.startsWith(legacyKey + '.account.'))) continue;
+            var raw = localStorage.getItem(key), cleaned = withoutRetiredSermonData(raw);
+            if (cleaned !== raw) localStorage.setItem(key, cleaned);
+          }
+        }
+      } catch (error) { ok = false; }
+      if (indexedDB && !indexedDBUnavailable) {
+        try {
+          var db = await openDatabase();
+          await new Promise(function (resolve, reject) {
+            var transaction = db.transaction(storeName, 'readwrite');
+            var request = transaction.objectStore(storeName).openCursor();
+            request.onsuccess = function () {
+              var cursor = request.result;
+              if (!cursor) return;
+              if (cursor.key === recordKey || (typeof cursor.key === 'string' && cursor.key.startsWith('account:'))) {
+                var cleaned = withoutRetiredSermonData(cursor.value);
+                if (cleaned !== cursor.value) cursor.update(cleaned);
+              }
+              cursor.continue();
+            };
+            request.onerror = function () { reject(request.error); };
+            transaction.oncomplete = resolve;
+            transaction.onerror = transaction.onabort = function () { reject(transaction.error); };
+          });
+        } catch (error) { ok = false; }
+      }
+      return { ok: ok };
+    }
+
+    return { load: load, save: save, removeRetiredSermonData: removeRetiredSermonData };
   }
 
-  return { createStorage: createStorage };
+  return { createStorage: createStorage, withoutRetiredSermonData: withoutRetiredSermonData };
 });

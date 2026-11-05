@@ -16,6 +16,26 @@ function fakeIndexedDB(options = {}) {
           transaction() {
             const transaction = {};
             const objectStore = {
+              openCursor() {
+                const request = {};
+                const entries = Array.from(values.entries());
+                let index = 0;
+                function next() {
+                  queueMicrotask(() => {
+                    if (options.failWrite) { transaction.error = new Error('write failed'); transaction.onerror(); return; }
+                    const entry = entries[index++];
+                    request.result = entry ? {
+                      key: entry[0], value: entry[1],
+                      update(value) { values.set(entry[0], value); },
+                      continue: next
+                    } : null;
+                    request.onsuccess();
+                    if (!entry) transaction.oncomplete();
+                  });
+                }
+                next();
+                return request;
+              },
               get(key) {
                 const result = {};
                 queueMicrotask(() => {
@@ -52,6 +72,8 @@ function mockLocalStorage(initial) {
   const values = new Map(initial ? [['flashdecks.v1', initial]] : []);
   return {
     values,
+    get length() { return values.size; },
+    key(index) { return Array.from(values.keys())[index]; },
     getItem(key) { return values.has(key) ? values.get(key) : null; },
     setItem(key, value) { values.set(key, String(value)); },
     removeItem(key) { values.delete(key); }
@@ -185,4 +207,54 @@ test('keeps account namespaces separate in the localStorage fallback too', async
   assert.equal((await storage.load('user-alice')).raw, '{"owner":"alice"}');
   assert.equal(localStorage.getItem('flashdecks.v1'), '{"owner":"guest"}');
   assert.equal(localStorage.getItem('flashdecks.v1.account.user-alice'), '{"owner":"alice"}');
+});
+
+test('retired data cleanup visits guest and inactive accounts without changing shared data', async () => {
+  const db = fakeIndexedDB(), local = mockLocalStorage();
+  const retained = {
+    decks: [{ id: 'custom-sermon-notes', title: 'My sermon notes', cards: [] }],
+    progress: { 'custom-sermon-notes': { best: { pct: 80 }, cards: {} } },
+    settings: { theme: 'dark', shuffle: true, showDraftDevotionals: true, otherSetting: 'keep' },
+    completedToday: { '2026-11-05': 4 }, streak: { lastStreakDate: '2026-11-05' },
+    onboarding: { completed: true }, devotions: { saved: { devotion: true } },
+    pausedSession: { type: 'quiz', i: 2 }, cloudSyncDeviceId: 'device-keep', unknownField: { keep: true }
+  };
+  const raw = JSON.stringify({ ...retained, sermons: { progress: { sermon: { score: 100 } }, downloads: {}, reminders: {} }, settings: { ...retained.settings, experience: 'sermons', showDraftSermons: true } });
+  for (const key of ['current', 'account:user-one', 'account:user-two']) db.values.set(key, raw);
+  db.values.set('shared-unknown', raw);
+  db.values.set('account:broken', '{bad json');
+  for (const key of ['flashdecks.v1', 'flashdecks.v1.account.user-one', 'flashdecks.v1.account.user-two']) local.values.set(key, raw);
+  local.values.set('sb-project-auth-token', raw);
+  local.values.set('cci-study-progress-base.user-one', raw);
+  local.values.set('flashdecks.v1.backup', raw);
+  const storage = createStorage({ indexedDB: db.indexedDB, localStorage: local });
+  assert.deepEqual(await storage.removeRetiredSermonData(), { ok: true });
+  for (const key of ['current', 'account:user-one', 'account:user-two']) assert.deepEqual(JSON.parse(db.values.get(key)), retained);
+  for (const key of ['flashdecks.v1', 'flashdecks.v1.account.user-one', 'flashdecks.v1.account.user-two']) assert.deepEqual(JSON.parse(local.values.get(key)), retained);
+  assert.equal(db.values.get('shared-unknown'), raw);
+  assert.equal(db.values.get('account:broken'), '{bad json');
+  for (const key of ['sb-project-auth-token', 'cci-study-progress-base.user-one', 'flashdecks.v1.backup']) assert.equal(local.values.get(key), raw);
+  const before = [...db.values.entries()];
+  await storage.removeRetiredSermonData();
+  assert.deepEqual([...db.values.entries()], before, 'cleanup is idempotent');
+});
+
+test('local-only cleanup preserves malformed profiles and save prevents retired fields returning', async () => {
+  const local = mockLocalStorage('{bad json');
+  local.values.set('flashdecks.v1.account.inactive', JSON.stringify({ progress: { lesson: 1 }, sermons: { progress: {} } }));
+  const storage = createStorage({ indexedDB: null, localStorage: local });
+  assert.deepEqual(await storage.removeRetiredSermonData(), { ok: true });
+  assert.equal(local.values.get('flashdecks.v1'), '{bad json');
+  assert.deepEqual(JSON.parse(local.values.get('flashdecks.v1.account.inactive')), { progress: { lesson: 1 } });
+  await storage.save(JSON.stringify({ progress: { lesson: 2 }, sermons: {}, settings: { theme: 'dark', experience: 'sermons' } }), 'inactive');
+  assert.deepEqual(JSON.parse(local.values.get('flashdecks.v1.account.inactive')), { progress: { lesson: 2 }, settings: { theme: 'dark' } });
+});
+
+test('failed cleanup reports failure and preserves records for the next launch', async () => {
+  const db = fakeIndexedDB({ failWrite: true });
+  const raw = JSON.stringify({ progress: { lesson: 3 }, sermons: {} });
+  db.values.set('current', raw);
+  const storage = createStorage({ indexedDB: db.indexedDB, localStorage: null });
+  assert.deepEqual(await storage.removeRetiredSermonData(), { ok: false });
+  assert.equal(db.values.get('current'), raw);
 });

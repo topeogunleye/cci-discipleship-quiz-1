@@ -10,7 +10,6 @@ function accountUi(service, initialStatus) {
   const window = {
     DeckParser: require('../js/parser.js'),
     StudyStorage: require('../js/storage.js'),
-    SermonStudy: require('../js/sermons.js'),
     CCITranscripts: require('../js/transcripts.js'),
     CCIAccount: { create: () => service },
     location: { protocol: 'capacitor:', origin: 'capacitor://localhost', href: 'capacitor://localhost/' }

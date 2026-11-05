@@ -8,7 +8,7 @@ Implemented the revised **option 3** concept from this conversation: a focused, 
 
 - Kept the app’s existing dark purple palette, type scale, rounded surfaces, and button styling.
 - Centered the player at up to 1,100px wide, reducing it on shorter desktop viewports so the lesson title and both study actions stay visible together.
-- Hid unrelated experience and sermon-reminder controls on the video screen so it stays focused.
+- Kept the lesson video screen focused on playback, transcripts, and study actions.
 - Kept Flashcards and Take quiz in a named action group. Both open the existing lesson-specific setup flow.
 - On narrow screens, stacked the player and summary while keeping the two actions side by side. At 320px, both actions fit inside the initial 568px viewport.
 - Added a compact no-recording state. The disabled Continue lesson button is omitted until a video is configured.
