@@ -9324,7 +9324,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 .lesson-video-summary{display:flex;align-items:center;justify-content:space-between;gap:24px;width:min(100%,1100px);margin:18px auto 0}.lesson-video-summary>div{min-width:0}.lesson-video-summary .eyebrow{color:var(--accent);font-size:var(--text-xs);font-weight:800;letter-spacing:.09em}.lesson-video-summary h1{margin:5px 0 8px;font-size:clamp(1.65rem,3vw,2.55rem);line-height:1.12}.lesson-video-summary p{max-width:760px;margin:0;color:var(--muted);font-size:var(--text-base);line-height:1.6}.lesson-video-continue{flex:0 0 auto;min-width:205px;min-height:54px}
 .lesson-video-study-actions{display:flex;flex-wrap:wrap;gap:12px;width:min(100%,1100px);margin:12px auto 0}.lesson-video-study-actions .btn{min-width:160px;min-height:46px}
 .lesson-video-progress,.lesson-video-segments{display:flex;align-items:center;gap:16px;width:min(100%,1100px);margin:18px auto 0;padding:14px 18px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}.lesson-video-progress span{flex:0 0 auto;color:var(--muted);font-size:var(--text-sm);font-weight:600}.lesson-video-progress progress{width:100%;height:8px;overflow:hidden;border:0;border-radius:99px;accent-color:var(--accent)}.lesson-video-progress progress::-webkit-progress-bar{border-radius:99px;background:var(--surface-dim)}.lesson-video-progress progress::-webkit-progress-value{border-radius:99px;background:var(--accent)}.lesson-video-progress progress::-moz-progress-bar{border-radius:99px;background:var(--accent)}
-.lesson-video-segments{flex-wrap:wrap;justify-content:flex-start}.lesson-video-segment{min-height:40px;padding:8px 13px;border:1px solid var(--line);border-radius:12px;background:var(--surface-dim);color:var(--ink);font:600 var(--text-sm)/1.3 var(--font-sans);cursor:pointer}.lesson-video-segment.is-active{border-color:var(--accent);background:var(--surface-dim);color:var(--ink)}.lesson-video-page button:focus-visible{outline:3px solid #2F6FED;outline-offset:3px}
+.lesson-video-segments{flex-wrap:wrap;justify-content:flex-start}.lesson-video-segment{min-height:40px;padding:8px 13px;border:1px solid var(--line);border-radius:12px;background:var(--surface-dim);color:var(--ink);font:600 var(--text-sm)/1.3 var(--font-sans);cursor:pointer}.lesson-video-segment.is-active{border-color:var(--accent);background:var(--surface-dim);color:var(--ink)}.lesson-video-page button:focus-visible{outline:3px solid #2F6FED;outline-offset:3px}.lesson-video-summary h1:focus-visible{outline:3px solid #2F6FED;outline-offset:5px;border-radius:2px}
 @media(max-width:700px){.chapter-video-entry{align-items:stretch;flex-direction:column;margin:16px 0;padding:17px}.chapter-video-entry>.btn{width:100%}.lesson-video-page{width:min(calc(100% - 24px),1240px);padding-top:12px}.lesson-video-topbar{grid-template-columns:minmax(0,1fr) auto;gap:8px 12px}.lesson-video-top-title{grid-column:1;grid-row:2;text-align:left}.lesson-video-section-count{grid-column:2;grid-row:2}.lesson-video-frame{border-radius:14px}.lesson-video-summary{align-items:stretch;flex-direction:column;gap:14px;margin-top:16px}.lesson-video-continue{width:100%;min-width:0}.lesson-video-study-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}.lesson-video-study-actions .btn{min-width:0;width:100%;padding-inline:10px}.lesson-video-progress,.lesson-video-segments{align-items:stretch;flex-direction:column;gap:10px;margin-top:16px;padding:12px}.lesson-video-progress progress{width:100%}}
 @media(max-width:520px){.account-auth-form{grid-template-columns:minmax(0,1fr);gap:12px}.account-guidance,.account-auth-actions{grid-column:1}.account-auth-actions{grid-template-columns:minmax(0,1fr)}.account-settings-group .row{align-items:stretch}.account-settings-group .row .btn{flex:1 1 100%}}
 @media(max-width:360px){.lesson-transcript summary{padding:12px}.lesson-transcript-body{padding:0 12px 12px}.lesson-transcript-cue{grid-template-columns:72px minmax(0,1fr);gap:6px;padding:9px 4px}}
@@ -11603,6 +11603,16 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       : 'No transcript segments match that search.';
   }
 
+  function returnToLessonVideo() {
+    var frame = document.querySelector('.lesson-video-frame');
+    var title = document.getElementById('lesson-video-title');
+    var target = frame || title;
+    if (!target) return;
+    var nextTop = Math.max(0, window.scrollY + target.getBoundingClientRect().top - 12);
+    window.scrollTo(window.scrollX, nextTop);
+    if (title) title.focus({ preventScroll: true });
+  }
+
   /* ---------- storage ---------- */
   function loadSavedState(raw) {
     S = defaultStudyState();
@@ -13015,7 +13025,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     return '<main class="lesson-video-page" aria-labelledby="lesson-video-title">' +
       '<header class="lesson-video-topbar"><button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button><div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong></div><span class="lesson-video-section-count">' + section + ' / ' + S.decks.length + '</span></header>' +
       '<section class="lesson-video-frame' + (video && canWatchVideo ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
-      '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title">' + esc(title) + '</h1><p>' + (canWatchVideo ? 'Watch the lesson, then reinforce what you learned with a quick study activity.' : 'Study this lesson locally with flashcards or a quiz. Sign in to watch its video.') + '</p></div>' + (video && canWatchVideo ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">Continue lesson</button>' : '') + '</section>' +
+      '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title" tabindex="-1">' + esc(title) + '</h1><p>' + (canWatchVideo ? 'Watch the lesson, then reinforce what you learned with a quick study activity.' : 'Study this lesson locally with flashcards or a quiz. Sign in to watch its video.') + '</p></div>' + (video && canWatchVideo ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">Continue lesson</button>' : '') + '</section>' +
       videoNavigation +
       '<div class="lesson-video-study-actions" role="group" aria-label="Study this lesson"><button type="button" class="btn" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '">Flashcards</button><button type="button" class="btn" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '">Take quiz</button></div>' +
       transcriptPanel +
@@ -14465,12 +14475,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
           V.videoIndex = +t.dataset.index;
           V.videoTime = 0;
           render(true);
-          var nextVideoButton = document.querySelector('.lesson-video-segment[data-index="' + V.videoIndex + '"]');
-          if (nextVideoButton) nextVideoButton.focus();
-          else {
-            var newVideoTitle = document.getElementById('lesson-video-title');
-            if (newVideoTitle) { newVideoTitle.setAttribute('tabindex', '-1'); newVideoTitle.focus(); }
-          }
+          returnToLessonVideo();
         }
         break;
       case 'lesson-video-play':

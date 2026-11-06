@@ -388,6 +388,16 @@
       : 'No transcript segments match that search.';
   }
 
+  function returnToLessonVideo() {
+    var frame = document.querySelector('.lesson-video-frame');
+    var title = document.getElementById('lesson-video-title');
+    var target = frame || title;
+    if (!target) return;
+    var nextTop = Math.max(0, window.scrollY + target.getBoundingClientRect().top - 12);
+    window.scrollTo(window.scrollX, nextTop);
+    if (title) title.focus({ preventScroll: true });
+  }
+
   /* ---------- storage ---------- */
   function loadSavedState(raw) {
     S = defaultStudyState();
@@ -1800,7 +1810,7 @@
     return '<main class="lesson-video-page" aria-labelledby="lesson-video-title">' +
       '<header class="lesson-video-topbar"><button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button><div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong></div><span class="lesson-video-section-count">' + section + ' / ' + S.decks.length + '</span></header>' +
       '<section class="lesson-video-frame' + (video && canWatchVideo ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
-      '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title">' + esc(title) + '</h1><p>' + (canWatchVideo ? 'Watch the lesson, then reinforce what you learned with a quick study activity.' : 'Study this lesson locally with flashcards or a quiz. Sign in to watch its video.') + '</p></div>' + (video && canWatchVideo ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">Continue lesson</button>' : '') + '</section>' +
+      '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title" tabindex="-1">' + esc(title) + '</h1><p>' + (canWatchVideo ? 'Watch the lesson, then reinforce what you learned with a quick study activity.' : 'Study this lesson locally with flashcards or a quiz. Sign in to watch its video.') + '</p></div>' + (video && canWatchVideo ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">Continue lesson</button>' : '') + '</section>' +
       videoNavigation +
       '<div class="lesson-video-study-actions" role="group" aria-label="Study this lesson"><button type="button" class="btn" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '">Flashcards</button><button type="button" class="btn" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '">Take quiz</button></div>' +
       transcriptPanel +
@@ -3250,12 +3260,7 @@
           V.videoIndex = +t.dataset.index;
           V.videoTime = 0;
           render(true);
-          var nextVideoButton = document.querySelector('.lesson-video-segment[data-index="' + V.videoIndex + '"]');
-          if (nextVideoButton) nextVideoButton.focus();
-          else {
-            var newVideoTitle = document.getElementById('lesson-video-title');
-            if (newVideoTitle) { newVideoTitle.setAttribute('tabindex', '-1'); newVideoTitle.focus(); }
-          }
+          returnToLessonVideo();
         }
         break;
       case 'lesson-video-play':
