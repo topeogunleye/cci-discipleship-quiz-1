@@ -9306,3 +9306,16 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
   .app-screen-enter,#modal .scrim,#modal .sheet{animation:none!important}
   .lesson-video-continue:hover{transform:none}
 }
+
+/* Keep motion only for the onboarding handshake; other interface motion is disabled. */
+@keyframes onboardingHandshakeShake {
+  0%, 76%, 100% { transform: rotate(0deg); }
+  80% { transform: rotate(18deg); }
+  84% { transform: rotate(-12deg); }
+  88% { transform: rotate(16deg); }
+  92% { transform: rotate(-8deg); }
+  96% { transform: rotate(8deg); }
+}
+*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+.onboarding-screen.commit-screen .commit-emoji{display:inline-block;transform-origin:70% 80%;animation:onboardingHandshakeShake 2.4s ease-in-out infinite!important}
+@media(prefers-reduced-motion:reduce){.onboarding-screen.commit-screen .commit-emoji{animation:none!important}}
