@@ -27,7 +27,9 @@ export async function onRequestPost({ request, env }) {
     return auth.jsonResponse({ ok: true }, 200, headers);
   }
 
-  const user = await auth.getAuthenticatedUser(body && body.accessToken, env);
+  let user;
+  try { user = await auth.getAuthenticatedUser(body && body.accessToken, env); }
+  catch (error) { return auth.authServiceUnavailableResponse(request, env, error); }
   if (!user) return auth.jsonResponse({ error: 'Sign in again to enable lesson video access.' }, 401, headers);
   const token = body.accessToken;
   let maxAge = 3600;

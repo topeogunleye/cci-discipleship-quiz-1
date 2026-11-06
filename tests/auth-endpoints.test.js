@@ -112,9 +112,75 @@ test('session endpoint clears the existing cookie without contacting Supabase', 
   } finally { globalThis.fetch = originalFetch; }
 });
 
+test('session renewal distinguishes invalid tokens from retryable Supabase failures', async () => {
+  const env = { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_test_key' };
+  const originalFetch = globalThis.fetch;
+  const request = () => new Request('https://study.example/api/auth/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'https://study.example' },
+    body: JSON.stringify({ accessToken: 'header.payload.signature' })
+  });
+  try {
+    globalThis.fetch = async () => new Response('{"message":"invalid"}', { status: 401 });
+    const invalid = await session.onRequestPost({ request: request(), env });
+    assert.equal(invalid.status, 401);
+    assert.equal(invalid.headers.get('set-cookie'), null);
+
+    for (const scenario of [
+      { label: 'rate limited', fetch: async () => new Response('{"secret":"do not expose"}', { status: 429, headers: { 'Retry-After': '19' } }), retryAfter: '19' },
+      { label: 'server error', fetch: async () => new Response('{"secret":"do not expose"}', { status: 503 }), retryAfter: '30' },
+      { label: 'network failure', fetch: async () => { throw new Error('private network details'); }, retryAfter: '30' }
+    ]) {
+      globalThis.fetch = scenario.fetch;
+      const response = await session.onRequestPost({ request: request(), env });
+      assert.equal(response.status, 503, scenario.label);
+      assert.equal(response.headers.get('retry-after'), scenario.retryAfter);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.equal(response.headers.get('access-control-allow-origin'), 'https://study.example');
+      assert.equal(response.headers.get('access-control-allow-credentials'), 'true');
+      assert.equal(response.headers.get('set-cookie'), null);
+      assert.doesNotMatch(await response.text(), /do not expose|private network details/);
+    }
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('server token validation rejects invalid and missing tokens', async () => {
   assert.equal(await auth.getAuthenticatedUser('', { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_ANON_KEY: 'public-key' }, async () => { throw new Error('must not fetch'); }), null);
   assert.equal(await auth.getAuthenticatedUser('short', { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_ANON_KEY: 'public-key' }, async () => { throw new Error('must not fetch'); }), null);
+});
+
+test('server token validation throws a safe retryable error for Supabase outages and rejects only 401 credentials', async () => {
+  const env = { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_test_key' };
+  const token = 'header.payload.signature';
+  const invalid = await auth.getAuthenticatedUser(token, env, async () => new Response('not included', { status: 401 }));
+  assert.equal(invalid, null);
+
+  for (const scenario of [
+    { status: 429, headers: { 'Retry-After': '17' }, retryAfter: 17 },
+    { status: 500, headers: {}, retryAfter: 30 },
+    { status: 403, headers: {}, retryAfter: 30 }
+  ]) {
+    await assert.rejects(
+      auth.getAuthenticatedUser(token, env, async () => new Response('secret upstream response', { status: scenario.status, headers: scenario.headers })),
+      error => error.name === 'AuthServiceUnavailableError' && error.retryAfter === scenario.retryAfter
+    );
+  }
+  await assert.rejects(
+    auth.getAuthenticatedUser(token, env, async () => { throw new Error('private transport detail'); }),
+    error => error.name === 'AuthServiceUnavailableError' && error.retryAfter === 30
+  );
+  await assert.rejects(
+    auth.getAuthenticatedUser(token, env, async () => new Response('invalid json', { status: 200 })),
+    error => error.name === 'AuthServiceUnavailableError'
+  );
+
+  const response = auth.authServiceUnavailableResponse(new Request('https://study.example/api/videos', { headers: { Origin: 'capacitor://localhost' } }), { ALLOWED_APP_ORIGINS: 'capacitor://localhost' }, { retryAfter: 17 });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('retry-after'), '17');
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal(response.headers.get('access-control-allow-origin'), 'capacitor://localhost');
+  assert.equal(response.headers.get('access-control-allow-credentials'), 'true');
+  assert.doesNotMatch(await response.text(), /secret|private/);
 });
 
 test('Supabase service-role and secret keys are rejected before being exposed to the browser', async () => {

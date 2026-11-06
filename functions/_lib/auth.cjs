@@ -65,19 +65,43 @@ function originAllowed(request, env) {
   return !origin || allowedOrigins(request, env).has(origin);
 }
 
+function authServiceUnavailable(retryAfter) {
+  const error = new Error('Authentication service is temporarily unavailable.');
+  error.name = 'AuthServiceUnavailableError';
+  const seconds = retryAfter === null || retryAfter === undefined || retryAfter === '' ? NaN : Number(retryAfter);
+  error.retryAfter = Number.isFinite(seconds) ? Math.max(1, Math.min(300, Math.floor(seconds))) : 30;
+  return error;
+}
+
+function authServiceUnavailableResponse(request, env, error) {
+  const seconds = Number(error && error.retryAfter);
+  const retryAfter = Number.isFinite(seconds) ? Math.max(1, Math.min(300, Math.floor(seconds))) : 30;
+  const headers = withCors({ 'Retry-After': String(retryAfter) }, request, env);
+  return jsonResponse({ error: 'Authentication service is temporarily unavailable. Please retry.' }, 503, headers);
+}
+
 async function getAuthenticatedUser(accessToken, env, fetcher) {
+  if (typeof accessToken !== 'string' || accessToken.length < 20 || accessToken.length > 8192) return null;
   const config = supabaseConfig(env);
-  if (!config || typeof accessToken !== 'string' || accessToken.length < 20 || accessToken.length > 8192) return null;
+  if (!config) throw authServiceUnavailable(30);
   const requestFetch = fetcher || fetch;
+  let response;
   try {
-    const response = await requestFetch(config.url + '/auth/v1/user', {
+    response = await requestFetch(config.url + '/auth/v1/user', {
       headers: { apikey: config.anonKey, Authorization: 'Bearer ' + accessToken, Accept: 'application/json' },
       cache: 'no-store'
     });
-    if (!response.ok) return null;
-    const user = await response.json();
-    return user && typeof user.id === 'string' && /^[0-9a-f-]{36}$/i.test(user.id) ? user : null;
-  } catch (error) { return null; }
+  } catch (error) { throw authServiceUnavailable(30); }
+  if (response.status === 401) return null;
+  if (!response.ok) {
+    const retryAfter = response.status === 429 ? response.headers.get('Retry-After') : null;
+    throw authServiceUnavailable(retryAfter);
+  }
+  let user;
+  try { user = await response.json(); }
+  catch (error) { throw authServiceUnavailable(30); }
+  if (!user || typeof user.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(user.id)) throw authServiceUnavailable(30);
+  return user;
 }
 
 function videoToken(request) {
@@ -96,4 +120,4 @@ function videoCookie(accessToken, maxAge) {
   return VIDEO_COOKIE + '=' + encodeURIComponent(accessToken) + '; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=' + Math.max(1, Math.min(300, Math.floor(maxAge || 300)));
 }
 
-module.exports = { VIDEO_COOKIE, jsonResponse, isPublishableKey, supabaseConfig, allowedOrigins, withCors, originAllowed, getAuthenticatedUser, videoToken, videoCookie };
+module.exports = { VIDEO_COOKIE, jsonResponse, isPublishableKey, supabaseConfig, allowedOrigins, withCors, originAllowed, authServiceUnavailable, authServiceUnavailableResponse, getAuthenticatedUser, videoToken, videoCookie };

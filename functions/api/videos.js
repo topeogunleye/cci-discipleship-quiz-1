@@ -1,4 +1,5 @@
 import auth from '../_lib/auth.cjs';
+import videoCatalog from '../_lib/video-catalog.cjs';
 
 function cors(request, env) {
   return auth.withCors({ 'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS', 'Access-Control-Allow-Headers': 'Range, If-Range, If-None-Match', 'Access-Control-Expose-Headers': 'Accept-Ranges, Content-Length, Content-Range, ETag' }, request, env);
@@ -41,12 +42,14 @@ export function onRequestOptions({ request, env }) {
 export async function onRequest({ request, env }) {
   if (!['GET', 'HEAD'].includes(request.method)) return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD, OPTIONS', 'Cache-Control': 'no-store' } });
   if (!auth.originAllowed(request, env)) return auth.jsonResponse({ error: 'This app origin is not allowed.' }, 403, cors(request, env));
-  const user = await auth.getAuthenticatedUser(auth.videoToken(request), env);
+  let user;
+  try { user = await auth.getAuthenticatedUser(auth.videoToken(request), env); }
+  catch (error) { return auth.authServiceUnavailableResponse(request, env, error); }
   if (!user) return unauthorized(request, env);
   if (!env || !env.LESSON_VIDEOS) return auth.jsonResponse({ error: 'Lesson video storage is not configured.' }, 503, cors(request, env));
 
   const key = new URL(request.url).searchParams.get('key') || '';
-  if (!safeObjectKey(key)) return auth.jsonResponse({ error: 'Lesson video not found.' }, 404, cors(request, env));
+  if (!safeObjectKey(key) || !videoCatalog.isCatalogVideoKey(key)) return auth.jsonResponse({ error: 'Lesson video not found.' }, 404, cors(request, env));
   const headers = cors(request, env);
   headers.set('Cache-Control', 'private, no-store');
   headers.set('X-Content-Type-Options', 'nosniff');
