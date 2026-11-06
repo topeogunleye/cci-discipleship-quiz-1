@@ -565,10 +565,12 @@
     if (!account) return Promise.resolve(accountStatus);
     return account.init(function (status) {
       var hadVideoAccess = !!(accountStatus.user && accountStatus.videoReady);
+      var priorUserId = accountStatus.user && accountStatus.user.id;
       accountStatus = status;
       if (!accountBootReady) return;
-      // Access changes still need to show or remove the player immediately.
-      if (V.name === 'lesson-video' && hadVideoAccess !== !!(status.user && status.videoReady)) render(true);
+      // Remove protected media on account changes, but keep an existing player mounted for same-user renewal outcomes.
+      var preserveActivePlayer = V.name === 'lesson-video' && priorUserId && status.user && priorUserId === status.user.id && !!document.getElementById('lesson-video-player');
+      if (V.name === 'lesson-video' && hadVideoAccess !== !!(status.user && status.videoReady) && !preserveActivePlayer) render(true);
       var nextOwner = status.user && status.user.id || null;
       if (nextOwner !== requestedStorageOwnerId) switchStorageOwner(nextOwner);
       else if (nextOwner && nextOwner === activeStorageOwnerId && status.videoReady && !cloudSyncTimer) scheduleCloudProgressSync();
@@ -641,7 +643,7 @@
       (action === 'account-signup' ? account.signUp(email, password) : account.signIn(email, password)).then(function (result) {
         if (result.error) finishAccountRequest(result.error, true, result);
         else if (result.confirmationRequired) finishAccountRequest('Check your email for a confirmation link, then return here to sign in.', false, result);
-        else finishAccountRequest(result.videoReady ? 'Signed in. Your lesson videos are ready.' : 'Signed in. Video access is being prepared; local study and progress sync are available.', false, result);
+        else finishAccountRequest(result.videoReady ? 'Signed in. Your lesson videos are ready.' : (result.videoAccessError || 'Signed in. Video access is being prepared; local study and progress sync are available.'), false, result);
       }).catch(function () { finishAccountRequest('The account request failed. Check your connection and try again.', true); });
       return;
     }
@@ -659,7 +661,7 @@
     if (action === 'account-video-session') {
       accountBusy = true; render(true);
       account.syncVideoSession(accountStatus.session, true).then(function (ready) {
-        accountBusy = false; accountStatus = account.status(); accountMessage = ready ? 'Video access is ready.' : 'Video access could not be prepared. Try again.'; render(true);
+        accountBusy = false; accountStatus = account.status(); accountMessage = ready ? 'Video access is ready.' : (accountStatus.videoAccessError || 'Video access could not be prepared. Try again.'); render(true);
       });
       return;
     }
@@ -676,11 +678,11 @@
     var connectionMessage = connectionState === 'loading' || accountBusy ? 'Connecting to account services…' : (accountStatus && accountStatus.initializationError || 'Account services are not configured yet. Guest study remains available on this device.');
     var message = accountMessage || (configured ? (user ? 'CCI lesson progress syncs when you are online. Custom decks remain local.' : 'Create an account or sign in to sync CCI lesson progress and watch lesson videos.') : connectionMessage);
     var controls;
-    if (!configured) controls = (connectionState === 'unconfigured' ? '<p class="meta">Account sign-in is not configured for this app deployment. You can keep studying as a guest.</p>' : '') +
-      (account && connectionState !== 'loading' ? '<button type="button" class="btn sm" data-act="account-retry"' + (accountBusy ? ' disabled' : '') + '>Retry account connection</button>' : '');
+    if (!configured) controls = (!accountBusy && connectionState === 'unconfigured' ? '<p class="meta">Account sign-in is not configured for this app deployment. You can keep studying as a guest.</p>' : '') +
+      (account && !accountBusy && connectionState !== 'loading' ? '<button type="button" class="btn sm" data-act="account-retry">Retry account connection</button>' : '');
     else if (user) {
       controls = '<p><strong>Signed in as</strong> ' + esc(user.email || 'CCI Study learner') + '</p>' +
-        (!accountStatus.videoReady ? '<p class="meta">Lesson-video access is not ready on this device yet.</p><button type="button" class="btn sm" data-act="account-video-session"' + (accountBusy ? ' disabled' : '') + '>Prepare video access</button>' : '<p class="meta">Private lesson videos are available to your account.</p>') +
+        (!accountStatus.videoReady ? '<p class="meta">' + esc(accountStatus.videoAccessError || 'Lesson-video access is not ready on this device yet.') + '</p><button type="button" class="btn sm" data-act="account-video-session"' + (accountBusy ? ' disabled' : '') + '>Prepare video access</button>' : '<p class="meta">Private lesson videos are available to your account.</p>') +
         (guestProgressForImport ? '<div class="note"><strong>CCI lesson progress from this device is available.</strong><p>Import explicitly to merge it with your account. Your guest copy will remain on this device.</p><button type="button" class="btn sm primary" data-act="account-import"' + (accountBusy ? ' disabled' : '') + '>Import this device’s progress</button></div>' : '') +
         '<div class="row"><button type="button" class="btn sm" data-act="account-sync"' + (accountBusy ? ' disabled' : '') + '>Sync now</button><button type="button" class="btn sm ghost" data-act="account-signout"' + (accountBusy ? ' disabled' : '') + '>Sign out</button></div>';
     } else {

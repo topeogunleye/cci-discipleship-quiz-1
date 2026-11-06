@@ -13,13 +13,13 @@
     var localStorage = Object.prototype.hasOwnProperty.call(options, 'localStorage') ? options.localStorage : (typeof window !== 'undefined' ? window.localStorage : null);
     var isNativeApp = typeof window !== 'undefined' && window.CciNative && window.CciNative.isNative;
     var apiBase = String(options.apiBase || (typeof window !== 'undefined' && window.CCI_API_BASE) || (typeof window !== 'undefined' && !isNativeApp && /^https?:$/.test(window.location.protocol) ? window.location.origin : DEFAULT_API_BASE)).replace(/\/$/, '');
-    var client = null, authSubscription = null, onChange = null, currentSession = null, configured = false, videoReady = false;
+    var client = null, authSubscription = null, onChange = null, currentSession = null, configured = false, videoReady = false, videoReadyUserId = null, videoAccessError = '';
     var cookieSync = Promise.resolve(), lastToken = null, lastUserId = null, cachedDeviceId = null, videoRefreshTimer = null;
     var resumeHandler = null;
     var initializationState = 'idle', initializationError = '', initializationPromise = null, lifecycleId = 0;
 
     function status() {
-      return { configured: configured, user: currentSession && currentSession.user ? currentSession.user : null, session: currentSession, videoReady: videoReady, apiBase: apiBase, initializationState: initializationState, initializationError: initializationError };
+      return { configured: configured, user: currentSession && currentSession.user ? currentSession.user : null, session: currentSession, videoReady: videoReady, videoAccessError: videoAccessError, apiBase: apiBase, initializationState: initializationState, initializationError: initializationError };
     }
 
     function notify() {
@@ -31,18 +31,21 @@
       videoRefreshTimer = null;
     }
 
-    function scheduleVideoRefresh(token) {
+    function scheduleVideoRefresh(token, delay) {
       clearVideoRefreshTimer();
       if (!token || typeof window === 'undefined' || !currentSession || currentSession.access_token !== token) return;
       videoRefreshTimer = setTimeout(function () {
         videoRefreshTimer = null;
         if (currentSession && currentSession.access_token === token) syncVideoSession(currentSession, true);
-      }, 240000);
+      }, Number.isFinite(delay) && delay > 0 ? delay : 240000);
     }
 
     function syncVideoSession(session, force) {
       var token = session && session.access_token || '';
+      var userId = session && session.user && session.user.id || null;
       if (token === lastToken && !force) { videoReady = !!token && videoReady; notify(); return Promise.resolve(videoReady); }
+      var wasVideoReady = videoReady;
+      var nextRetryDelay = 240000;
       lastToken = token;
       clearVideoRefreshTimer();
       cookieSync = cookieSync.catch(function () {}).then(function () {
@@ -55,11 +58,38 @@
           body: JSON.stringify(token ? { accessToken: token } : { clear: true })
         });
       }).then(function (response) {
-        if (!response.ok) throw new Error(response.status === 401 ? 'Sign in again to watch lessons.' : 'Video access could not be prepared.');
+        if (!response.ok) {
+          var error = new Error('Video access could not be prepared.');
+          error.status = response.status;
+          var retryAfter = Number(response.headers && response.headers.get('Retry-After'));
+          if (Number.isFinite(retryAfter) && retryAfter > 0) error.retryAfter = Math.min(300, retryAfter);
+          throw error;
+        }
         videoReady = !!token && !!currentSession && currentSession.access_token === token;
+        videoReadyUserId = videoReady ? userId : null;
+        videoAccessError = '';
         return videoReady;
-      }).catch(function () { videoReady = false; return false; }).then(function (result) {
-        if (token && currentSession && currentSession.access_token === token) scheduleVideoRefresh(token);
+      }).catch(function (error) {
+        if (token && currentSession && currentSession.access_token === token) {
+          if (error && error.status === 401) {
+            videoReady = false;
+            videoReadyUserId = null;
+            nextRetryDelay = 0;
+            videoAccessError = 'Your video session is no longer valid. Refresh your sign-in to watch lessons.';
+          } else {
+            videoReady = wasVideoReady && videoReadyUserId === userId;
+            if (!videoReady) videoReadyUserId = null;
+            nextRetryDelay = error && Number.isFinite(error.retryAfter) ? error.retryAfter * 1000 : 30000;
+            videoAccessError = 'Video access is temporarily unavailable. Your account remains signed in; retry shortly.';
+          }
+        } else {
+          videoReady = false;
+          videoReadyUserId = null;
+          videoAccessError = '';
+        }
+        return false;
+      }).then(function (result) {
+        if (token && currentSession && currentSession.access_token === token && nextRetryDelay > 0) scheduleVideoRefresh(token, nextRetryDelay);
         notify();
         return result;
       });
@@ -134,7 +164,7 @@
         if (typeof document !== 'undefined' && document.removeEventListener) document.removeEventListener('visibilitychange', resumeHandler);
       }
       resumeHandler = null;
-      authSubscription = null; client = null; currentSession = null; lastToken = null; lastUserId = null; configured = false; videoReady = false;
+      authSubscription = null; client = null; currentSession = null; lastToken = null; lastUserId = null; configured = false; videoReady = false; videoReadyUserId = null; videoAccessError = '';
     }
 
     function init(changeHandler) {
@@ -211,7 +241,7 @@
       var result = await client.auth.signUp({ email: String(email || '').trim(), password: String(password || ''), options: { emailRedirectTo: (typeof window !== 'undefined' ? window.location.origin : apiBase) } });
       if (result.error) return { error: authError(result.error) };
       if (result.data.session) { acceptSession(result.data.session); await cookieSync; }
-      return { user: result.data.user || null, session: result.data.session || null, videoReady: videoReady, confirmationRequired: !result.data.session };
+      return { user: result.data.user || null, session: result.data.session || null, videoReady: videoReady, videoAccessError: videoAccessError, confirmationRequired: !result.data.session };
     }
 
     async function signIn(email, password) {
@@ -220,7 +250,7 @@
       if (result.error) return { error: authError(result.error) };
       acceptSession(result.data.session);
       await cookieSync;
-      return { user: result.data.user || null, session: result.data.session || null, videoReady: videoReady };
+      return { user: result.data.user || null, session: result.data.session || null, videoReady: videoReady, videoAccessError: videoAccessError };
     }
 
     async function signOut() {

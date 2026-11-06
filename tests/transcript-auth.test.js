@@ -75,3 +75,30 @@ test('transcript middleware rejects non-WebVTT paths and methods before continui
   assert.equal(invalidMethod.status, 405);
   assert.equal(nextCalls, 0);
 });
+
+test('transcript route distinguishes invalid credentials from retryable Auth failures', async () => {
+  const env = { SUPABASE_URL: 'https://auth.example', SUPABASE_ANON_KEY: 'sb_publishable_test_key', ALLOWED_APP_ORIGINS: 'capacitor://localhost' };
+  const originalFetch = globalThis.fetch;
+  const request = () => new Request('https://study.example/transcript/lesson.vtt', {
+    headers: { Cookie: '__Host-cci-video-session=header.payload.signature', Origin: 'capacitor://localhost' }
+  });
+  try {
+    globalThis.fetch = async () => new Response('{"secret":"never returned"}', { status: 401 });
+    const invalid = await onRequest({ request: request(), env });
+    assert.equal(invalid.status, 401);
+
+    for (const fetcher of [
+      async () => new Response('{"secret":"never returned"}', { status: 429, headers: { 'Retry-After': '12' } }),
+      async () => new Response('{"secret":"never returned"}', { status: 502 }),
+      async () => { throw new Error('private transport details'); }
+    ]) {
+      globalThis.fetch = fetcher;
+      const unavailable = await onRequest({ request: request(), env });
+      assert.equal(unavailable.status, 503);
+      assert.equal(unavailable.headers.get('cache-control'), 'no-store');
+      assert.equal(unavailable.headers.get('access-control-allow-origin'), 'capacitor://localhost');
+      assert.equal(unavailable.headers.get('access-control-allow-credentials'), 'true');
+      assert.doesNotMatch(await unavailable.text(), /never returned|private transport details/);
+    }
+  } finally { globalThis.fetch = originalFetch; }
+});

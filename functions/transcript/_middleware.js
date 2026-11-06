@@ -17,7 +17,9 @@ export async function onRequest(context) {
   const match = /^\/transcript\/([A-Za-z0-9._-]+\.vtt)$/i.exec(pathname);
   if (!match) return auth.jsonResponse({ error: 'Transcript not found.' }, 404, headersFor(request, env));
 
-  const user = await auth.getAuthenticatedUser(auth.videoToken(request), env);
+  let user;
+  try { user = await auth.getAuthenticatedUser(auth.videoToken(request), env); }
+  catch (error) { return auth.authServiceUnavailableResponse(request, env, error); }
   if (!user) return auth.jsonResponse({ error: 'Sign in to view this lesson transcript.' }, 401, headersFor(request, env));
 
   const filename = match[1];

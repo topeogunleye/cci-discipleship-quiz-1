@@ -208,6 +208,47 @@ test('account service prepares a private video session cookie without exposing t
   assert.equal(service.status().videoReady, false);
 });
 
+test('transient video-session failures preserve the signed-in user and ready player state', async () => {
+  let change, session = null, mode = 'ready';
+  const token = 'header.payload.signature-private-token';
+  const Supabase = { createClient: () => ({ auth: {
+    onAuthStateChange(callback) { change = callback; return { data: { subscription: { unsubscribe() {} } } }; },
+    async getSession() { return { data: { session } }; },
+    async signInWithPassword() { session = { access_token: token, user: { id: 'user-video', email: 'learner@example.com' } }; change('SIGNED_IN', session); return { data: { session, user: session.user } }; }
+  } }) };
+  const fetch = async url => {
+    if (url.endsWith('/api/auth/config')) return new Response(JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }));
+    if (mode === 'invalid') return new Response('{}', { status: 401 });
+    if (mode === 'unavailable') return new Response('{}', { status: 503, headers: { 'Retry-After': '7' } });
+    return new Response('{"ok":true}', { status: 200 });
+  };
+  const service = create({ apiBase: 'https://study.example', fetch, Supabase, localStorage: localStore() });
+  await service.init();
+  const signedIn = await service.signIn('learner@example.com', 'long-password');
+  assert.equal(signedIn.videoReady, true);
+
+  mode = 'unavailable';
+  assert.equal(await service.syncVideoSession(signedIn.session, true), false);
+  assert.equal(service.status().user.id, 'user-video');
+  assert.equal(service.status().videoReady, true, 'a transient renewal failure must not remove the playing video');
+  assert.match(service.status().videoAccessError, /temporarily unavailable/i);
+
+  const otherSession = { access_token: 'header.other.signature', user: { id: 'user-other', email: 'other@example.com' } };
+  session = otherSession;
+  change('SIGNED_IN', otherSession);
+  mode = 'unavailable';
+  await service.syncVideoSession(otherSession, true);
+  assert.equal(service.status().user.id, 'user-other');
+  assert.equal(service.status().videoReady, false, 'video readiness must not carry across users when renewal fails');
+
+  mode = 'invalid';
+  assert.equal(await service.syncVideoSession(otherSession, true), false);
+  assert.equal(service.status().user.id, 'user-other', 'invalid video credentials do not silently sign the app out');
+  assert.equal(service.status().videoReady, false);
+  assert.match(service.status().videoAccessError, /no longer valid/i);
+  service.destroy();
+});
+
 test('cloud progress sync retries a compare-and-set conflict and merges both sides', async () => {
   let call = 0, session = { access_token: 'header.payload.signature', user: { id: 'user-2' } };
   const remoteData = { schemaVersion: 1, progress: { d1: { cards: { q1: { attempts: 2, misses: 1, lastSeen: 20 } }, best: null } }, completedToday: {}, streak: { lastStreakDate: null } };

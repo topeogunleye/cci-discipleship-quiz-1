@@ -7,17 +7,20 @@ const crypto = require('node:crypto');
 const test = require('node:test');
 const vm = require('node:vm');
 const transcriptTools = require('../js/transcripts.js');
+const videoCatalog = require('../functions/_lib/video-catalog.cjs');
+const catalogData = require('../content/lesson-videos.json');
 
 const root = path.join(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'functions/api/videos.js'), 'utf8')
   .replace("import auth from '../_lib/auth.cjs';", "const auth = require('../_lib/auth.cjs');")
+  .replace("import videoCatalog from '../_lib/video-catalog.cjs';", "const videoCatalog = require('../_lib/video-catalog.cjs');")
   .replace(/export function /g, 'function ')
   .replace(/export async function /g, 'async function ')
   .replace(/export const __test = /, 'const __test = ');
 
 function loadHandlers(fetcher) {
   return vm.runInNewContext(source + '\n({ onRequest, onRequestOptions, __test })', {
-    require: request => request === '../_lib/auth.cjs' ? require('../functions/_lib/auth.cjs') : require(request), URL, Request, Response, Headers, fetch: fetcher
+    require: request => request === '../_lib/auth.cjs' ? require('../functions/_lib/auth.cjs') : (request === '../_lib/video-catalog.cjs' ? videoCatalog : require(request)), URL, Request, Response, Headers, fetch: fetcher
   });
 }
 
@@ -39,26 +42,67 @@ test('private video endpoint rejects unauthenticated access before reading R2', 
   assert.equal(response.headers.get('cache-control'), 'no-store');
 });
 
+test('private video endpoint reports invalid credentials separately from retryable Auth failures', async () => {
+  let r2Reads = 0;
+  const handlers = loadHandlers();
+  const bucket = { get: async () => { r2Reads++; return null; } };
+  const originalFetch = globalThis.fetch;
+  const request = () => new Request('https://study.example/api/videos?key=' + encodeURIComponent(catalogData.videos[0].objectKey), {
+    headers: { Cookie: '__Host-cci-video-session=header.payload.signature', Origin: 'capacitor://localhost' }
+  });
+  try {
+    globalThis.fetch = async () => new Response('{"error":"private upstream detail"}', { status: 401 });
+    const invalid = await handlers.onRequest({ request: request(), env: { ...environment(bucket), ALLOWED_APP_ORIGINS: 'capacitor://localhost' } });
+    assert.equal(invalid.status, 401);
+    assert.equal(r2Reads, 0);
+
+    globalThis.fetch = async () => new Response('{"error":"private upstream detail"}', { status: 429, headers: { 'Retry-After': '24' } });
+    const limited = await handlers.onRequest({ request: request(), env: { ...environment(bucket), ALLOWED_APP_ORIGINS: 'capacitor://localhost' } });
+    assert.equal(limited.status, 503);
+    assert.equal(limited.headers.get('retry-after'), '24');
+    assert.equal(limited.headers.get('cache-control'), 'no-store');
+    assert.equal(limited.headers.get('access-control-allow-origin'), 'capacitor://localhost');
+    assert.equal(limited.headers.get('access-control-allow-credentials'), 'true');
+    assert.doesNotMatch(await limited.text(), /private upstream detail/);
+    assert.equal(r2Reads, 0);
+
+    globalThis.fetch = async () => { throw new Error('upstream secret details'); };
+    const unavailable = await handlers.onRequest({ request: request(), env: { ...environment(bucket), ALLOWED_APP_ORIGINS: 'capacitor://localhost' } });
+    assert.equal(unavailable.status, 503);
+    assert.equal(unavailable.headers.get('retry-after'), '30');
+    assert.equal(r2Reads, 0);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('private video endpoint validates keys and streams authenticated byte ranges', async () => {
   const seen = [];
   const handlers = loadHandlers(async () => new Response(JSON.stringify({ id: '123e4567-e89b-12d3-a456-426614174000' }), { status: 200 }));
   const bucket = { get: async (key, options) => {
     seen.push({ key, options });
     return { size: 10, httpEtag: 'etag', range: { offset: 2, length: 4 }, body: new Response('2345').body };
-  } };
+  }, head: async key => { seen.push({ key, head: true }); return { size: 10, httpEtag: 'etag' }; } };
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify({ id: '123e4567-e89b-12d3-a456-426614174000' }), { status: 200 });
   try {
     const invalid = await handlers.onRequest({ request: new Request('https://study.example/api/videos?key=../private.mp4', { headers: { Cookie: '__Host-cci-video-session=header.payload.signature' } }), env: environment(bucket) });
     assert.equal(invalid.status, 404);
     assert.equal(seen.length, 0);
-    const response = await handlers.onRequest({ request: new Request('https://study.example/api/videos?key=Lesson%2Fvideo.mp4', { headers: { Cookie: '__Host-cci-video-session=header.payload.signature', Range: 'bytes=2-5' } }), env: environment(bucket) });
+    const unlisted = await handlers.onRequest({ request: new Request('https://study.example/api/videos?key=Unlisted%2Fprivate.mp4', { headers: { Cookie: '__Host-cci-video-session=header.payload.signature' } }), env: environment(bucket) });
+    assert.equal(unlisted.status, 404);
+    assert.equal(seen.length, 0, 'safe but unlisted keys must never reach R2');
+    const catalogKey = catalogData.videos[0].objectKey;
+    const catalogUrl = 'https://study.example/api/videos?key=' + encodeURIComponent(catalogKey);
+    const response = await handlers.onRequest({ request: new Request(catalogUrl, { headers: { Cookie: '__Host-cci-video-session=header.payload.signature', Range: 'bytes=2-5' } }), env: environment(bucket) });
     assert.equal(response.status, 206);
     assert.equal(response.headers.get('content-range'), 'bytes 2-5/10');
     assert.equal(response.headers.get('cache-control'), 'private, no-store');
     assert.equal(await response.text(), '2345');
-    assert.equal(seen[0].key, 'Lesson/video.mp4');
-    const invalidRange = await handlers.onRequest({ request: new Request('https://study.example/api/videos?key=Lesson%2Fvideo.mp4', { headers: { Cookie: '__Host-cci-video-session=header.payload.signature', Range: 'bytes=20-25' } }), env: environment(bucket) });
+    assert.equal(seen[0].key, catalogKey);
+    const head = await handlers.onRequest({ request: new Request(catalogUrl, { method: 'HEAD', headers: { Cookie: '__Host-cci-video-session=header.payload.signature' } }), env: environment(bucket) });
+    assert.equal(head.status, 200);
+    assert.equal(head.headers.get('content-length'), '10');
+    assert.equal(await head.text(), '');
+    const invalidRange = await handlers.onRequest({ request: new Request(catalogUrl, { headers: { Cookie: '__Host-cci-video-session=header.payload.signature', Range: 'bytes=20-25' } }), env: environment(bucket) });
     assert.equal(invalidRange.status, 416);
     assert.equal(invalidRange.headers.get('content-range'), 'bytes */10');
   } finally { globalThis.fetch = originalFetch; }
