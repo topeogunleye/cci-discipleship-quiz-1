@@ -1811,9 +1811,9 @@
     return '<main class="lesson-video-page" aria-labelledby="lesson-video-title">' +
       '<header class="lesson-video-topbar"><button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button><div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong></div><span class="lesson-video-section-count">' + section + ' / ' + S.decks.length + '</span></header>' +
       '<section class="lesson-video-frame' + (video && canWatchVideo ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
-      '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title" tabindex="-1">' + esc(title) + '</h1><p>' + (canWatchVideo ? 'Watch the lesson, then reinforce what you learned with a quick study activity.' : 'Study this lesson locally with flashcards or a quiz. Sign in to watch its video.') + '</p></div>' + (video && canWatchVideo ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">Continue lesson</button>' : '') + '</section>' +
+      '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title" tabindex="-1">' + esc(title) + '</h1><p>' + (canWatchVideo ? 'Watch this lesson video, then reinforce Chapter ' + section + ' (' + esc(parsed.topic) + ') with study activities covering all ' + d.cards.length + ' questions across the chapter’s ' + videos.length + ' recordings.' : 'Study Chapter ' + section + ' (' + esc(parsed.topic) + ') locally with flashcards or a quiz covering all ' + d.cards.length + ' questions. Sign in to watch its lesson videos.') + '</p></div>' + (video && canWatchVideo ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">' + (V.videoTime > 0 ? 'Resume lesson' : 'Play lesson') + '</button>' : '') + '</section>' +
       videoNavigation +
-      '<div class="lesson-video-study-actions" role="group" aria-label="Study this lesson"><button type="button" class="btn" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '">Flashcards</button><button type="button" class="btn" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '">Take quiz</button></div>' +
+      '<div class="lesson-video-study-actions" role="group" aria-label="Study Chapter ' + section + ' (' + esc(parsed.topic) + ')"><button type="button" class="btn" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" aria-label="Study Chapter ' + section + ' Flashcards, ' + d.cards.length + ' cards">Chapter Flashcards (' + d.cards.length + ')</button><button type="button" class="btn" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" aria-label="Take Chapter ' + section + ' Quiz, ' + d.cards.length + ' questions">Chapter Quiz (' + d.cards.length + ')</button></div>' +
       transcriptPanel +
       videoNav +
     '</main>';
@@ -2941,9 +2941,33 @@
   function setup(mode, id) {
     var ids = id === '*' ? (SEL.size ? Array.from(SEL) : S.decks.map(function (d) { return d.id; })) : [id];
     if (!ids.length) ids = S.decks.map(function (d) { return d.id; });
-    V.setup = { mode: mode, ids: ids, returnToVideo: V.name === 'lesson-video' ? { deckId: V.id, videoIndex: Number.isInteger(V.videoIndex) ? V.videoIndex : 0, currentTime: 0 } : null };
+    var returnToVideo = null;
+    if (V.name === 'lesson-video') {
+      var currentVideo = document.getElementById('lesson-video-player');
+      var videoTime = currentVideo && Number.isFinite(currentVideo.currentTime) ? Math.max(0, currentVideo.currentTime) : 0;
+      returnToVideo = {
+        deckId: V.id,
+        videoIndex: Number.isInteger(V.videoIndex) ? V.videoIndex : 0,
+        currentTime: videoTime
+      };
+      if (currentVideo && !currentVideo.paused) currentVideo.pause();
+    }
+    V.setup = { mode: mode, ids: ids, returnToVideo: returnToVideo };
     var q = mode === 'quiz';
+    var scopeNote = '';
+    if (returnToVideo && ids.length === 1) {
+      var targetDeck = deck(ids[0]);
+      if (targetDeck) {
+        var targetParsed = MobileStudy.parseChapterTitle(targetDeck.title);
+        var targetVideos = lessonVideosForDeck(targetDeck.id);
+        scopeNote = '<p class="note" style="margin-top:4px;margin-bottom:var(--space-md);">' +
+          'Chapter ' + (targetParsed.sectionNum || 1) + ': ' + esc(targetParsed.topic) +
+          ' · ' + targetVideos.length + ' ' + (targetVideos.length === 1 ? 'video' : 'videos') +
+          ' · ' + targetDeck.cards.length + ' ' + (targetDeck.cards.length === 1 ? 'question' : 'questions') + '</p>';
+      }
+    }
     openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setup-title"><h2 id="setup-title">' + (q ? 'Start quiz' : 'Start flashcards') + '</h2>' +
+      scopeNote +
       (q ? '<label class="field"><span>Questions</span><select id="s-len"><option value="0">All cards</option><option value="10">10</option><option value="20">20</option><option value="30">30</option></select></label>'
          : '<label class="check"><input type="checkbox" id="s-shuf"' + (S.settings.shuffle ? ' checked' : '') + '> Shuffle cards</label>') +
       '<label class="check"><input type="checkbox" id="s-unk"> Skip cards I already know</label><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="start">Start</button></div></div>');

@@ -2,9 +2,9 @@ name: Test, build, and deploy to Cloudflare Pages
 
 on:
   push:
-    branches: [main, 'fix/**']
+    branches: [main, 'fix/**', 'antigravity/**']
   pull_request:
-    branches: [main]
+    branches: [main, 'antigravity/**']
   workflow_dispatch:
 
 permissions:
