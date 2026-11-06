@@ -7,7 +7,7 @@
   var STARTER_DECKS = [], DEVOTIONALS = [], LESSON_VIDEOS = [];
   var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, biblePreviewCache = null, suppressBiblePreviewFocus = null;
   var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), activeStorageOwnerId = null, requestedStorageOwnerId = null, guestProgressForImport = null, account = Account ? Account.create() : null, accountStatus = { configured: false, user: null, videoReady: false }, accountBootReady = false, accountMessage = '', accountEmailDraft = '', accountBusy = false, accountSwitchQueue = Promise.resolve(), cloudSyncQueue = Promise.resolve(), cloudSyncTimer = null, lessonTranscriptCache = Object.create(null), lessonTranscriptRequests = Object.create(null), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
-  var browserLocalStorage = null, browserIndexedDB = null;
+  var browserLocalStorage = null, browserIndexedDB = null, animateRouteChange = false;
   var lessonTranscriptGeneration = 0;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
   if (!browserLocalStorage) { try { if (typeof localStorage !== 'undefined') browserLocalStorage = localStorage; } catch (e) {} }
@@ -2124,6 +2124,7 @@
           '<ol>' + examRows + '</ol>' +
         '</section>' +
         '<div class="completion-actions-bar">' +
+          (R.returnToVideo ? '<button class="btn full" data-act="results-return-video">Return to video</button>' : '') +
           '<button class="btn primary full btn-continue" data-act="home">Continue</button>' +
         '</div>' +
       '</section>';
@@ -2154,6 +2155,7 @@
       '</div>' +
       '<div class="result-actions completion-actions-bar">' +
         (miss.length ? '<button class="btn primary full" data-act="review">Review ' + plural(miss.length, R.kind === 'quiz' ? 'missed card' : 'card') + '</button>' : '<p class="note result-note">' + (R.kind === 'quiz' ? 'No missed cards. Outstanding work!' : 'Nothing left marked as still learning.') + '</p>') +
+        (R.returnToVideo ? '<button class="btn full" data-act="results-return-video">Return to video</button>' : '') +
         '<button class="btn full" data-act="again">' + (R.kind === 'quiz' ? 'Retake quiz' : 'Study again') + '</button>' +
         '<button class="btn full ghost btn-continue" data-act="results-continue">Continue</button>' +
       '</div>' +
@@ -2691,8 +2693,10 @@
 
   function sessionHead(t, right, isExam) {
     return '<header class="top study-header coaching-study-header">' +
-      '<button class="study-close-btn" data-act="pause-session" aria-label="Close study session">' +
-        '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+      '<button class="study-close-btn" data-act="' + (V.returnToVideo ? 'study-return-video' : 'pause-session') + '" aria-label="' + (V.returnToVideo ? 'Return to video' : 'Close study session') + '" title="' + (V.returnToVideo ? 'Return to video' : 'Close study session') + '">' +
+        (V.returnToVideo
+          ? '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>'
+          : '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>') +
       '</button>' +
       '<div class="study-heading">' +
         '<span class="eyebrow">CCI · DISCIPLESHIP</span>' +
@@ -2786,10 +2790,30 @@
     var showRocket = (V.name === 'home' || V.name === 'journey');
     var rocketHtml = showRocket ? renderRocketFab() : '';
     app.innerHTML = banner() +
-      '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + '">' +
+      '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + (animateRouteChange ? ' app-screen-enter' : '') + '">' +
         (hasDesktopSidebar ? renderDesktopSidebar(V.name === 'devotional' ? 'home' : V.name) : '') +
         '<main class="desktop-main">' + view() + tabBarHtml + rocketHtml + '</main>' +
       '</div>';
+    animateRouteChange = false;
+    var renderedVideo = document.getElementById('lesson-video-player');
+    if (renderedVideo) {
+      var videoAction = app.querySelector('.lesson-video-continue');
+      var syncVideoAction = function () {
+        if (!videoAction) return;
+        var label = renderedVideo.ended ? 'Replay lesson' : (renderedVideo.paused ? (renderedVideo.currentTime > 0 ? 'Resume lesson' : 'Play lesson') : 'Pause lesson');
+        var accessibleLabel = label + ': ' + (renderedVideo.getAttribute('aria-label') || 'video');
+        if (videoAction.textContent !== label) videoAction.textContent = label;
+        if (videoAction.getAttribute('aria-label') !== accessibleLabel) videoAction.setAttribute('aria-label', accessibleLabel);
+      };
+      ['play', 'pause', 'ended', 'timeupdate', 'loadedmetadata'].forEach(function (eventName) { renderedVideo.addEventListener(eventName, syncVideoAction); });
+      var seekTime = Number(V.videoTime);
+      if (Number.isFinite(seekTime) && seekTime > 0) {
+        var seekVideo = function () { try { renderedVideo.currentTime = Math.min(seekTime, Number.isFinite(renderedVideo.duration) ? renderedVideo.duration : seekTime); } catch (e) {} };
+        if (renderedVideo.readyState >= 1) seekVideo();
+        else renderedVideo.addEventListener('loadedmetadata', seekVideo, { once: true });
+      }
+      syncVideoAction();
+    }
     if (!keep) window.scrollTo(0, 0);
     if (V.name === 'flash') {
       var f = app.querySelector('.flip');
@@ -2804,6 +2828,7 @@
     if (V.name === 'exam' && v.name !== 'exam') stopExamTimer();
     rocketMenuOpen = false;
     var prev = V;
+    animateRouteChange = !!prev && (prev.name !== v.name || prev.id !== v.id);
     V = v;
     try {
       if (window.history && window.history.pushState) {
@@ -2812,6 +2837,7 @@
           window.history.replaceState(stateObj, '', window.location.href);
         } else if (!prev || prev.name !== V.name || prev.id !== V.id) {
           stateObj.videoIndex = Number.isInteger(V.videoIndex) ? V.videoIndex : 0;
+          if (Number.isFinite(V.videoTime) && V.videoTime >= 0) stateObj.videoTime = V.videoTime;
           window.history.pushState(stateObj, '', window.location.href);
         }
       }
@@ -2826,7 +2852,7 @@
           pauseStudySession();
         }
         rocketMenuOpen = false;
-        V = { name: e.state.name, id: e.state.id, videoIndex: Number.isInteger(e.state.videoIndex) ? e.state.videoIndex : 0 };
+        V = { name: e.state.name, id: e.state.id, videoIndex: Number.isInteger(e.state.videoIndex) ? e.state.videoIndex : 0, videoTime: Number.isFinite(e.state.videoTime) && e.state.videoTime >= 0 ? e.state.videoTime : 0 };
         render();
       }
     });
@@ -2836,7 +2862,7 @@
   function setup(mode, id) {
     var ids = id === '*' ? (SEL.size ? Array.from(SEL) : S.decks.map(function (d) { return d.id; })) : [id];
     if (!ids.length) ids = S.decks.map(function (d) { return d.id; });
-    V.setup = { mode: mode, ids: ids };
+    V.setup = { mode: mode, ids: ids, returnToVideo: V.name === 'lesson-video' ? { deckId: V.id, videoIndex: Number.isInteger(V.videoIndex) ? V.videoIndex : 0, currentTime: 0 } : null };
     var q = mode === 'quiz';
     openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setup-title"><h2 id="setup-title">' + (q ? 'Start quiz' : 'Start flashcards') + '</h2>' +
       (q ? '<label class="field"><span>Questions</span><select id="s-len"><option value="0">All cards</option><option value="10">10</option><option value="20">20</option><option value="30">30</option></select></label>'
@@ -2910,7 +2936,12 @@
     if (o.unk) cards = cards.filter(function (x) { return !isMastered(x.deckId, x.card.id); });
     if (exam) cards = StudyLogic.examQuestions(cards, o.limit);
     if (!cards.length) { toast(selectedCount ? 'All selected cards are already marked known.' : 'There are no cards in this selection yet.'); return; }
-    closeModal(); begin(s.mode, exam ? cards : (o.shuf ? shuffle(cards) : cards), o, s.ids);
+    if (s.returnToVideo) {
+      var studyVideo = document.getElementById('lesson-video-player');
+      s.returnToVideo.currentTime = studyVideo && Number.isFinite(studyVideo.currentTime) ? Math.max(0, studyVideo.currentTime) : 0;
+      if (studyVideo && !studyVideo.paused) studyVideo.pause();
+    }
+    closeModal(); begin(s.mode, exam ? cards : (o.shuf ? shuffle(cards) : cards), o, s.ids, s.returnToVideo);
   }
   function startDue() {
     var cards = dueReviewItems(allCardItems(), Date.now());
@@ -2945,12 +2976,12 @@
     var mode = requestedMode === 'flash' ? 'flash' : 'quiz';
     begin(mode, shuffle(cards), { unk: false, limit: mode === 'quiz' ? 10 : 0, shuf: true, challenge: true, saveBest: false }, deckIdsFor(cards));
   }
-  function begin(mode, cards, o, ids) {
+  function begin(mode, cards, o, ids, returnToVideo) {
     if (mode === 'quiz' || mode === 'exam') {
       cards = cards.map(function (it) { return { deckId: it.deckId, card: it.card, optionOrder: shuffle([0, 1, 2, 3]) }; });
       if (mode === 'quiz' && o.limit && o.limit < cards.length) cards = cards.slice(0, o.limit);
     }
-    var session = { name: mode, cards: cards, i: 0, flipped: false, picked: null, score: 0, answers: [], marks: {}, opts: o, ids: ids, startedAt: Date.now() };
+    var session = { name: mode, cards: cards, i: 0, flipped: false, picked: null, score: 0, answers: [], marks: {}, opts: o, ids: ids, startedAt: Date.now(), returnToVideo: returnToVideo || null };
     if (mode === 'exam') session.remaining = o.duration;
     go(session);
     saveActiveSession();
@@ -3013,7 +3044,7 @@
     var learn = V.cards.filter(function (x) { return V.marks[x.card.id] === 'unknown'; }), known = V.cards.filter(function (x) { return V.marks[x.card.id] === 'known'; }).length;
     var isFirst = checkAndRecordFirstSessionToday();
     S.pausedSession = null; save();
-    go({ name: 'results', kind: 'flash', known: known, learning: learn, skipped: V.cards.length - known - learn.length, all: V.cards, opts: V.opts, ids: V.ids, isFirstSessionToday: isFirst });
+    go({ name: 'results', kind: 'flash', known: known, learning: learn, skipped: V.cards.length - known - learn.length, all: V.cards, opts: V.opts, ids: V.ids, isFirstSessionToday: isFirst, returnToVideo: V.returnToVideo || null });
   }
   function finishQuiz() {
     var per = {}, missed = [];
@@ -3026,7 +3057,7 @@
     });
     var isFirst = checkAndRecordFirstSessionToday();
     S.pausedSession = null; save();
-    go({ name: 'results', kind: 'quiz', score: V.score, total: V.answers.length, missed: missed, newBest: newBest, all: V.cards, opts: V.opts, ids: V.ids, isFirstSessionToday: isFirst });
+    go({ name: 'results', kind: 'quiz', score: V.score, total: V.answers.length, missed: missed, newBest: newBest, all: V.cards, opts: V.opts, ids: V.ids, isFirstSessionToday: isFirst, returnToVideo: V.returnToVideo || null });
   }
   function finishExam(expired) {
     if (V.name !== 'exam') return;
@@ -3149,9 +3180,20 @@
         break;
       case 'lesson-video-play':
         var lessonVideoElement = document.getElementById('lesson-video-player');
-        if (lessonVideoElement && lessonVideoElement.play) {
-          var playbackAttempt = lessonVideoElement.play();
+        if (lessonVideoElement) {
+          var playbackAttempt = !lessonVideoElement.paused && !lessonVideoElement.ended
+            ? (lessonVideoElement.pause(), null)
+            : lessonVideoElement.play();
           if (playbackAttempt && playbackAttempt.catch) playbackAttempt.catch(function () { toast('Video playback could not start. Check the video source and try again.'); });
+        }
+        break;
+      case 'study-return-video':
+        if (isStudySession(V.name) && V.returnToVideo) {
+          var returnContext = V.returnToVideo;
+          if (V.name === 'exam') stopExamTimer();
+          S.pausedSession = MobileStudy.snapshot(V);
+          save();
+          go({ name: 'lesson-video', id: returnContext.deckId, videoIndex: returnContext.videoIndex, videoTime: returnContext.currentTime });
         }
         break;
       case 'lesson-transcript-seek':
@@ -3268,6 +3310,9 @@
         } else {
           go({ name: 'home' });
         }
+        break;
+      case 'results-return-video':
+        if (V.returnToVideo) go({ name: 'lesson-video', id: V.returnToVideo.deckId, videoIndex: V.returnToVideo.videoIndex, videoTime: V.returnToVideo.currentTime });
         break;
       case 'close-streak':
         go({ name: V.returnTo || 'home' });
@@ -3441,8 +3486,8 @@
       case 'next': step(1); break;
       case 'prev': step(-1); break;
       case 'pick': pick(+t.dataset.i); break;
-      case 'review': begin('flash', shuffle(V.kind === 'quiz' ? V.missed : V.learning), {}, V.ids); break;
-      case 'again': var all = V.all; begin(V.kind === 'quiz' ? 'quiz' : 'flash', V.kind === 'quiz' ? shuffle(all) : all, V.opts, V.ids); break;
+      case 'review': begin('flash', shuffle(V.kind === 'quiz' ? V.missed : V.learning), {}, V.ids, V.returnToVideo); break;
+      case 'again': var all = V.all; begin(V.kind === 'quiz' ? 'quiz' : 'flash', V.kind === 'quiz' ? shuffle(all) : all, V.opts, V.ids, V.returnToVideo); break;
     }
   });
   function step(dir) {
