@@ -9290,19 +9290,3 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 @media(max-width:360px){.lesson-video-frame.is-unavailable{min-height:180px}.lesson-video-top-title strong{font-size:var(--text-base)}.lesson-video-section-count{font-size:var(--text-xs)}}
 @media (min-width:701px) and (max-height:920px){.lesson-video-page{padding-top:12px}.lesson-video-topbar{margin-bottom:12px}.lesson-video-frame{width:min(100%,900px)}.lesson-video-summary{margin-top:12px}}
 @media (min-width:701px) and (max-height:820px){.lesson-video-frame{width:min(100%,740px)}}
-
-/* Short, purposeful transitions help route and dialog changes feel connected. */
-@keyframes appScreenEnter{from{opacity:.72;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
-@keyframes appModalScrimEnter{from{opacity:0}to{opacity:1}}
-@keyframes appModalSheetEnter{from{opacity:.88;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-.app-screen-enter{animation:appScreenEnter 180ms var(--ease-out, ease-out) both}
-#modal .scrim{animation:appModalScrimEnter 150ms ease-out both}
-#modal .sheet{animation:appModalSheetEnter 190ms var(--ease-out, ease-out) both}
-.lesson-video-continue{transition:transform 160ms ease,box-shadow 160ms ease}
-.lesson-video-continue:hover{transform:translateY(-1px)}
-
-@media(prefers-reduced-motion:reduce){
-  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
-  .app-screen-enter,#modal .scrim,#modal .sheet{animation:none!important}
-  .lesson-video-continue:hover{transform:none}
-}
