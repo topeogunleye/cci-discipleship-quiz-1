@@ -988,15 +988,17 @@
   /* ---------- helpers ---------- */
   function applyTheme() { var t = S.settings.theme; if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t); }
   var toastT; function toast(m) { toastEl.textContent = m; toastEl.className = 'show'; clearTimeout(toastT); toastT = setTimeout(function () { toastEl.className = ''; }, 3200); }
-  function openModal(html) {
-    returnFocus = document.activeElement;
+  function openModal(html, options) {
+    options = options || {};
+    if (!options.preserveReturnFocus) returnFocus = document.activeElement;
     modal.innerHTML = html;
     var rocketEl = document.querySelector('.rocket-container');
     if (rocketEl) rocketEl.style.display = 'none';
-    var first = modal.querySelector('button, input, select, textarea');
+    var first = options.focusSelector ? modal.querySelector(options.focusSelector) : null;
+    if (!first || first.disabled) first = modal.querySelector('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])');
     if (first) first.focus();
   }
-  function openLessonDetailSheet(lessonId) {
+  function openLessonDetailSheet(lessonId, focusAction) {
     var detailDeck = deck(lessonId);
     if (!detailDeck) return;
     var detailProgress = prog(detailDeck.id);
@@ -1009,6 +1011,22 @@
     var sectionNumber = parsedDetail.sectionNum || 1;
     var progressPct = detailDeck.cards.length ? Math.round(100 * detailMastered / detailDeck.cards.length) : 0;
     var gradient = 'deck-grad-' + (((sectionNumber - 1) % 12) + 1);
+    var lessonDecks = STARTER_DECKS.map(function (source) { return deck('d-' + slug(source.title)); }).filter(Boolean);
+    var lessonIndex = lessonDecks.findIndex(function (lessonDeck) { return lessonDeck.id === detailDeck.id; });
+    var lessonNavigation = '';
+    if (lessonIndex >= 0 && lessonDecks.length > 1) {
+      var previousLesson = lessonIndex > 0 ? lessonDecks[lessonIndex - 1] : null;
+      var nextLesson = lessonIndex < lessonDecks.length - 1 ? lessonDecks[lessonIndex + 1] : null;
+      lessonNavigation = '<div class="lesson-detail-navigation" role="group" aria-label="Navigate lessons">' +
+        (previousLesson
+          ? '<button type="button" class="btn lesson-detail-previous" data-act="lesson-detail-prev" data-id="' + previousLesson.id + '" aria-label="Previous lesson: ' + esc(MobileStudy.parseChapterTitle(previousLesson.title).topic) + '">← Previous</button>'
+          : '<button type="button" class="btn lesson-detail-previous" disabled aria-label="No previous lesson">← Previous</button>') +
+        '<span class="lesson-detail-position">Lesson ' + (lessonIndex + 1) + ' of ' + lessonDecks.length + '</span>' +
+        (nextLesson
+          ? '<button type="button" class="btn lesson-detail-next" data-act="lesson-detail-next" data-id="' + nextLesson.id + '" aria-label="Next lesson: ' + esc(MobileStudy.parseChapterTitle(nextLesson.title).topic) + '">Next →</button>'
+          : '<button type="button" class="btn lesson-detail-next" disabled aria-label="No next lesson">Next →</button>') +
+        '</div>';
+    }
     openModal('<div class="scrim" data-act="close"></div><section class="sheet lesson-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="lesson-detail-title">' +
       '<span class="lesson-detail-handle" aria-hidden="true"></span>' +
       '<div class="lesson-detail-hero ' + gradient + '">' +
@@ -1021,11 +1039,12 @@
         '<div><b>' + detailMastered + '</b><span>Mastered</span></div>' +
         '<div><b>' + detailWeak + '</b><span>Weak spots</span></div>' +
       '</div>' +
+      lessonNavigation +
       '<div class="lesson-detail-actions">' +
         '<button type="button" class="btn primary lesson-detail-study" data-act="lesson-detail-study" data-id="' + detailDeck.id + '">Study this lesson</button>' +
         '<button type="button" class="btn lesson-detail-close" data-act="close">Close</button>' +
       '</div>' +
-    '</section>');
+    '</section>', focusAction ? { preserveReturnFocus: true, focusSelector: '[data-act="' + focusAction + '"]' } : null);
   }
   function ask(msg, label, fn) { pendingAsk = fn; openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><h2 id="dialog-title" class="dialog-title">Please confirm</h2><p>' + esc(msg) + '</p><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn danger" data-act="askok">' + esc(label) + '</button></div></div>'); }
   function closeModal() {
@@ -3191,6 +3210,8 @@
       case 'home': closeModal(); go({ name: 'home' }); break;
       case 'open-chapter': go({ name: 'chapter', id: t.dataset.id }); break;
       case 'lesson-detail-open': openLessonDetailSheet(t.dataset.id); break;
+      case 'lesson-detail-prev':
+      case 'lesson-detail-next': openLessonDetailSheet(t.dataset.id, a); break;
       case 'lesson-detail-study':
         closeModal();
         go({ name: 'chapter', id: t.dataset.id });

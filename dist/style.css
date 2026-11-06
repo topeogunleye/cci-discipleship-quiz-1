@@ -1338,6 +1338,34 @@ a:hover { color: var(--link-hover); }
   text-transform: none;
 }
 
+.lesson-detail-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.lesson-detail-navigation .btn {
+  min-height: 42px;
+  padding: 8px 10px;
+  font-size: .82rem;
+  white-space: nowrap;
+}
+
+.lesson-detail-navigation .btn:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.lesson-detail-position {
+  color: var(--ink-secondary);
+  font-size: .82rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
 .lesson-detail-actions {
   display: flex;
   flex-direction: column;
