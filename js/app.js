@@ -577,6 +577,26 @@
       else if (V.name === 'settings') render(true);
     }).catch(function () {});
   }
+  var pendingVideoReturnKey = 'cci-pending-video-return';
+  function readPendingVideoReturn() {
+    try {
+      var saved = JSON.parse(window.sessionStorage.getItem(pendingVideoReturnKey) || 'null');
+      if (saved && typeof saved.deckId === 'string' && saved.deckId) return {
+        deckId: saved.deckId,
+        videoIndex: Number.isInteger(saved.videoIndex) && saved.videoIndex >= 0 ? saved.videoIndex : 0
+      };
+    } catch (e) {}
+    return null;
+  }
+  function savePendingVideoReturn(deckId, videoIndex) {
+    try {
+      if (deckId) window.sessionStorage.setItem(pendingVideoReturnKey, JSON.stringify({
+        deckId: String(deckId),
+        videoIndex: Number.isInteger(videoIndex) && videoIndex >= 0 ? videoIndex : 0
+      }));
+      else window.sessionStorage.removeItem(pendingVideoReturnKey);
+    } catch (e) {}
+  }
   function accountAction(action, form) {
     if (!account) { accountMessage = 'Account support is not available in this app build.'; render(true); return; }
     if (action === 'account-retry') {
@@ -627,8 +647,12 @@
       function finishAccountRequest(message, failed, result) {
         accountBusy = false;
         accountMessage = message;
-        if (!failed && result && !result.confirmationRequired && V.name === 'settings' && V.returnToVideoId) {
-          var returnId = V.returnToVideoId, returnIndex = Number.isInteger(V.returnVideoIndex) ? V.returnVideoIndex : 0;
+        var pendingReturn = V.name === 'settings' && V.returnToVideoId
+          ? { deckId: V.returnToVideoId, videoIndex: Number.isInteger(V.returnVideoIndex) ? V.returnVideoIndex : 0 }
+          : readPendingVideoReturn();
+        if (!failed && result && !result.confirmationRequired && pendingReturn) {
+          var returnId = pendingReturn.deckId, returnIndex = pendingReturn.videoIndex;
+          savePendingVideoReturn(null);
           accountEmailDraft = '';
           accountMessage = '';
           go({ name: 'lesson-video', id: returnId, videoIndex: returnIndex });
@@ -3242,6 +3266,9 @@
           if (nextRoute.name === 'settings' && t.dataset.returnVideo) {
             nextRoute.returnToVideoId = t.dataset.returnVideo;
             nextRoute.returnVideoIndex = Number(t.dataset.returnVideoIndex) || 0;
+            savePendingVideoReturn(nextRoute.returnToVideoId, nextRoute.returnVideoIndex);
+          } else if (nextRoute.name !== 'settings' || V.name !== 'settings') {
+            savePendingVideoReturn(null);
           }
           go(nextRoute);
         }
