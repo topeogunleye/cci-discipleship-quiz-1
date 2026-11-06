@@ -225,3 +225,120 @@ test('lesson video view clearly communicates chapter study scope and card counts
   assert.match(appSource, /reinforce Chapter ' \+ section \+ ' \(/);
   assert.match(appSource, /scopeNote = '<p class="note" style="margin-top:4px;margin-bottom:var\(--space-md\);">' \+/);
 });
+
+test('lesson video study modal launches overlay without unmounting player, pauses video, and auto-saves progress', () => {
+  const appSource = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
+  assert.match(appSource, /startVideoStudyModal/);
+  assert.match(appSource, /renderVideoStudyModal/);
+  assert.match(appSource, /closeVideoStudyModal/);
+  assert.match(appSource, /stepVideoStudy/);
+  assert.match(appSource, /pickVideoStudy/);
+  assert.match(appSource, /finishVideoStudy/);
+  assert.match(appSource, /class="sheet video-study-modal"/);
+  assert.match(appSource, /data-act="close-video-study"/);
+  assert.match(appSource, /data-act="resume-video-study"/);
+  assert.match(appSource, /data-act="results-return-video"/);
+
+  const styleSource = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
+  assert.match(styleSource, /.video-study-scrim/);
+  assert.match(styleSource, /#modal .video-study-modal/);
+  assert.match(styleSource, /@media\s*\(max-width:\s*767px\)/);
+  assert.match(styleSource, /@media\s*\(min-width:\s*768px\)/);
+  assert.match(styleSource, /.video-study-header/);
+  assert.match(styleSource, /.video-study-close-btn/);
+  assert.match(styleSource, /.video-study-body/);
+
+  const elements = {
+    app: { innerHTML: '', querySelector: () => null, querySelectorAll: () => [] },
+    modal: { innerHTML: '', querySelector: () => null, querySelectorAll: () => [] },
+    toast: { textContent: '', className: '' },
+    'lesson-video-player': { paused: false, currentTime: 42.5, pause() { this.paused = true; }, addEventListener() {}, removeEventListener() {}, getAttribute() { return ''; } },
+    's-unk': { checked: false },
+    's-shuf': { checked: false },
+    's-len': { value: '0' }
+  };
+  let capturedEvents = {};
+  const doc = {
+    getElementById: id => elements[id],
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: (name, fn) => { capturedEvents[name] = fn; },
+    activeElement: { focus() {} },
+    documentElement: { setAttribute() {}, removeAttribute() {} },
+    contains: () => true
+  };
+  const win = {
+    DeckParser: require('../js/parser.js'),
+    StudyStorage: require('../js/storage.js'),
+    CCITranscripts: require('../js/transcripts.js'),
+    MobileStudy: require('../js/mobile-study.js'),
+    StudyLogic: require('../js/study.js'),
+    CCIAccount: { create: () => ({ init: () => Promise.resolve({ configured: false }) }) },
+    location: { protocol: 'https:', origin: 'https://study.example', href: 'https://study.example/' },
+    scrollTo: () => {},
+    localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+    indexedDB: null
+  };
+  const testWrapper = appSource.replace('  boot();', `
+    boot();
+    window._test = {
+      getV: () => V,
+      setV: val => { V = val; },
+      getS: () => S,
+      setup: setup,
+      start: start,
+      closeVideoStudyModal: closeVideoStudyModal,
+      stepVideoStudy: stepVideoStudy
+    };
+  `);
+  vm.runInNewContext(testWrapper, {
+    window: win,
+    document: doc,
+    URL,
+    Request,
+    Response,
+    Headers,
+    setTimeout: () => {},
+    clearTimeout: () => {}
+  });
+  const t = win._test;
+  const deckId = 'd-test-chapter';
+  t.getS().decks = [{
+    id: deckId,
+    title: 'Section 1 Test Chapter',
+    cards: [
+      { id: 'c1', question: 'Question 1', options: ['A', 'B', 'C', 'D'], answer: 'A' },
+      { id: 'c2', question: 'Question 2', options: ['A', 'B', 'C', 'D'], answer: 'B' }
+    ]
+  }];
+  t.setV({ name: 'lesson-video', id: deckId, videoIndex: 0, videoTime: 10 });
+
+  // Setup pauses video
+  t.setup('flash', deckId);
+  assert.equal(elements['lesson-video-player'].paused, true, 'Video must pause when study setup opens');
+
+  // Start study modal
+  t.start();
+  assert.equal(t.getV().name, 'lesson-video', 'V.name must remain lesson-video');
+  assert.ok(t.getV().videoStudy, 'videoStudy session must be active');
+  assert.match(elements.modal.innerHTML, /video-study-modal/);
+
+  // Advance card
+  t.stepVideoStudy(1);
+  assert.equal(t.getV().videoStudy.i, 1);
+  assert.equal(t.getS().pausedSession.i, 1);
+
+  // Close study modal auto-saves in-flight progress
+  t.closeVideoStudyModal();
+  assert.equal(t.getV().videoStudy, null);
+  assert.equal(elements.modal.innerHTML, '');
+  assert.ok(t.getS().pausedSession);
+  assert.equal(t.getS().pausedSession.returnToVideo.deckId, deckId);
+  assert.equal(t.getS().pausedSession.i, 1);
+
+  // Re-opening setup offers resume shortcut
+  t.setup('flash', deckId);
+  assert.match(elements.modal.innerHTML, /data-act="resume-video-study"/);
+  assert.match(elements.modal.innerHTML, /Resume saved flashcards/);
+});
+

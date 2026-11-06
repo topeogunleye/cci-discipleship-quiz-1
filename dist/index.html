@@ -9450,6 +9450,144 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 .lesson-video-position{min-width:110px;text-align:center;color:var(--muted);font-size:var(--text-sm);font-weight:700}
 @media(max-width:700px){.lesson-video-navigation{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.lesson-video-position{grid-column:1 / -1;grid-row:1;width:100%}.lesson-video-nav-button{width:100%;min-width:0}.lesson-video-navigation .lesson-video-nav-button:first-child{grid-column:1;grid-row:2}.lesson-video-navigation .lesson-video-nav-button:last-child{grid-column:2;grid-row:2}}
 
+/* ---------- Video Lesson In-Page Study Modal ---------- */
+.video-study-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 210 !important;
+}
+
+#modal .video-study-modal {
+  position: fixed;
+  z-index: 211;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--ink);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--line);
+}
+
+@media (max-width: 767px) {
+  #modal .video-study-modal {
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-width: none !important;
+    border-radius: 0 !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    transform: none !important;
+  }
+}
+
+@media (min-width: 768px) {
+  #modal .video-study-modal {
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
+    width: min(720px, calc(100vw - 48px)) !important;
+    max-width: 720px !important;
+    max-height: min(860px, calc(100vh - 48px)) !important;
+    max-height: min(860px, calc(100dvh - 48px)) !important;
+    border-radius: 24px !important;
+    padding: 0 !important;
+  }
+}
+
+.video-study-header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.video-study-close-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 99px;
+  font-size: var(--text-sm);
+}
+
+.video-study-header-title {
+  flex: 1 1 auto;
+  text-align: center;
+  overflow: hidden;
+}
+
+.video-study-header-title h2 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink);
+}
+
+.video-study-header-counter {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 60px;
+  text-align: right;
+}
+
+.video-study-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+}
+
+.video-study-body .study-shell {
+  padding: 0;
+  margin: 0;
+  max-width: none;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  min-height: auto;
+}
+
+.video-study-body .study-header {
+  display: none !important;
+}
+
+.video-study-body .coaching-completion-hero {
+  padding-top: var(--space-sm);
+}
+
+.video-study-return-btn {
+  font-weight: 700;
+}
+
+
 </style>
 </head>
 <body>
@@ -12042,6 +12180,10 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
   }
   function isStudySession(name) { return name === 'flash' || name === 'quiz' || name === 'exam'; }
   function saveActiveSession() {
+    if (V.videoStudy) {
+      S.pausedSession = MobileStudy.snapshot(V.videoStudy);
+      return save();
+    }
     if (!isStudySession(V.name)) return Promise.resolve();
     S.pausedSession = MobileStudy.snapshot(V);
     return save();
@@ -13293,17 +13435,18 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     return '<div class="barin"><span>' + plural(SEL.size, 'deck') + ' · ' + plural(n, 'card') + '</span><div class="row"><button class="btn sm" data-act="setup" data-mode="flash" data-id="*">Flashcards</button><button class="btn primary sm" data-act="setup" data-mode="quiz" data-id="*">Quiz</button></div></div>';
   }
 
-  views.flash = function () {
-    var it = V.cards[V.i], c = it.card, ai = LET.indexOf(c.answer), d = deck(it.deckId);
-    var title = V.opts && V.opts.daily ? 'Today’s Study' : (d ? d.title : 'Flashcards');
+  views.flash = function (session) {
+    var s = session || V;
+    var it = s.cards[s.i], c = it.card, ai = LET.indexOf(c.answer), d = deck(it.deckId);
+    var title = s.opts && s.opts.daily ? 'Today’s Study' : (d ? d.title : 'Flashcards');
     var parsed = MobileStudy.parseChapterTitle(title);
     var displayTitle = parsed.topic || title;
     var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') + bibleNote(c);
-    var isLast = V.i === V.cards.length - 1;
-    var cardFace = V.flipped
+    var isLast = s.i === s.cards.length - 1;
+    var cardFace = s.flipped
       ? '<div class="flip on flash-card-back" data-flip-surface="true">' +
           '<div class="inner"><div class="face back" aria-hidden="false">' +
-            '<span class="card-face-top"><span class="tag">Answer · ' + c.answer + '</span><span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span></span>' +
+            '<span class="card-face-top"><span class="tag">Answer · ' + c.answer + '</span><span class="face-index">' + (s.i + 1) + ' / ' + s.cards.length + '</span></span>' +
             '<span class="a">' + esc(c.options[ai]) + '</span>' +
             notes +
             '<span class="qs">' + esc(c.question) + '</span>' +
@@ -13312,39 +13455,40 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
         '</div>'
       : '<button class="flip" data-act="flip" type="button" aria-pressed="false" aria-label="Reveal answer">' +
           '<span class="inner"><span class="face front" aria-hidden="false">' +
-            '<span class="card-face-top"><span class="tag">' + esc(d ? (MobileStudy.parseChapterTitle(d.title).topic || d.title) : '') + '</span><span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span></span>' +
+            '<span class="card-face-top"><span class="tag">' + esc(d ? (MobileStudy.parseChapterTitle(d.title).topic || d.title) : '') + '</span><span class="face-index">' + (s.i + 1) + ' / ' + s.cards.length + '</span></span>' +
             '<span class="q">' + esc(c.question) + '</span>' +
             '<span class="flip-cue"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap or Space to flip</span>' +
           '</span></span>' +
         '</button>';
 
     return '<section class="study-shell flash-session coaching-study-flow" aria-label="Flashcard study session">' +
-      sessionHead(displayTitle, (V.i + 1) + ' / ' + V.cards.length) +
-      progressBar(V.i + 1, V.cards.length) +
+      sessionHead(displayTitle, (s.i + 1) + ' / ' + s.cards.length) +
+      progressBar(s.i + 1, s.cards.length) +
       '<div class="coaching-question-container">' + cardFace + '</div>' +
-      (V.flipped ? '<div class="flash-rating row grow" role="group" aria-label="Mark your confidence">' +
+      (s.flipped ? '<div class="flash-rating row grow" role="group" aria-label="Mark your confidence">' +
         '<button class="btn btn-confidence" data-act="mark" data-v="unknown">Still learning</button>' +
         '<button class="btn primary btn-confidence" data-act="mark" data-v="known">I know it</button>' +
       '</div>' : '') +
       '<div class="study-bottom-bar"><div class="row grow nav study-navigation">' +
-        '<button class="btn ghost btn-prev" data-act="prev"' + (V.i ? '' : ' disabled') + '>Previous</button>' +
-        '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'Finish session' : (V.flipped ? 'Next card' : 'Skip card')) + '</button>' +
+        '<button class="btn ghost btn-prev" data-act="prev"' + (s.i ? '' : ' disabled') + '>Previous</button>' +
+        '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'Finish session' : (s.flipped ? 'Next card' : 'Skip card')) + '</button>' +
       '</div></div>' +
       '<p class="study-shortcuts">Use ← / → to move between cards</p>' +
     '</section>';
   };
 
-  views.quiz = function () {
-    var isExam = V.name === 'exam', it = V.cards[V.i], c = it.card, picked = V.picked, done = picked !== null;
+  views.quiz = function (session) {
+    var s = session || V;
+    var isExam = s.name === 'exam', it = s.cards[s.i], c = it.card, picked = s.picked, done = picked !== null;
     var d = deck(it.deckId);
     var order = it.optionOrder || [0, 1, 2, 3];
-    var isLast = V.i === V.cards.length - 1;
+    var isLast = s.i === s.cards.length - 1;
     var parsed = d ? MobileStudy.parseChapterTitle(d.title) : { topic: isExam ? 'Timed Exam' : 'Quiz' };
     var sessionTitle = isExam ? 'Timed Exam' : parsed.topic;
 
     var hasSeenTooltip = false;
     try { hasSeenTooltip = !!window.localStorage.getItem('cci_seen_answer_tooltip'); } catch (e) {}
-    var showTooltip = !hasSeenTooltip && !done && V.i === 0;
+    var showTooltip = !hasSeenTooltip && !done && s.i === 0;
 
     var opts = order.map(function (source, k) {
       var cls = 'opt';
@@ -13402,16 +13546,16 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 
     var title = isExam ? 'Exam' : 'Quiz';
     var status = isExam
-      ? '<span id="exam-clock" role="timer" aria-label="Time remaining ' + formatClock(V.remaining) + '">' + formatClock(V.remaining) + '</span>'
-      : '<span class="score-inline" aria-label="Question ' + (V.i + 1) + ' of ' + V.cards.length + '">' + (V.i + 1) + '<span aria-hidden="true"> / </span><span class="sr-only">of</span>' + V.cards.length + '</span>';
+      ? '<span id="exam-clock" role="timer" aria-label="Time remaining ' + formatClock(s.remaining) + '">' + formatClock(s.remaining) + '</span>'
+      : '<span class="score-inline" aria-label="Question ' + (s.i + 1) + ' of ' + s.cards.length + '">' + (s.i + 1) + '<span aria-hidden="true"> / </span><span class="sr-only">of</span>' + s.cards.length + '</span>';
 
     return '<section class="study-shell ' + (isExam ? 'exam-session' : 'quiz-session') + ' coaching-study-flow" aria-label="' + (isExam ? 'Timed exam' : 'Quiz') + '">' +
       sessionHead(sessionTitle, status, isExam) +
-      progressBar(V.i + (done ? 1 : 0), V.cards.length) +
+      progressBar(s.i + (done ? 1 : 0), s.cards.length) +
       '<div class="quiz-question-layout' + (desktopFeedback ? ' has-feedback' : '') + '">' +
         '<article class="question-panel coaching-question-panel">' +
           '<div class="question-meta-row">' +
-            '<span class="count">Question ' + (V.i + 1) + ' of ' + V.cards.length + '</span>' +
+            '<span class="count">Question ' + (s.i + 1) + ' of ' + s.cards.length + '</span>' +
             (showTooltip ? '<div class="coaching-first-tooltip" role="tooltip"><span class="tooltip-dot" aria-hidden="true"></span>Tap an answer to check it</div>' : '') +
           '</div>' +
           '<h2 class="qtext coaching-question-text" id="question-prompt" tabindex="-1">' + esc(c.question) + '</h2>' +
@@ -13424,8 +13568,8 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     '</section>';
   };
 
-  views.results = function () {
-    var R = V;
+  views.results = function (session) {
+    var R = session || V;
     var durationMs = (R.finishedAt || Date.now()) - (R.startedAt || (Date.now() - 60000));
     var minutes = Math.max(1, Math.round(durationMs / 60000));
     var cardsMastered = 0;
@@ -13498,7 +13642,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
           '<ol>' + examRows + '</ol>' +
         '</section>' +
         '<div class="completion-actions-bar">' +
-          (R.returnToVideo ? '<button class="btn full" data-act="results-return-video">Return to video</button>' : '') +
+          (R.returnToVideo ? '<button class="btn ' + (V.videoStudy ? 'primary ' : '') + 'full video-study-return-btn" data-act="results-return-video">Return to video</button>' : '') +
           '<button class="btn primary full btn-continue" data-act="home">Continue</button>' +
         '</div>' +
       '</section>';
@@ -13529,7 +13673,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       '</div>' +
       '<div class="result-actions completion-actions-bar">' +
         (miss.length ? '<button class="btn primary full" data-act="review">Review ' + plural(miss.length, R.kind === 'quiz' ? 'missed card' : 'card') + '</button>' : '<p class="note result-note">' + (R.kind === 'quiz' ? 'No missed cards. Outstanding work!' : 'Nothing left marked as still learning.') + '</p>') +
-        (R.returnToVideo ? '<button class="btn full" data-act="results-return-video">Return to video</button>' : '') +
+        (R.returnToVideo ? '<button class="btn ' + (V.videoStudy ? 'primary ' : '') + 'full video-study-return-btn" data-act="results-return-video">Return to video</button>' : '') +
         '<button class="btn full" data-act="again">' + (R.kind === 'quiz' ? 'Retake quiz' : 'Study again') + '</button>' +
         '<button class="btn full ghost btn-continue" data-act="results-continue">Continue</button>' +
       '</div>' +
@@ -14253,6 +14397,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     V.setup = { mode: mode, ids: ids, returnToVideo: returnToVideo };
     var q = mode === 'quiz';
     var scopeNote = '';
+    var resumeBtn = '';
     if (returnToVideo && ids.length === 1) {
       var targetDeck = deck(ids[0]);
       if (targetDeck) {
@@ -14263,12 +14408,17 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
           ' · ' + targetVideos.length + ' ' + (targetVideos.length === 1 ? 'video' : 'videos') +
           ' · ' + targetDeck.cards.length + ' ' + (targetDeck.cards.length === 1 ? 'question' : 'questions') + '</p>';
       }
+      if (S.pausedSession && S.pausedSession.returnToVideo && S.pausedSession.returnToVideo.deckId === ids[0] && S.pausedSession.name === mode && S.pausedSession.cards && S.pausedSession.cards.length) {
+        var savedCardNum = Math.min((S.pausedSession.i || 0) + 1, S.pausedSession.cards.length);
+        resumeBtn = '<button type="button" class="btn primary full" data-act="resume-video-study" style="margin-bottom:var(--space-md);">Resume saved ' + (q ? 'quiz' : 'flashcards') + ' (' + savedCardNum + ' of ' + S.pausedSession.cards.length + ')</button>';
+      }
     }
     openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setup-title"><h2 id="setup-title">' + (q ? 'Start quiz' : 'Start flashcards') + '</h2>' +
       scopeNote +
+      resumeBtn +
       (q ? '<label class="field"><span>Questions</span><select id="s-len"><option value="0">All cards</option><option value="10">10</option><option value="20">20</option><option value="30">30</option></select></label>'
          : '<label class="check"><input type="checkbox" id="s-shuf"' + (S.settings.shuffle ? ' checked' : '') + '> Shuffle cards</label>') +
-      '<label class="check"><input type="checkbox" id="s-unk"> Skip cards I already know</label><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="start">Start</button></div></div>');
+      '<label class="check"><input type="checkbox" id="s-unk"> Skip cards I already know</label><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="start">' + (resumeBtn ? 'Start fresh' : 'Start') + '</button></div></div>');
   }
   function setupExam(ids, mixed, defaultCount, defaultMinutes) {
     var selectedIds = ids && ids.length ? ids.slice() : S.decks.map(function (d) { return d.id; });
@@ -14341,6 +14491,8 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       var studyVideo = document.getElementById('lesson-video-player');
       s.returnToVideo.currentTime = studyVideo && Number.isFinite(studyVideo.currentTime) ? Math.max(0, studyVideo.currentTime) : 0;
       if (studyVideo && !studyVideo.paused) studyVideo.pause();
+      startVideoStudyModal(s.mode, exam ? cards : (o.shuf ? shuffle(cards) : cards), o, s.ids, s.returnToVideo);
+      return;
     }
     closeModal(); begin(s.mode, exam ? cards : (o.shuf ? shuffle(cards) : cards), o, s.ids, s.returnToVideo);
   }
@@ -14377,6 +14529,196 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     var mode = requestedMode === 'flash' ? 'flash' : 'quiz';
     begin(mode, shuffle(cards), { unk: false, limit: mode === 'quiz' ? 10 : 0, shuf: true, challenge: true, saveBest: false }, deckIdsFor(cards));
   }
+
+  function startVideoStudyModal(mode, cards, o, ids, returnToVideo, restoredState) {
+    if (!restoredState && (mode === 'quiz' || mode === 'exam')) {
+      cards = cards.map(function (it) { return { deckId: it.deckId, card: it.card, optionOrder: shuffle([0, 1, 2, 3]) }; });
+      if (mode === 'quiz' && o && o.limit && o.limit < cards.length) cards = cards.slice(0, o.limit);
+    } else if (!restoredState && o && o.shuf) {
+      cards = shuffle(cards);
+    }
+    V.videoStudy = restoredState ? restoredState : {
+      name: mode,
+      cards: cards,
+      i: 0,
+      flipped: false,
+      picked: null,
+      score: 0,
+      answers: [],
+      marks: {},
+      opts: o || {},
+      ids: ids,
+      startedAt: Date.now(),
+      returnToVideo: returnToVideo || null,
+      results: null
+    };
+    S.pausedSession = MobileStudy.snapshot(V.videoStudy);
+    save();
+    renderVideoStudyModal();
+  }
+
+  function renderVideoStudyModal() {
+    if (!V.videoStudy) return;
+    var s = V.videoStudy;
+    var d = deck(s.returnToVideo ? s.returnToVideo.deckId : (s.ids && s.ids[0]));
+    var parsed = d ? MobileStudy.parseChapterTitle(d.title) : { sectionNum: 1, topic: 'Lesson Study' };
+    var section = parsed.sectionNum || 1;
+    var modeName = s.name === 'flash' ? 'Flashcards' : 'Quiz';
+    var headerTitle = 'Chapter ' + section + ' ' + modeName;
+    var counter = s.results ? 'Complete' : ((s.i + 1) + ' / ' + s.cards.length);
+
+    var bodyHtml = '';
+    if (s.results) {
+      bodyHtml = views.results(s.results);
+    } else if (s.name === 'flash') {
+      bodyHtml = views.flash(s);
+    } else {
+      bodyHtml = views.quiz(s);
+    }
+
+    var modalHtml = '<div class="scrim video-study-scrim" data-act="close-video-study"></div>' +
+      '<section class="sheet video-study-modal" role="dialog" aria-modal="true" aria-labelledby="video-study-modal-title">' +
+        '<header class="video-study-header">' +
+          '<button type="button" class="btn sm ghost video-study-close-btn" data-act="close-video-study" aria-label="Close and return to video">' +
+            '<span aria-hidden="true">✕</span> <span>Close & Return</span>' +
+          '</button>' +
+          '<div class="video-study-header-title">' +
+            '<h2 id="video-study-modal-title">' + esc(headerTitle) + '</h2>' +
+          '</div>' +
+          '<span class="video-study-header-counter" aria-live="polite">' + esc(counter) + '</span>' +
+        '</header>' +
+        '<div class="video-study-body">' + bodyHtml + '</div>' +
+      '</section>';
+
+    openModal(modalHtml, { preserveReturnFocus: true });
+
+    if (!s.results) {
+      if (s.name === 'flash') {
+        var f = modal.querySelector('.flip');
+        if (f) f.focus({ preventScroll: true });
+      } else if (s.name === 'quiz') {
+        var q = modal.querySelector('.qtext');
+        if (q) q.focus({ preventScroll: true });
+      }
+    } else {
+      var retBtn = modal.querySelector('.video-study-return-btn');
+      if (retBtn) retBtn.focus({ preventScroll: true });
+    }
+  }
+
+  function stepVideoStudy(dir) {
+    if (!V.videoStudy) return;
+    var s = V.videoStudy;
+    var n = s.i + dir;
+    if (n >= s.cards.length) {
+      finishVideoStudy();
+      return;
+    }
+    if (n < 0) return;
+    s.i = n;
+    s.flipped = false;
+    s.picked = null;
+    S.pausedSession = MobileStudy.snapshot(s);
+    save();
+    renderVideoStudyModal();
+  }
+
+  function pickVideoStudy(k) {
+    if (!V.videoStudy || V.videoStudy.picked !== null) return;
+    var s = V.videoStudy;
+    try { window.localStorage.setItem('cci_seen_answer_tooltip', 'true'); } catch (e) {}
+    var it = s.cards[s.i], selected = LET[(it.optionOrder || [0, 1, 2, 3])[k]], ok = selected === it.card.answer;
+    triggerHaptic(ok ? 'correct' : 'wrong');
+    s.picked = k;
+    s.answers.push({ item: it, ok: ok, selected: selected });
+    if (ok) s.score++;
+    var p = prog(it.deckId);
+    p.cards[it.card.id] = StudyLogic.review(p.cards[it.card.id], ok, Date.now());
+    trackStudied(1);
+    S.pausedSession = MobileStudy.snapshot(s);
+    save();
+    renderVideoStudyModal();
+  }
+
+  function finishVideoStudy() {
+    if (!V.videoStudy) return;
+    var s = V.videoStudy;
+    var isFirst = checkAndRecordFirstSessionToday();
+    S.pausedSession = null;
+    save();
+
+    if (s.name === 'flash') {
+      var learn = s.cards.filter(function (x) { return s.marks[x.card.id] === 'unknown'; });
+      var known = s.cards.filter(function (x) { return s.marks[x.card.id] === 'known'; }).length;
+      s.results = {
+        name: 'results',
+        kind: 'flash',
+        known: known,
+        learning: learn,
+        skipped: s.cards.length - known - learn.length,
+        all: s.cards,
+        opts: s.opts,
+        ids: s.ids,
+        isFirstSessionToday: isFirst,
+        returnToVideo: s.returnToVideo || null
+      };
+    } else {
+      var per = {}, missed = [];
+      s.answers.forEach(function (a) {
+        var p = per[a.item.deckId] || (per[a.item.deckId] = { s: 0, t: 0 });
+        p.t++;
+        if (a.ok) p.s++;
+        else missed.push(a.item);
+      });
+      var newBest = false;
+      Object.keys(per).forEach(function (id) {
+        var d = deck(id), p = per[id];
+        if (!d || s.opts.saveBest === false || p.t < Math.min(10, d.cards.length)) return;
+        var pct = Math.round(100 * p.s / p.t), pr = prog(id);
+        if (!pr.best || pct > pr.best.pct) {
+          pr.best = { pct: pct, score: p.s, total: p.t, date: Date.now() };
+          newBest = true;
+        }
+      });
+      s.results = {
+        name: 'results',
+        kind: 'quiz',
+        score: s.score,
+        total: s.answers.length,
+        missed: missed,
+        newBest: newBest,
+        all: s.cards,
+        opts: s.opts,
+        ids: s.ids,
+        isFirstSessionToday: isFirst,
+        returnToVideo: s.returnToVideo || null
+      };
+    }
+    renderVideoStudyModal();
+  }
+
+  function closeVideoStudyModal() {
+    if (!V.videoStudy) {
+      closeModal();
+      return;
+    }
+    if (!V.videoStudy.results) {
+      S.pausedSession = MobileStudy.snapshot(V.videoStudy);
+      save();
+      toast('Study paused. Your progress is saved.');
+    }
+    V.videoStudy = null;
+    closeModal();
+    var currentVideo = document.getElementById('lesson-video-player');
+    var videoAction = app.querySelector('.lesson-video-continue');
+    if (currentVideo && videoAction) {
+      var label = currentVideo.ended ? 'Replay lesson' : (currentVideo.paused ? (currentVideo.currentTime > 0 ? 'Resume lesson' : 'Play lesson') : 'Pause lesson');
+      videoAction.textContent = label;
+      videoAction.setAttribute('aria-label', label + ': ' + (currentVideo.getAttribute('aria-label') || 'video'));
+      videoAction.focus();
+    }
+  }
+
   function begin(mode, cards, o, ids, returnToVideo) {
     if (mode === 'quiz' || mode === 'exam') {
       cards = cards.map(function (it) { return { deckId: it.deckId, card: it.card, optionOrder: shuffle([0, 1, 2, 3]) }; });
@@ -14761,14 +15103,37 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
         go({ name: 'streak', returnTo: 'home' });
         break;
       case 'results-continue':
+        if (V.videoStudy) {
+          closeVideoStudyModal();
+          break;
+        }
         if (V.isFirstSessionToday && S.settings.showStreak !== false) {
           go({ name: 'streak', returnTo: 'home' });
         } else {
           go({ name: 'home' });
         }
         break;
+      case 'close-video-study':
+        closeVideoStudyModal();
+        break;
+      case 'resume-video-study':
+        var restored = MobileStudy.restore(S.pausedSession, S.decks);
+        if (restored) {
+          var studyVid = document.getElementById('lesson-video-player');
+          if (studyVid && !studyVid.paused) studyVid.pause();
+          startVideoStudyModal(restored.name, restored.cards, restored.opts, restored.ids, restored.returnToVideo, restored);
+        } else {
+          S.pausedSession = null;
+          save();
+          toast('Saved session could not be restored.');
+        }
+        break;
       case 'results-return-video':
-        if (V.returnToVideo) go({ name: 'lesson-video', id: V.returnToVideo.deckId, videoIndex: V.returnToVideo.videoIndex, videoTime: V.returnToVideo.currentTime });
+        if (V.videoStudy) {
+          closeVideoStudyModal();
+        } else if (V.returnToVideo) {
+          go({ name: 'lesson-video', id: V.returnToVideo.deckId, videoIndex: V.returnToVideo.videoIndex, videoTime: V.returnToVideo.currentTime });
+        }
         break;
       case 'close-streak':
         go({ name: V.returnTo || 'home' });
@@ -14937,13 +15302,59 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       case 'ccancel': V.editing = null; render(true); break;
       case 'csave': saveCard(); break;
       case 'cdel': d = deck(V.id); var ci = +t.dataset.i; ask('Delete question ' + (ci + 1) + '?', 'Delete card', function () { var c = d.cards.splice(ci, 1)[0], p = prog(d.id); delete p.cards[c.id]; p.best = null; V.editing = null; save(); render(true); }); break;
-      case 'flip': V.flipped = !V.flipped; saveActiveSession(); render(true); break;
-      case 'mark': mark(V.cards[V.i], t.dataset.v); V.marks[V.cards[V.i].card.id] = t.dataset.v; step(1); break;
-      case 'next': step(1); break;
-      case 'prev': step(-1); break;
-      case 'pick': pick(+t.dataset.i); break;
-      case 'review': begin('flash', shuffle(V.kind === 'quiz' ? V.missed : V.learning), {}, V.ids, V.returnToVideo); break;
-      case 'again': var all = V.all; begin(V.kind === 'quiz' ? 'quiz' : 'flash', V.kind === 'quiz' ? shuffle(all) : all, V.opts, V.ids, V.returnToVideo); break;
+      case 'flip':
+        if (V.videoStudy) {
+          V.videoStudy.flipped = !V.videoStudy.flipped;
+          S.pausedSession = MobileStudy.snapshot(V.videoStudy);
+          save();
+          renderVideoStudyModal();
+        } else {
+          V.flipped = !V.flipped;
+          saveActiveSession();
+          render(true);
+        }
+        break;
+      case 'mark':
+        if (V.videoStudy) {
+          mark(V.videoStudy.cards[V.videoStudy.i], t.dataset.v);
+          V.videoStudy.marks[V.videoStudy.cards[V.videoStudy.i].card.id] = t.dataset.v;
+          stepVideoStudy(1);
+        } else {
+          mark(V.cards[V.i], t.dataset.v);
+          V.marks[V.cards[V.i].card.id] = t.dataset.v;
+          step(1);
+        }
+        break;
+      case 'next':
+        if (V.videoStudy) stepVideoStudy(1);
+        else step(1);
+        break;
+      case 'prev':
+        if (V.videoStudy) stepVideoStudy(-1);
+        else step(-1);
+        break;
+      case 'pick':
+        if (V.videoStudy) pickVideoStudy(+t.dataset.i);
+        else pick(+t.dataset.i);
+        break;
+      case 'review':
+        if (V.videoStudy && V.videoStudy.results) {
+          var missed = V.videoStudy.results.kind === 'quiz' ? V.videoStudy.results.missed : V.videoStudy.results.learning;
+          startVideoStudyModal('flash', shuffle(missed), {}, V.videoStudy.results.ids, V.videoStudy.results.returnToVideo);
+        } else {
+          begin('flash', shuffle(V.kind === 'quiz' ? V.missed : V.learning), {}, V.ids, V.returnToVideo);
+        }
+        break;
+      case 'again':
+        if (V.videoStudy && V.videoStudy.results) {
+          var allCards = V.videoStudy.results.all;
+          var nextMode = V.videoStudy.results.kind === 'quiz' ? 'quiz' : 'flash';
+          startVideoStudyModal(nextMode, nextMode === 'quiz' ? shuffle(allCards) : allCards, V.videoStudy.results.opts, V.videoStudy.results.ids, V.videoStudy.results.returnToVideo);
+        } else {
+          var all = V.all;
+          begin(V.kind === 'quiz' ? 'quiz' : 'flash', V.kind === 'quiz' ? shuffle(all) : all, V.opts, V.ids, V.returnToVideo);
+        }
+        break;
     }
   });
   function step(dir) {
@@ -15107,7 +15518,11 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       go({ name: V.from || 'home' });
       return;
     }
-    if (modal.innerHTML && e.key === 'Escape') { e.preventDefault(); return closeModal(); }
+    if (modal.innerHTML && e.key === 'Escape') {
+      e.preventDefault();
+      if (V.videoStudy) return closeVideoStudyModal();
+      return closeModal();
+    }
     if (modal.innerHTML && e.key === 'Tab') {
       var focusable = Array.from(modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
       if (focusable.length) {
@@ -15117,7 +15532,27 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       }
       return;
     }
-    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || modal.innerHTML) return;
+    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    if (V.videoStudy && !V.videoStudy.results) {
+      if (V.videoStudy.name === 'flash') {
+        if (e.key === 'ArrowRight') stepVideoStudy(1);
+        else if (e.key === 'ArrowLeft') stepVideoStudy(-1);
+        else if ((e.key === ' ' || e.key === 'Enter') && e.target.closest('button.flip[data-act="flip"], button.flip-cue-button')) {
+          e.preventDefault();
+          V.videoStudy.flipped = !V.videoStudy.flipped;
+          S.pausedSession = MobileStudy.snapshot(V.videoStudy);
+          save();
+          renderVideoStudyModal();
+        }
+      } else if (V.videoStudy.name === 'quiz') {
+        var k = 'abcd'.indexOf(e.key.toLowerCase());
+        if (k < 0) k = '1234'.indexOf(e.key);
+        if (k >= 0 && V.videoStudy.picked === null) pickVideoStudy(k);
+        else if ((e.key === 'Enter' || e.key === 'ArrowRight') && V.videoStudy.picked !== null) stepVideoStudy(1);
+      }
+      return;
+    }
+    if (modal.innerHTML) return;
     if (V.name === 'flash') {
       if (e.key === 'ArrowRight') step(1); else if (e.key === 'ArrowLeft') step(-1);
       else if ((e.key === ' ' || e.key === 'Enter') && e.target.closest('button.flip[data-act="flip"], button.flip-cue-button')) { e.preventDefault(); V.flipped = !V.flipped; render(true); }
@@ -15129,9 +15564,13 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
   var tx = 0, ty = 0;
   document.addEventListener('touchstart', function (e) { if (e.target.closest('.flip') && !e.target.closest('a, button')) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; } else tx = 0; }, { passive: true });
   document.addEventListener('touchend', function (e) {
-    if (!tx || V.name !== 'flash') return;
+    if (!tx || (V.name !== 'flash' && (!V.videoStudy || V.videoStudy.name !== 'flash'))) return;
     var dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; tx = 0;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) { e.preventDefault(); step(dx < 0 ? 1 : -1); }
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      e.preventDefault();
+      if (V.videoStudy) stepVideoStudy(dx < 0 ? 1 : -1);
+      else step(dx < 0 ? 1 : -1);
+    }
   });
 
   function registerNativeNavigation() {
