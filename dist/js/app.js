@@ -7,6 +7,7 @@
   var STARTER_DECKS = [], DEVOTIONALS = [], LESSON_VIDEOS = [];
   var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, biblePreviewCache = null, suppressBiblePreviewFocus = null;
   var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), activeStorageOwnerId = null, requestedStorageOwnerId = null, guestProgressForImport = null, account = Account ? Account.create() : null, accountStatus = { configured: false, user: null, videoReady: false }, accountBootReady = false, accountMessage = '', accountEmailDraft = '', accountBusy = false, accountSwitchQueue = Promise.resolve(), cloudSyncQueue = Promise.resolve(), cloudSyncTimer = null, lessonTranscriptCache = Object.create(null), lessonTranscriptRequests = Object.create(null), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
+  var quizFeedbackDrag = null, quizFeedbackIgnoreClick = false;
   var browserLocalStorage = null, browserIndexedDB = null, animateRouteChange = false;
   var lessonTranscriptGeneration = 0;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
@@ -2085,15 +2086,17 @@
               bibleNote(c) +
             '</div>';
         };
-        fbSheet = '<div class="coaching-bottom-sheet ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '" role="status" aria-live="polite">' +
-          '<div class="sheet-drag-handle" aria-hidden="true"></div>' +
-          '<div class="sheet-content">' +
-            feedbackContent() +
+        fbSheet = '<div class="coaching-bottom-sheet quiz-feedback-sheet ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '">' +
+          '<button type="button" class="quiz-feedback-resize-control" data-act="quiz-feedback-toggle" aria-label="Collapse answer feedback panel" aria-expanded="true" aria-controls="quiz-feedback-content" title="Drag to resize; press to collapse or expand">' +
+            '<span class="sheet-drag-handle" aria-hidden="true"></span>' +
+          '</button>' +
+          '<div class="sheet-content quiz-feedback-content" id="quiz-feedback-content" role="status" aria-live="polite">' + feedbackContent() + '</div>' +
+          '<div class="quiz-feedback-actions">' +
             '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Next question') + '</button>' +
           '</div>' +
         '</div>';
-        desktopFeedback = '<aside class="quiz-explanation-card ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '" role="status" aria-live="polite">' +
-          '<div class="quiz-explanation-content">' + feedbackContent() + '</div>' +
+        desktopFeedback = '<aside class="quiz-explanation-card ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '">' +
+          '<div class="quiz-explanation-content" role="status" aria-live="polite">' + feedbackContent() + '</div>' +
           '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Continue') + '</button>' +
         '</aside>';
       }
@@ -3213,6 +3216,44 @@
   document.addEventListener('pointerdown', function (e) {
     if (activeBiblePreview && !activeBiblePreview.wrapper.contains(e.target)) closeBiblePreview(false);
   });
+  function setQuizFeedbackExpanded(control, expanded) {
+    if (!control) return;
+    var sheet = control.closest('.quiz-feedback-sheet');
+    if (!sheet) return;
+    sheet.classList.toggle('is-compact', !expanded);
+    control.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    control.setAttribute('aria-label', expanded ? 'Collapse answer feedback panel' : 'Expand answer feedback panel');
+    control.title = expanded ? 'Drag down to reduce; press to collapse' : 'Drag up to expand; press to expand';
+  }
+
+  document.addEventListener('pointerdown', function (e) {
+    var control = e.target.closest('.quiz-feedback-resize-control');
+    if (!control || e.button !== 0 || window.matchMedia('(min-width: 901px)').matches) return;
+    quizFeedbackDrag = { control: control, pointerId: e.pointerId, startY: e.clientY, lastY: e.clientY, moved: false };
+    control.focus({ preventScroll: true });
+    try { control.setPointerCapture(e.pointerId); } catch (error) {}
+    e.preventDefault();
+  }, true);
+  document.addEventListener('pointermove', function (e) {
+    if (!quizFeedbackDrag || e.pointerId !== quizFeedbackDrag.pointerId) return;
+    quizFeedbackDrag.lastY = e.clientY;
+    if (Math.abs(e.clientY - quizFeedbackDrag.startY) > 8) quizFeedbackDrag.moved = true;
+  }, true);
+  document.addEventListener('pointerup', function (e) {
+    if (!quizFeedbackDrag || e.pointerId !== quizFeedbackDrag.pointerId) return;
+    var drag = quizFeedbackDrag;
+    quizFeedbackDrag = null;
+    var delta = drag.lastY - drag.startY;
+    if (drag.moved && Math.abs(delta) >= 28) {
+      setQuizFeedbackExpanded(drag.control, delta < 0);
+      quizFeedbackIgnoreClick = true;
+      window.setTimeout(function () { quizFeedbackIgnoreClick = false; }, 0);
+    }
+  }, true);
+  document.addEventListener('pointercancel', function (e) {
+    if (quizFeedbackDrag && e.pointerId === quizFeedbackDrag.pointerId) quizFeedbackDrag = null;
+  }, true);
+
   document.addEventListener('click', function (e) {
     var target = e.target && e.target.closest ? e.target : null;
     if (!target) return;
@@ -3236,8 +3277,12 @@
       V.flipped = false; saveActiveSession(); render(true); return;
     }
     var t = e.target.closest('[data-act]'); if (!t) return;
+    if (quizFeedbackIgnoreClick && t.matches('.quiz-feedback-resize-control')) { quizFeedbackIgnoreClick = false; e.preventDefault(); return; }
     var a = t.dataset.act, d;
     switch (a) {
+      case 'quiz-feedback-toggle':
+        setQuizFeedbackExpanded(t, t.getAttribute('aria-expanded') !== 'true');
+        break;
       case 'home': closeModal(); go({ name: 'home' }); break;
       case 'open-chapter': go({ name: 'chapter', id: t.dataset.id }); break;
       case 'lesson-detail-open': openLessonDetailSheet(t.dataset.id); break;
@@ -3707,6 +3752,12 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && activeBiblePreview) {
       e.preventDefault(); closeBiblePreview(activeBiblePreview.wrapper.contains(document.activeElement)); return;
+    }
+    var feedbackResizeControl = e.target && e.target.closest ? e.target.closest('.quiz-feedback-resize-control') : null;
+    if (feedbackResizeControl && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      setQuizFeedbackExpanded(feedbackResizeControl, e.key === 'ArrowUp');
+      return;
     }
     if (rocketMenuOpen) {
       if (e.key === 'Escape') {
