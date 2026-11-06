@@ -59,6 +59,22 @@ test('temporary account connection failures provide an explicit working retry', 
   assert.match(ui.settings(), /data-account-form/);
 });
 
+test('account retry shows a clean loading state without stale unconfigured copy or retry controls', async () => {
+  let finishRetry;
+  const { ui } = accountUi({ retry: () => new Promise(resolve => { finishRetry = resolve; }) }, {
+    configured: false, initializationState: 'unconfigured', initializationError: 'Account services are not configured yet.'
+  });
+  assert.match(ui.settings(), /Retry account connection/);
+  ui.act('account-retry');
+  const loading = ui.settings();
+  assert.match(loading, /Connecting to account services/);
+  assert.doesNotMatch(loading, /Retry account connection|Account sign-in is not configured for this app deployment/);
+  finishRetry({ configured: false, initializationState: 'unconfigured', initializationError: 'Account services are not configured yet.' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(ui.settings(), /Retry account connection/);
+  assert.match(ui.settings(), /Account services are not configured yet/);
+});
+
 test('native lesson captions and transcript use the same authenticated host as the video', () => {
   const { ui } = accountUi({ apiBase: 'https://study.example' });
   const videos = ui.videos({ schemaVersion: 1, videos: [{ id: 'lesson-1', deckId: 'd-lesson', title: 'Lesson', objectKey: 'Lesson/video.mp4' }] }, {

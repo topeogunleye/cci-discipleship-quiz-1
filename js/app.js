@@ -678,8 +678,8 @@
     var connectionMessage = connectionState === 'loading' || accountBusy ? 'Connecting to account services…' : (accountStatus && accountStatus.initializationError || 'Account services are not configured yet. Guest study remains available on this device.');
     var message = accountMessage || (configured ? (user ? 'CCI lesson progress syncs when you are online. Custom decks remain local.' : 'Create an account or sign in to sync CCI lesson progress and watch lesson videos.') : connectionMessage);
     var controls;
-    if (!configured) controls = (connectionState === 'unconfigured' ? '<p class="meta">Account sign-in is not configured for this app deployment. You can keep studying as a guest.</p>' : '') +
-      (account && connectionState !== 'loading' ? '<button type="button" class="btn sm" data-act="account-retry"' + (accountBusy ? ' disabled' : '') + '>Retry account connection</button>' : '');
+    if (!configured) controls = (!accountBusy && connectionState === 'unconfigured' ? '<p class="meta">Account sign-in is not configured for this app deployment. You can keep studying as a guest.</p>' : '') +
+      (account && !accountBusy && connectionState !== 'loading' ? '<button type="button" class="btn sm" data-act="account-retry">Retry account connection</button>' : '');
     else if (user) {
       controls = '<p><strong>Signed in as</strong> ' + esc(user.email || 'CCI Study learner') + '</p>' +
         (!accountStatus.videoReady ? '<p class="meta">' + esc(accountStatus.videoAccessError || 'Lesson-video access is not ready on this device yet.') + '</p><button type="button" class="btn sm" data-act="account-video-session"' + (accountBusy ? ' disabled' : '') + '>Prepare video access</button>' : '<p class="meta">Private lesson videos are available to your account.</p>') +
