@@ -39,6 +39,20 @@ test('paused sessions round-trip against current deck data without changing ques
   assert.equal(restored.score, 1);
 });
 
+test('video study return context survives pause and restore without affecting older sessions', () => {
+  const current = item('section-1', 'q1');
+  const session = {
+    name: 'flash', cards: [current], i: 0, marks: {}, opts: {}, ids: ['section-1'],
+    returnToVideo: { deckId: 'section-1', videoIndex: 3, currentTime: 124.5 }
+  };
+  const restored = MobileStudy.restore(MobileStudy.snapshot(session), [{ id: 'section-1', cards: [current.card] }]);
+  assert.deepEqual(restored.returnToVideo, { deckId: 'section-1', videoIndex: 3, currentTime: 124.5 });
+  const older = MobileStudy.restore({ ...MobileStudy.snapshot(session), returnToVideo: undefined }, [{ id: 'section-1', cards: [current.card] }]);
+  assert.equal(older.returnToVideo, null);
+  const missingReturnDeck = MobileStudy.restore(MobileStudy.snapshot({ ...session, returnToVideo: { deckId: 'removed-section', videoIndex: 0, currentTime: 10 } }), [{ id: 'section-1', cards: [current.card] }]);
+  assert.equal(missingReturnDeck.returnToVideo, null);
+});
+
 test('paused sessions are discarded when their saved card no longer exists', () => {
   const snapshot = MobileStudy.snapshot({ name: 'flash', cards: [item('section-1', 'deleted')], i: 0, marks: {}, opts: {}, ids: [] });
   assert.equal(MobileStudy.restore(snapshot, [{ id: 'section-1', cards: [] }]), null);

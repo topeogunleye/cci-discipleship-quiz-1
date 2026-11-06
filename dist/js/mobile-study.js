@@ -82,7 +82,10 @@
       marks: Object.assign({}, session.marks || {}),
       opts: Object.assign({}, session.opts || {}),
       ids: Array.isArray(session.ids) ? session.ids.slice() : [],
-      remaining: Number.isFinite(session.remaining) && session.remaining >= 0 ? session.remaining : null
+      remaining: Number.isFinite(session.remaining) && session.remaining >= 0 ? session.remaining : null,
+      returnToVideo: session.returnToVideo && typeof session.returnToVideo.deckId === 'string' && Number.isInteger(session.returnToVideo.videoIndex) && Number.isFinite(session.returnToVideo.currentTime) && session.returnToVideo.currentTime >= 0
+        ? { deckId: session.returnToVideo.deckId, videoIndex: Math.max(0, session.returnToVideo.videoIndex), currentTime: session.returnToVideo.currentTime }
+        : null
     };
   }
 
@@ -122,6 +125,9 @@
     }
     var picked = Number.isInteger(saved.picked) && saved.picked >= 0 && saved.picked < 4 ? saved.picked : null;
     var remaining = Number.isFinite(saved.remaining) && saved.remaining >= 0 ? saved.remaining : undefined;
+    var returnToVideo = saved.returnToVideo && typeof saved.returnToVideo.deckId === 'string' && Number.isInteger(saved.returnToVideo.videoIndex) && Number.isFinite(saved.returnToVideo.currentTime) && saved.returnToVideo.currentTime >= 0 && decks.some(function (deck) { return deck && deck.id === saved.returnToVideo.deckId; })
+      ? { deckId: saved.returnToVideo.deckId, videoIndex: Math.max(0, saved.returnToVideo.videoIndex), currentTime: saved.returnToVideo.currentTime }
+      : null;
     return {
       name: saved.name,
       cards: cards,
@@ -133,7 +139,8 @@
       marks: marks,
       opts: saved.opts && typeof saved.opts === 'object' && !Array.isArray(saved.opts) ? saved.opts : {},
       ids: Array.isArray(saved.ids) ? saved.ids.filter(function (id) { return typeof id === 'string'; }) : [],
-      remaining: remaining
+      remaining: remaining,
+      returnToVideo: returnToVideo
     };
   }
 
