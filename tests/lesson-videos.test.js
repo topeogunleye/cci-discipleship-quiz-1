@@ -216,3 +216,12 @@ test('only unambiguous, metadata-equivalent, or explicitly confirmed English SRT
   assert.deepEqual(missing, []);
   assert.deepEqual(catalog.videos.filter(video => !mappedIds.has(video.id)), [], 'Every recording must have an explicit transcript mapping');
 });
+
+test('lesson video view clearly communicates chapter study scope and card counts', () => {
+  const appSource = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
+  assert.match(appSource, /Chapter Flashcards \(' \+ d\.cards\.length \+ '\)/);
+  assert.match(appSource, /Chapter Quiz \(' \+ d\.cards\.length \+ '\)/);
+  assert.match(appSource, /aria-label="Study Chapter ' \+ section \+ ' \(/);
+  assert.match(appSource, /reinforce Chapter ' \+ section \+ ' \(/);
+  assert.match(appSource, /scopeNote = '<p class="note" style="margin-top:4px;margin-bottom:var\(--space-md\);">' \+/);
+});
