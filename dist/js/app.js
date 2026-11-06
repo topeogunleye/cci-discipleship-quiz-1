@@ -504,7 +504,8 @@
         : 'Progress synced. Your study data is also saved on this device.';
       if (importSnapshot) guestProgressForImport = null;
       save(true);
-      render(true);
+      // Background sync must not replace the playing video or its caption/transcript state.
+      if (V.name !== 'lesson-video' || !accountStatus.videoReady || !document.getElementById('lesson-video-player')) render(true);
       if (changedDuringSync) scheduleCloudProgressSync();
       return true;
     }).catch(function (error) {
@@ -563,8 +564,11 @@
   function initializeAccount() {
     if (!account) return Promise.resolve(accountStatus);
     return account.init(function (status) {
+      var hadVideoAccess = !!(accountStatus.user && accountStatus.videoReady);
       accountStatus = status;
       if (!accountBootReady) return;
+      // Access changes still need to show or remove the player immediately.
+      if (V.name === 'lesson-video' && hadVideoAccess !== !!(status.user && status.videoReady)) render(true);
       var nextOwner = status.user && status.user.id || null;
       if (nextOwner !== requestedStorageOwnerId) switchStorageOwner(nextOwner);
       else if (nextOwner && nextOwner === activeStorageOwnerId && status.videoReady && !cloudSyncTimer) scheduleCloudProgressSync();
