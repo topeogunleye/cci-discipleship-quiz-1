@@ -583,19 +583,30 @@
       var saved = JSON.parse(window.sessionStorage.getItem(pendingVideoReturnKey) || 'null');
       if (saved && typeof saved.deckId === 'string' && saved.deckId) return {
         deckId: saved.deckId,
-        videoIndex: Number.isInteger(saved.videoIndex) && saved.videoIndex >= 0 ? saved.videoIndex : 0
+        videoIndex: Number.isInteger(saved.videoIndex) && saved.videoIndex >= 0 ? saved.videoIndex : 0,
+        videoId: typeof saved.videoId === 'string' ? saved.videoId : ''
       };
     } catch (e) {}
     return null;
   }
-  function savePendingVideoReturn(deckId, videoIndex) {
+  function savePendingVideoReturn(deckId, videoIndex, videoId) {
     try {
       if (deckId) window.sessionStorage.setItem(pendingVideoReturnKey, JSON.stringify({
         deckId: String(deckId),
-        videoIndex: Number.isInteger(videoIndex) && videoIndex >= 0 ? videoIndex : 0
+        videoIndex: Number.isInteger(videoIndex) && videoIndex >= 0 ? videoIndex : 0,
+        videoId: typeof videoId === 'string' ? videoId : ''
       }));
       else window.sessionStorage.removeItem(pendingVideoReturnKey);
     } catch (e) {}
+  }
+  function returnToPendingVideo(pending) {
+    if (!pending || typeof pending.deckId !== 'string' || !pending.deckId) return false;
+    var videos = lessonVideosForDeck(pending.deckId);
+    var videoIndex = pending.videoId ? videos.findIndex(function (item) { return item.id === pending.videoId; }) : -1;
+    if (videoIndex < 0) videoIndex = Number.isInteger(pending.videoIndex) && pending.videoIndex >= 0 ? pending.videoIndex : 0;
+    savePendingVideoReturn(null);
+    go({ name: 'lesson-video', id: pending.deckId, videoIndex: videoIndex });
+    return true;
   }
   function accountAction(action, form) {
     if (!account) { accountMessage = 'Account support is not available in this app build.'; render(true); return; }
@@ -648,15 +659,12 @@
         accountBusy = false;
         accountMessage = message;
         var pendingReturn = V.name === 'settings' && V.returnToVideoId
-          ? { deckId: V.returnToVideoId, videoIndex: Number.isInteger(V.returnVideoIndex) ? V.returnVideoIndex : 0 }
+          ? { deckId: V.returnToVideoId, videoIndex: Number.isInteger(V.returnVideoIndex) ? V.returnVideoIndex : 0, videoId: V.returnVideoAssetId || '' }
           : readPendingVideoReturn();
         if (!failed && result && !result.confirmationRequired && pendingReturn) {
-          var returnId = pendingReturn.deckId, returnIndex = pendingReturn.videoIndex;
-          savePendingVideoReturn(null);
           accountEmailDraft = '';
           accountMessage = '';
-          go({ name: 'lesson-video', id: returnId, videoIndex: returnIndex });
-          return;
+          if (returnToPendingVideo(pendingReturn)) return;
         }
         render(true);
         if (failed) {
@@ -685,7 +693,9 @@
     if (action === 'account-video-session') {
       accountBusy = true; render(true);
       account.syncVideoSession(accountStatus.session, true).then(function (ready) {
-        accountBusy = false; accountStatus = account.status(); accountMessage = ready ? 'Video access is ready.' : (accountStatus.videoAccessError || 'Video access could not be prepared. Try again.'); render(true);
+        accountBusy = false; accountStatus = account.status();
+        if (ready && V.name === 'settings' && returnToPendingVideo(readPendingVideoReturn())) return;
+        accountMessage = ready ? 'Video access is ready.' : (accountStatus.videoAccessError || 'Video access could not be prepared. Try again.'); render(true);
       });
       return;
     }
@@ -1766,11 +1776,18 @@
     var parsed = MobileStudy.parseChapterTitle(d.title), section = parsed.sectionNum || 1;
     var videos = lessonVideosForDeck(d.id), index = Math.max(0, Math.min(Number.isInteger(V.videoIndex) ? V.videoIndex : 0, videos.length - 1));
     var video = videos[index] || null, title = video ? video.title : parsed.topic + ' video lesson';
+    var videoNavigation = videos.length > 1
+      ? '<nav class="lesson-video-navigation" aria-label="Lesson video navigation">' +
+        '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-index="' + Math.max(0, index - 1) + '"' + (index === 0 ? ' disabled' : '') + ' aria-label="Previous video' + (index > 0 ? ': ' + esc(videos[index - 1].title) : '') + '" title="' + (index > 0 ? 'Previous: ' + esc(videos[index - 1].title) : 'First video') + '">‹ <span>Previous</span></button>' +
+        '<span class="lesson-video-position" aria-live="polite">Video ' + (index + 1) + ' of ' + videos.length + '</span>' +
+        '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-index="' + Math.min(videos.length - 1, index + 1) + '"' + (index === videos.length - 1 ? ' disabled' : '') + ' aria-label="Next video' + (index < videos.length - 1 ? ': ' + esc(videos[index + 1].title) : '') + '" title="' + (index < videos.length - 1 ? 'Next: ' + esc(videos[index + 1].title) : 'Last video') + '"><span>Next</span> ›</button>' +
+      '</nav>'
+      : '';
     var canWatchVideo = !!(accountStatus.user && accountStatus.videoReady);
     var player = video
       ? (canWatchVideo
           ? '<video class="lesson-video-player" id="lesson-video-player" controls playsinline preload="metadata" crossorigin="use-credentials"' + (video.posterUrl ? ' poster="' + esc(video.posterUrl) + '"' : '') + ' aria-label="Video lesson: ' + esc(title) + '"><source src="' + esc(video.videoUrl) + '" type="video/mp4">' + (video.captionsUrl ? '<track kind="captions" src="' + esc(video.captionsUrl) + '" srclang="' + esc(video.captionsLanguage) + '" label="' + esc(video.captionsLabel) + '" default>' : '') + '<span>Your browser does not support video playback.</span></video>'
-          : '<div class="lesson-video-unavailable lesson-video-auth-required" role="status"><strong>' + (accountStatus.user ? 'Preparing secure video access' : 'Sign in to watch this lesson') + '</strong><p>' + (accountStatus.user ? 'Your lesson files stay private. Video access is being prepared for your account.' : 'Create a free account or sign in to watch. You can continue studying locally without an account.') + '</p><button type="button" class="btn primary" data-act="nav-tab" data-tab="settings" data-return-video="' + esc(d.id) + '" data-return-video-index="' + index + '">' + (accountStatus.user ? 'Account settings' : 'Sign in or create account') + '</button></div>')
+          : '<div class="lesson-video-unavailable lesson-video-auth-required" role="status"><strong>' + (accountStatus.user ? 'Preparing secure video access' : 'Sign in to watch this lesson') + '</strong><p>' + (accountStatus.user ? 'Your lesson files stay private. Video access is being prepared for your account.' : 'Create a free account or sign in to watch. You can continue studying locally without an account.') + '</p><button type="button" class="btn primary" data-act="nav-tab" data-tab="settings" data-return-video="' + esc(d.id) + '" data-return-video-index="' + index + '" data-return-video-asset-id="' + esc(video.id) + '">' + (accountStatus.user ? 'Account settings' : 'Sign in or create account') + '</button></div>')
       : '<div class="lesson-video-unavailable" role="status"><strong>Lesson video not available yet</strong><p>The ' + esc(parsed.topic) + ' video has not been added yet. Use Flashcards or Take quiz below.</p></div>';
     var transcriptPanel = video && video.transcriptUrl
       ? (canWatchVideo
@@ -1784,6 +1801,7 @@
       '<header class="lesson-video-topbar"><button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button><div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong></div><span class="lesson-video-section-count">' + section + ' / ' + S.decks.length + '</span></header>' +
       '<section class="lesson-video-frame' + (video && canWatchVideo ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
       '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title">' + esc(title) + '</h1><p>' + (canWatchVideo ? 'Watch the lesson, then reinforce what you learned with a quick study activity.' : 'Study this lesson locally with flashcards or a quiz. Sign in to watch its video.') + '</p></div>' + (video && canWatchVideo ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">Continue lesson</button>' : '') + '</section>' +
+      videoNavigation +
       '<div class="lesson-video-study-actions" role="group" aria-label="Study this lesson"><button type="button" class="btn" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '">Flashcards</button><button type="button" class="btn" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '">Take quiz</button></div>' +
       transcriptPanel +
       videoNav +
@@ -2878,6 +2896,9 @@
     try {
       if (window.history && window.history.pushState) {
         var stateObj = { name: V.name, id: V.id || null };
+        if (V.returnToVideoId) stateObj.returnToVideoId = V.returnToVideoId;
+        if (Number.isInteger(V.returnVideoIndex)) stateObj.returnVideoIndex = V.returnVideoIndex;
+        if (typeof V.returnVideoAssetId === 'string' && V.returnVideoAssetId) stateObj.returnVideoAssetId = V.returnVideoAssetId;
         if (replace) {
           window.history.replaceState(stateObj, '', window.location.href);
         } else if (!prev || prev.name !== V.name || prev.id !== V.id) {
@@ -2897,7 +2918,7 @@
           pauseStudySession();
         }
         rocketMenuOpen = false;
-        V = { name: e.state.name, id: e.state.id, videoIndex: Number.isInteger(e.state.videoIndex) ? e.state.videoIndex : 0, videoTime: Number.isFinite(e.state.videoTime) && e.state.videoTime >= 0 ? e.state.videoTime : 0 };
+        V = { name: e.state.name, id: e.state.id, videoIndex: Number.isInteger(e.state.videoIndex) ? e.state.videoIndex : 0, videoTime: Number.isFinite(e.state.videoTime) && e.state.videoTime >= 0 ? e.state.videoTime : 0, returnToVideoId: e.state.returnToVideoId || '', returnVideoIndex: Number.isInteger(e.state.returnVideoIndex) ? e.state.returnVideoIndex : 0, returnVideoAssetId: e.state.returnVideoAssetId || '' };
         render();
       }
     });
@@ -3223,7 +3244,19 @@
         go({ name: 'chapter', id: t.dataset.id || V.id });
         break;
       case 'lesson-video-select':
-        if (lessonVideosForDeck(V.id)[+t.dataset.index]) { V.videoIndex = +t.dataset.index; render(true); }
+        if (lessonVideosForDeck(V.id)[+t.dataset.index] && +t.dataset.index !== V.videoIndex) {
+          var currentLessonPlayer = document.getElementById('lesson-video-player');
+          if (currentLessonPlayer) currentLessonPlayer.pause();
+          V.videoIndex = +t.dataset.index;
+          V.videoTime = 0;
+          render(true);
+          var nextVideoButton = document.querySelector('.lesson-video-segment[data-index="' + V.videoIndex + '"]');
+          if (nextVideoButton) nextVideoButton.focus();
+          else {
+            var newVideoTitle = document.getElementById('lesson-video-title');
+            if (newVideoTitle) { newVideoTitle.setAttribute('tabindex', '-1'); newVideoTitle.focus(); }
+          }
+        }
         break;
       case 'lesson-video-play':
         var lessonVideoElement = document.getElementById('lesson-video-player');
@@ -3287,7 +3320,8 @@
           if (nextRoute.name === 'settings' && t.dataset.returnVideo) {
             nextRoute.returnToVideoId = t.dataset.returnVideo;
             nextRoute.returnVideoIndex = Number(t.dataset.returnVideoIndex) || 0;
-            savePendingVideoReturn(nextRoute.returnToVideoId, nextRoute.returnVideoIndex);
+            nextRoute.returnVideoAssetId = t.dataset.returnVideoAssetId || '';
+            savePendingVideoReturn(nextRoute.returnToVideoId, nextRoute.returnVideoIndex, nextRoute.returnVideoAssetId);
           } else if (nextRoute.name !== 'settings' || V.name !== 'settings') {
             savePendingVideoReturn(null);
           }
