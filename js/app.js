@@ -3149,10 +3149,28 @@
         resumeBtn = '<button type="button" class="btn primary full" data-act="resume-video-study" style="margin-bottom:var(--space-md);">Resume saved ' + (q ? 'quiz' : 'flashcards') + ' (' + savedCardNum + ' of ' + S.pausedSession.cards.length + ')</button>';
       }
     }
+    var totalCards = videoCards.length || (function () {
+      var count = 0;
+      ids.forEach(function (deckId) {
+        var d = deck(deckId);
+        if (d && d.cards) count += d.cards.length;
+      });
+      return count;
+    })();
+    var questionCountOptions = (function () {
+      var opts = ['<option value="0">All cards' + (totalCards ? ' (' + totalCards + ')' : '') + '</option>'];
+      var counts = totalCards <= 10
+        ? (totalCards >= 6 ? [5] : [])
+        : [10, 20, 30, 50].filter(function (n) { return n < totalCards; });
+      counts.forEach(function (n) {
+        opts.push('<option value="' + n + '">' + n + '</option>');
+      });
+      return opts.join('');
+    })();
     openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setup-title"><h2 id="setup-title">' + (targetVideo && videoCards.length ? (q ? 'Start video quiz' : 'Start video flashcards') : (q ? 'Start quiz' : 'Start flashcards')) + '</h2>' +
       scopeNote +
       resumeBtn +
-      (q ? '<label class="field"><span>Questions</span><select id="s-len"><option value="0">All cards</option><option value="10">10</option><option value="20">20</option><option value="30">30</option></select></label>'
+      (q ? '<label class="field"><span>Questions</span><select id="s-len">' + questionCountOptions + '</select></label>'
          : '<label class="check"><input type="checkbox" id="s-shuf"' + (S.settings.shuffle ? ' checked' : '') + '> Shuffle cards</label>') +
       '<label class="check"><input type="checkbox" id="s-unk"> Skip cards I already know</label><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="start">' + (resumeBtn ? 'Start fresh' : 'Start') + '</button></div></div>');
   }
