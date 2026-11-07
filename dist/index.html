@@ -14754,6 +14754,172 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     }
   }
 
+  function viewToHash(v) {
+    if (!v || !v.name || v.name === 'home') return '#/';
+    switch (v.name) {
+      case 'journey':
+      case 'practice':
+      case 'progress':
+      case 'settings':
+      case 'import':
+        return '#/' + v.name;
+      case 'chapter':
+        return '#/chapter/' + encodeURIComponent(v.id || '');
+      case 'lesson-video': {
+        var base = '#/video/' + encodeURIComponent(v.id || '');
+        var vIndex = Number.isInteger(v.videoIndex) ? Math.max(0, v.videoIndex) : 0;
+        base += '/' + vIndex;
+        if (Number.isFinite(v.videoTime) && v.videoTime > 0) {
+          base += '?t=' + Math.floor(v.videoTime);
+        }
+        return base;
+      }
+      case 'devotional':
+        return '#/devotional/' + encodeURIComponent(v.id || '');
+      case 'streak':
+        return '#/streak';
+      case 'picker':
+        return '#/picker/' + encodeURIComponent(v.mode || 'flash');
+      case 'edit':
+        return '#/edit/' + encodeURIComponent(v.id || '');
+      case 'onboarding':
+        return '#/onboarding';
+      case 'flash':
+      case 'quiz': {
+        var targetId = v.id || (Array.isArray(v.ids) && v.ids.length === 1 ? v.ids[0] : '');
+        return '#/study/' + v.name + (targetId ? '/' + encodeURIComponent(targetId) : '');
+      }
+      case 'exam':
+        return '#/study/exam';
+      case 'results':
+        return '#/results';
+      default:
+        return '#/';
+    }
+  }
+
+  function hashToView(hash) {
+    if (typeof hash !== 'string') return { name: 'home' };
+    var cleaned = hash.trim().replace(/^#\/?/, '');
+    if (!cleaned) return { name: 'home' };
+
+    var query = {};
+    var qIdx = cleaned.indexOf('?');
+    if (qIdx >= 0) {
+      var qs = cleaned.slice(qIdx + 1);
+      cleaned = cleaned.slice(0, qIdx);
+      qs.split('&').forEach(function (param) {
+        var parts = param.split('=');
+        if (parts[0]) {
+          query[decodeURIComponent(parts[0])] = parts[1] ? decodeURIComponent(parts[1]) : '';
+        }
+      });
+    }
+
+    var segments = cleaned.split('/').filter(Boolean).map(function (seg) {
+      try { return decodeURIComponent(seg); } catch (e) { return seg; }
+    });
+    var root = segments[0] ? segments[0].toLowerCase() : '';
+
+    switch (root) {
+      case '':
+      case 'home':
+        return { name: 'home' };
+      case 'journey':
+        return { name: 'journey' };
+      case 'practice':
+        return { name: 'practice' };
+      case 'progress':
+      case 'stats':
+        return { name: 'progress' };
+      case 'settings':
+      case 'account':
+        return { name: 'settings' };
+      case 'chapter':
+      case 'deck':
+        return segments[1] ? { name: 'chapter', id: segments[1] } : { name: 'journey' };
+      case 'video':
+      case 'lesson-video': {
+        var deckId = segments[1] || '';
+        if (!deckId) return { name: 'journey' };
+        var vIdx = segments[2] ? parseInt(segments[2], 10) : 0;
+        if (isNaN(vIdx) || vIdx < 0) vIdx = 0;
+        var vTime = query.t ? parseFloat(query.t) : 0;
+        if (isNaN(vTime) || vTime < 0) vTime = 0;
+        return { name: 'lesson-video', id: deckId, videoIndex: vIdx, videoTime: vTime };
+      }
+      case 'devotional':
+        return segments[1] ? { name: 'devotional', id: segments[1] } : { name: 'home' };
+      case 'streak':
+        return { name: 'streak', returnTo: 'home' };
+      case 'picker': {
+        var mode = segments[1] === 'quiz' ? 'quiz' : 'flash';
+        return { name: 'picker', mode: mode, from: 'home', pickerMulti: false, pickerMixed: false };
+      }
+      case 'edit':
+        return segments[1] ? { name: 'edit', id: segments[1], editing: null, filter: '' } : { name: 'home' };
+      case 'import':
+        return { name: 'import' };
+      case 'onboarding':
+        return { name: 'onboarding', step: 0, answers: MobileStudy.defaultOnboarding(false) };
+      case 'study': {
+        var studyMode = segments[1] || 'flash';
+        if (studyMode === 'quiz' || studyMode === 'flash') {
+          return segments[2] ? { name: 'study', mode: studyMode, id: segments[2] } : { name: 'study', mode: studyMode };
+        }
+        if (studyMode === 'exam') {
+          return { name: 'study', mode: 'exam' };
+        }
+        return { name: 'home' };
+      }
+      case 'quiz':
+      case 'flash':
+        return segments[1] ? { name: 'study', mode: root, id: segments[1] } : { name: 'study', mode: root };
+      case 'exam':
+        return { name: 'study', mode: 'exam' };
+      case 'results':
+        return { name: 'results' };
+      default:
+        return { name: 'home' };
+    }
+  }
+
+  function normalizeHash(h) {
+    if (!h) return '#/';
+    var str = String(h).trim();
+    if (str === '#' || str === '#/' || str === '') return '#/';
+    return str.charAt(0) === '#' ? str : '#' + str;
+  }
+
+  function syncHashWithView(v, replace) {
+    if (typeof window === 'undefined' || !window.location) return;
+    var targetHash = viewToHash(v);
+    try {
+      if (window.history && (replace ? window.history.replaceState : window.history.pushState)) {
+        var stateObj = { name: v.name, id: v.id || null, hash: targetHash };
+        if (v.returnToVideoId) stateObj.returnToVideoId = v.returnToVideoId;
+        if (Number.isInteger(v.returnVideoIndex)) stateObj.returnVideoIndex = v.returnVideoIndex;
+        if (typeof v.returnVideoAssetId === 'string' && v.returnVideoAssetId) stateObj.returnVideoAssetId = v.returnVideoAssetId;
+        stateObj.videoIndex = Number.isInteger(v.videoIndex) ? v.videoIndex : 0;
+        if (Number.isFinite(v.videoTime) && v.videoTime >= 0) stateObj.videoTime = v.videoTime;
+        var targetUrl = (window.location.pathname || '') + (window.location.search || '') + targetHash;
+        if (replace) {
+          window.history.replaceState(stateObj, '', targetUrl);
+        } else {
+          window.history.pushState(stateObj, '', targetUrl);
+        }
+      } else if (typeof window.location.hash === 'string' && normalizeHash(window.location.hash) !== normalizeHash(targetHash)) {
+        window.location.hash = targetHash;
+      }
+    } catch (e) {
+      try {
+        if (typeof window.location.hash === 'string' && normalizeHash(window.location.hash) !== normalizeHash(targetHash)) {
+          window.location.hash = targetHash;
+        }
+      } catch (err) {}
+    }
+  }
+
   function go(v, replace) {
     if (V.name === 'exam' && v.name !== 'exam') stopExamTimer();
     rocketMenuOpen = false;
@@ -14761,35 +14927,69 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     animateRouteChange = !!prev && (prev.name !== v.name || prev.id !== v.id);
     if (prev && (prev.name === 'quiz' || prev.name === 'flash' || prev.name === 'exam') && v.name !== prev.name) scheduleCloudProgressSync(true);
     V = v;
-    try {
-      if (window.history && window.history.pushState) {
-        var stateObj = { name: V.name, id: V.id || null };
-        if (V.returnToVideoId) stateObj.returnToVideoId = V.returnToVideoId;
-        if (Number.isInteger(V.returnVideoIndex)) stateObj.returnVideoIndex = V.returnVideoIndex;
-        if (typeof V.returnVideoAssetId === 'string' && V.returnVideoAssetId) stateObj.returnVideoAssetId = V.returnVideoAssetId;
-        if (replace) {
-          window.history.replaceState(stateObj, '', window.location.href);
-        } else if (!prev || prev.name !== V.name || prev.id !== V.id) {
-          stateObj.videoIndex = Number.isInteger(V.videoIndex) ? V.videoIndex : 0;
-          if (Number.isFinite(V.videoTime) && V.videoTime >= 0) stateObj.videoTime = V.videoTime;
-          window.history.pushState(stateObj, '', window.location.href);
-        }
+    var shouldReplace = !!replace;
+    var prevHash = prev ? viewToHash(prev) : '';
+    var newHash = viewToHash(V);
+    if (!replace && prev && prev.name === V.name && prev.id === V.id && prevHash === newHash) {
+      shouldReplace = true;
+    }
+    syncHashWithView(V, shouldReplace);
+    render();
+  }
+
+  function handleLocationChange(e) {
+    var currentHash = (typeof window !== 'undefined' && window.location && typeof window.location.hash === 'string') ? window.location.hash : '';
+    var currentViewHash = viewToHash(V);
+    if (normalizeHash(currentHash) === normalizeHash(currentViewHash) && !(e && e.state && Number.isFinite(e.state.videoTime) && e.state.videoTime !== V.videoTime)) {
+      return;
+    }
+    if (isStudySession(V.name)) {
+      if (V.name === 'exam') stopExamTimer();
+      saveActiveSession();
+    }
+    rocketMenuOpen = false;
+    var targetView = hashToView(currentHash);
+    if (e && e.state) {
+      if (e.state.returnToVideoId) targetView.returnToVideoId = e.state.returnToVideoId;
+      if (Number.isInteger(e.state.returnVideoIndex)) targetView.returnVideoIndex = e.state.returnVideoIndex;
+      if (e.state.returnVideoAssetId) targetView.returnVideoAssetId = e.state.returnVideoAssetId;
+      if (Number.isFinite(e.state.videoTime) && e.state.videoTime >= 0 && !targetView.videoTime) {
+        targetView.videoTime = e.state.videoTime;
       }
-    } catch (e) {}
+    }
+    if (targetView.name === 'study' || isStudySession(targetView.name)) {
+      var restored = S.pausedSession ? MobileStudy.restore(S.pausedSession, S.decks) : null;
+      if (restored) {
+        V = restored;
+        if (V.name === 'exam') startExamTimer();
+        saveActiveSession();
+      } else {
+        var targetDeck = targetView.id && deck(targetView.id);
+        V = targetDeck ? { name: 'chapter', id: targetDeck.id } : { name: 'home' };
+        syncHashWithView(V, true);
+      }
+    } else if (targetView.name === 'results') {
+      V = { name: 'home' };
+      syncHashWithView(V, true);
+    } else {
+      V = targetView;
+    }
     render();
   }
 
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-    window.addEventListener('popstate', function (e) {
-      if (e.state && e.state.name) {
-        if (isStudySession(V.name)) {
-          pauseStudySession();
-        }
-        rocketMenuOpen = false;
-        V = { name: e.state.name, id: e.state.id, videoIndex: Number.isInteger(e.state.videoIndex) ? e.state.videoIndex : 0, videoTime: Number.isFinite(e.state.videoTime) && e.state.videoTime >= 0 ? e.state.videoTime : 0, returnToVideoId: e.state.returnToVideoId || '', returnVideoIndex: Number.isInteger(e.state.returnVideoIndex) ? e.state.returnVideoIndex : 0, returnVideoAssetId: e.state.returnVideoAssetId || '' };
-        render();
-      }
-    });
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+  }
+
+  var Routing = {
+    viewToHash: viewToHash,
+    hashToView: hashToView,
+    syncHashWithView: syncHashWithView
+  };
+
+  if (typeof window !== 'undefined') {
+    window.Routing = Routing;
   }
 
   /* ---------- sessions ---------- */
@@ -15433,6 +15633,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
           if (currentLessonPlayer) currentLessonPlayer.pause();
           V.videoIndex = +t.dataset.index;
           V.videoTime = 0;
+          syncHashWithView(V, false);
           render(true);
           returnToLessonVideo();
         }
@@ -15705,8 +15906,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
         finishOnboarding(true, true);
         break;
       case 'retake-onboarding':
-        V = { name: 'onboarding', step: 2, answers: Object.assign({}, S.onboarding || MobileStudy.defaultOnboarding(true)) };
-        render();
+        go({ name: 'onboarding', step: 2, answers: Object.assign({}, S.onboarding || MobileStudy.defaultOnboarding(true)) });
         break;
       case 'close': closeModal(); break;
       case 'askok': var fn = pendingAsk; closeModal(); if (fn) fn(); break;
@@ -16187,6 +16387,29 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
         if (!activeStorageOwnerId) { requestedStorageOwnerId = null; }
         if (isFirstRun) {
           V = { name: 'onboarding', step: 0, answers: MobileStudy.defaultOnboarding(false) };
+          syncHashWithView(V, true);
+        } else {
+          var initialHash = (typeof window !== 'undefined' && window.location && typeof window.location.hash === 'string') ? window.location.hash : '';
+          var route = hashToView(initialHash);
+          if (route.name === 'study' || isStudySession(route.name)) {
+            var restored = S.pausedSession ? MobileStudy.restore(S.pausedSession, S.decks) : null;
+            if (restored) {
+              V = restored;
+              if (V.name === 'exam') startExamTimer();
+              saveActiveSession();
+              syncHashWithView(V, true);
+            } else {
+              var targetDeck = route.id && deck(route.id);
+              V = targetDeck ? { name: 'chapter', id: targetDeck.id } : { name: 'home' };
+              syncHashWithView(V, true);
+            }
+          } else if (route.name === 'results') {
+            V = { name: 'home' };
+            syncHashWithView(V, true);
+          } else {
+            V = route;
+            syncHashWithView(V, true);
+          }
         }
         render();
         registerServiceWorker();
