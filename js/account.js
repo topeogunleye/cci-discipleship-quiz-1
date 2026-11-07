@@ -8,6 +8,7 @@
 
   function createAccount(options) {
     options = options || {};
+    var sleep = typeof options.sleep === 'function' ? options.sleep : function (ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); };
     var fetcher = options.fetch || (typeof fetch === 'function' ? fetch.bind(globalThis) : null);
     var supabaseApi = options.Supabase || (typeof root !== 'undefined' ? root.Supabase : null);
     var localStorage = Object.prototype.hasOwnProperty.call(options, 'localStorage') ? options.localStorage : (typeof window !== 'undefined' ? window.localStorage : null);
@@ -289,12 +290,20 @@
         var merged = typeof syncEngine.mergeForDevice === 'function'
           ? syncEngine.mergeForDevice(base, localSnapshot, remoteSnapshot, activeDeviceId, additionalSnapshot)
           : syncEngine.merge(base, additionalSnapshot ? syncEngine.merge(syncEngine.empty(), localSnapshot, additionalSnapshot) : localSnapshot, remoteSnapshot);
+        if (typeof syncEngine.validateSnapshotSize === 'function') {
+          syncEngine.validateSnapshotSize(merged);
+        }
         var result = await writeProgress(remoteVersion, merged);
         if (result && result.ok === true) {
           var checkpointSaved = writeBase(userId, merged);
           return { snapshot: merged, version: result.version, deviceId: activeDeviceId, imported: !!additionalSnapshot, checkpointSaved: checkpointSaved };
         }
         if (!result || result.ok !== false) throw new Error('Cloud progress returned an invalid response.');
+        if (attempt < 5) {
+          var backoff = Math.min(600, 30 * Math.pow(2, attempt));
+          var jitter = Math.floor(Math.random() * (backoff / 2));
+          await sleep(backoff + jitter);
+        }
       }
       throw new Error('Progress changed on another device. Try syncing again while online.');
     }

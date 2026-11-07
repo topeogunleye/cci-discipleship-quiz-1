@@ -505,16 +505,33 @@
     var starterIds = STARTER_DECKS.map(function (item) { return 'd-' + slug(item.title); }).filter(function (id) { return currentDeckIds.has(id); });
     return ProgressSync ? ProgressSync.extract(state, starterIds) : null;
   }
-  function scheduleCloudProgressSync() {
+  var lastCloudSyncTime = 0;
+  var MIN_STUDY_SYNC_INTERVAL_MS = 15000;
+  var IDLE_SYNC_DELAY_MS = 1500;
+  function isInteractiveStudyActive() {
+    return V && (V.name === 'quiz' || V.name === 'flash' || (V.name === 'lesson-video' && !!V.videoStudy));
+  }
+  function scheduleCloudProgressSync(immediate) {
     if (!account || !accountStatus.user || !navigator.onLine || preserveStorage) return;
+    if (immediate) {
+      if (cloudSyncTimer) { window.clearTimeout(cloudSyncTimer); cloudSyncTimer = null; }
+      syncCloudProgress();
+      return;
+    }
     if (cloudSyncTimer) window.clearTimeout(cloudSyncTimer);
-    cloudSyncTimer = window.setTimeout(function () { cloudSyncTimer = null; syncCloudProgress(); }, 1400);
+    var delay = IDLE_SYNC_DELAY_MS;
+    if (isInteractiveStudyActive()) {
+      var elapsed = Date.now() - lastCloudSyncTime;
+      delay = Math.max(IDLE_SYNC_DELAY_MS, MIN_STUDY_SYNC_INTERVAL_MS - elapsed);
+    }
+    cloudSyncTimer = window.setTimeout(function () { cloudSyncTimer = null; syncCloudProgress(); }, delay);
   }
   function syncCloudProgress(importSnapshot) {
     if (!account || !accountStatus.user || !ProgressSync) return Promise.resolve(false);
     if (!navigator.onLine) { accountMessage = 'You are offline. Progress is saved on this device and will sync when you reconnect.'; if (V.name === 'settings') render(true); return Promise.resolve(false); }
     if (cloudSyncTimer) { window.clearTimeout(cloudSyncTimer); cloudSyncTimer = null; }
     var owner = accountStatus.user.id, current = null;
+    lastCloudSyncTime = Date.now();
     accountMessage = 'Syncing study progress…';
     if (V.name === 'settings') render(true);
     cloudSyncQueue = cloudSyncQueue.catch(function () {}).then(function () {
@@ -2932,6 +2949,7 @@
     rocketMenuOpen = false;
     var prev = V;
     animateRouteChange = !!prev && (prev.name !== v.name || prev.id !== v.id);
+    if (prev && (prev.name === 'quiz' || prev.name === 'flash' || prev.name === 'exam') && v.name !== prev.name) scheduleCloudProgressSync(true);
     V = v;
     try {
       if (window.history && window.history.pushState) {
@@ -3290,6 +3308,7 @@
     if (!V.videoStudy.results) {
       S.pausedSession = MobileStudy.snapshot(V.videoStudy);
       save();
+      scheduleCloudProgressSync(true);
       toast('Study paused. Your progress is saved.');
     }
     V.videoStudy = null;
@@ -4253,8 +4272,16 @@
       });
     });
   }
-  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('online', function () {
-    if (accountStatus.user) syncCloudProgress();
-  });
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('online', function () {
+      if (accountStatus.user) syncCloudProgress();
+    });
+    window.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden' && cloudSyncTimer) syncCloudProgress();
+    });
+    window.addEventListener('pagehide', function () {
+      if (cloudSyncTimer) syncCloudProgress();
+    });
+  }
   boot();
 })();
