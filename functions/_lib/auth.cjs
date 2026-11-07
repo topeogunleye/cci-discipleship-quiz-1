@@ -2,8 +2,12 @@
 
 const VIDEO_COOKIE = '__Host-cci-video-session';
 const JWKS_TTL_MS = 5 * 60 * 1000;
+const JWKS_UNKNOWN_KID_REFRESH_COOLDOWN_MS = 30 * 1000;
+const JWKS_FAILURE_BACKOFF_MS = 30 * 1000;
 const jwksCache = new Map();
 const jwksInflight = new Map();
+const jwksRefreshAt = new Map();
+const jwksFailureUntil = new Map();
 
 function jsonResponse(body, status, headers) {
   const resultHeaders = new Headers(headers || {});
@@ -145,8 +149,20 @@ async function fetchJwks(url, fetcher, forceRefresh) {
   const now = Date.now();
   const cached = jwksCache.get(url);
   if (!forceRefresh && cached && cached.expiresAt > now) return cached.keys;
-  if (forceRefresh) jwksCache.delete(url);
   if (jwksInflight.has(url)) return jwksInflight.get(url);
+  const retryAt = jwksFailureUntil.get(url) || 0;
+  if (retryAt > now) {
+    if (cached && cached.expiresAt > now) return cached.keys;
+    throw authServiceUnavailable(Math.max(1, Math.ceil((retryAt - now) / 1000)));
+  }
+  if (forceRefresh) {
+    const lastRefreshAt = jwksRefreshAt.get(url) || 0;
+    if (now - lastRefreshAt < JWKS_UNKNOWN_KID_REFRESH_COOLDOWN_MS) {
+      return cached ? cached.keys : fetchJwks(url, fetcher, false);
+    }
+    // Throttle refreshes per Supabase project, not per attacker-controlled kid.
+    jwksRefreshAt.set(url, now);
+  }
   const requestFetch = fetcher || fetch;
   const request = Promise.resolve().then(() => requestFetch(url + '/auth/v1/.well-known/jwks.json', {
     headers: { Accept: 'application/json' },
@@ -158,8 +174,10 @@ async function fetchJwks(url, fetcher, forceRefresh) {
     if (!data || !Array.isArray(data.keys)) throw authServiceUnavailable(30);
     const keys = data.keys.filter(key => key && typeof key === 'object' && typeof key.kid === 'string');
     jwksCache.set(url, { keys, expiresAt: Date.now() + JWKS_TTL_MS });
+    jwksFailureUntil.delete(url);
     return keys;
   }).catch(error => {
+    jwksFailureUntil.set(url, Date.now() + JWKS_FAILURE_BACKOFF_MS);
     if (error && error.name === 'AuthServiceUnavailableError') throw error;
     throw authServiceUnavailable(30);
   }).finally(() => jwksInflight.delete(url));
@@ -321,4 +339,4 @@ function videoCookie(accessToken, maxAge) {
   return VIDEO_COOKIE + '=' + encodeURIComponent(accessToken) + '; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=' + Math.max(1, Math.min(3600, Math.floor(lifetime)));
 }
 
-module.exports = { VIDEO_COOKIE, jsonResponse, isPublishableKey, supabaseConfig, allowedOrigins, withCors, originAllowed, authServiceUnavailable, authServiceUnavailableResponse, getAuthenticatedUser, verifySupabaseAccessToken, accessTokenExpiration, accessTokenSubject, createPlaybackTicket, verifyPlaybackTicket, isPlaybackTicket, videoToken, videoCookie, __test: { decodeJwt, validAccessClaims, resetJwksCache: () => { jwksCache.clear(); jwksInflight.clear(); } } };
+module.exports = { VIDEO_COOKIE, jsonResponse, isPublishableKey, supabaseConfig, allowedOrigins, withCors, originAllowed, authServiceUnavailable, authServiceUnavailableResponse, getAuthenticatedUser, verifySupabaseAccessToken, accessTokenExpiration, accessTokenSubject, createPlaybackTicket, verifyPlaybackTicket, isPlaybackTicket, videoToken, videoCookie, __test: { decodeJwt, validAccessClaims, resetJwksCache: () => { jwksCache.clear(); jwksInflight.clear(); jwksRefreshAt.clear(); jwksFailureUntil.clear(); } } };

@@ -1,5 +1,7 @@
 const ESV_PASSAGE_TEXT_URL = 'https://api.esv.org/v3/passage/text/';
 const MAX_REFERENCE_LENGTH = 180;
+const UPSTREAM_TIMEOUT_MS = 5000;
+const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
 
 function jsonResponse(body, status, customHeaders) {
   const headers = new Headers({
@@ -34,6 +36,27 @@ export function onRequestOptions() {
   });
 }
 
+async function checkRateLimit(request, env) {
+  const limiter = env && env.ESV_RATE_LIMITER;
+  if (!limiter || typeof limiter.limit !== 'function') {
+    return env && env.ESV_RATE_LIMIT_REQUIRED === 'true' ? 'unavailable' : 'allowed';
+  }
+
+  // Cloudflare supplies this header at the edge. Do not trust client-provided
+  // forwarding headers as a substitute for the actual connecting IP.
+  const clientIp = request.headers.get('CF-Connecting-IP');
+  if (!clientIp) return 'unavailable';
+
+  try {
+    const result = await limiter.limit({ key: 'esv-passage:' + clientIp });
+    return result && result.success === true ? 'allowed' : 'limited';
+  } catch (error) {
+    // Fail closed if the configured limiter is unavailable so requests do not
+    // continue to consume the shared upstream ESV quota without protection.
+    return 'unavailable';
+  }
+}
+
 export async function onRequestGet(context) {
   const { request, env } = context || {};
   const url = new URL(request.url);
@@ -43,6 +66,18 @@ export async function onRequestGet(context) {
   }
   if (!env || !env.ESV_API_KEY) {
     return jsonResponse({ error: 'ESV passage previews are not configured.' }, 503);
+  }
+
+  const rateLimit = await checkRateLimit(request, env);
+  if (rateLimit === 'limited') {
+    return jsonResponse({ error: 'Too many passage requests. Please try again shortly.' }, 429, {
+      'Retry-After': String(RATE_LIMIT_RETRY_AFTER_SECONDS)
+    });
+  }
+  if (rateLimit === 'unavailable') {
+    return jsonResponse({ error: 'The ESV passage service is temporarily unavailable.' }, 503, {
+      'Retry-After': '30'
+    });
   }
 
   const canonicalRef = reference.trim().replace(/\s+/g, ' ');
@@ -55,13 +90,18 @@ export async function onRequestGet(context) {
   apiUrl.searchParams.set('include-passage-references', 'false');
   apiUrl.searchParams.set('include-short-copyright', 'true');
 
+  const canAbortUpstream = typeof AbortController === 'function' && typeof setTimeout === 'function';
+  const controller = canAbortUpstream ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(function () { controller.abort(); }, UPSTREAM_TIMEOUT_MS) : null;
   try {
-    const response = await fetch(apiUrl.toString(), {
+    const fetchOptions = {
       headers: {
         Accept: 'application/json',
         Authorization: 'Token ' + env.ESV_API_KEY
       }
-    });
+    };
+    if (controller) fetchOptions.signal = controller.signal;
+    const response = await fetch(apiUrl.toString(), fetchOptions);
     if (!response.ok) return jsonResponse({ error: 'The ESV passage could not be loaded.' }, response.status === 429 ? 503 : 502);
 
     const data = await response.json();
@@ -73,5 +113,7 @@ export async function onRequestGet(context) {
     return jsonResponse({ text: text }, 200);
   } catch (error) {
     return jsonResponse({ error: 'The ESV passage service is temporarily unavailable.' }, 502);
+  } finally {
+    if (timeoutId !== null && typeof clearTimeout === 'function') clearTimeout(timeoutId);
   }
 }
