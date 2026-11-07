@@ -27,8 +27,24 @@ function loadHandlers(fetcher) {
 const environment = r2 => ({
   SUPABASE_URL: 'https://auth.example',
   SUPABASE_ANON_KEY: 'sb_publishable_test_key',
+  VIDEO_AUTH_MODE: 'remote',
   LESSON_VIDEOS: r2
 });
+
+function makeEs256Fixture(options) {
+  options = options || {};
+  const pair = options.pair || crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const publicKey = { ...pair.publicKey.export({ format: 'jwk' }), kid: options.kid || 'lesson-key-1', alg: 'ES256', use: 'sig', key_ops: ['verify'] };
+  const claims = {
+    iss: 'https://auth.example/auth/v1', aud: 'authenticated', role: 'authenticated',
+    sub: '123e4567-e89b-12d3-a456-426614174000', exp: Math.floor(Date.now() / 1000) + 3600,
+    ...(options.claims || {})
+  };
+  const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const input = encode({ alg: 'ES256', kid: options.kid || 'lesson-key-1', typ: 'JWT' }) + '.' + encode(claims);
+  const signature = crypto.sign('sha256', Buffer.from(input), { key: pair.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+  return { pair, publicKey, claims, token: input + '.' + signature };
+}
 
 test('private video endpoint rejects unauthenticated access before reading R2', async () => {
   let r2Reads = 0;
@@ -106,6 +122,41 @@ test('private video endpoint validates keys and streams authenticated byte range
     assert.equal(invalidRange.status, 416);
     assert.equal(invalidRange.headers.get('content-range'), 'bytes */10');
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test('local JWKS authorization avoids Supabase user lookup on every video range', async () => {
+  const fixture = makeEs256Fixture();
+  const bucketReads = [];
+  const authFetches = [];
+  const bucket = { get: async (key, options) => {
+    bucketReads.push({ key, options });
+    return { size: 10, httpEtag: 'etag', range: { offset: 0, length: 4 }, body: new Response('data').body };
+  }, head: async () => ({ size: 10, httpEtag: 'etag' }) };
+  const originalFetch = globalThis.fetch;
+  require('../functions/_lib/auth.cjs').__test.resetJwksCache();
+  globalThis.fetch = async url => {
+    authFetches.push(String(url));
+    return new Response(JSON.stringify({ keys: [fixture.publicKey] }), { status: 200 });
+  };
+  try {
+    const handlers = loadHandlers();
+    const key = catalogData.videos[0].objectKey;
+    for (const range of ['bytes=0-3', 'bytes=4-7']) {
+      const response = await handlers.onRequest({
+        request: new Request('https://study.example/api/videos?key=' + encodeURIComponent(key), {
+          headers: { Cookie: '__Host-cci-video-session=' + encodeURIComponent(fixture.token), Range: range }
+        }),
+        env: { ...environment(bucket), VIDEO_AUTH_MODE: undefined }
+      });
+      assert.equal(response.status, 206);
+    }
+    assert.equal(bucketReads.length, 2);
+    assert.deepEqual(authFetches, ['https://auth.example/auth/v1/.well-known/jwks.json']);
+    assert.ok(authFetches.every(url => !url.endsWith('/auth/v1/user')), 'range requests must not call Supabase Auth user endpoint');
+  } finally {
+    globalThis.fetch = originalFetch;
+    require('../functions/_lib/auth.cjs').__test.resetJwksCache();
+  }
 });
 
 test('catalog maps all uploaded objects to manifest decks without publishing media URLs', () => {

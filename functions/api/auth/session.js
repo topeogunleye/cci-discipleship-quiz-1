@@ -32,11 +32,13 @@ export async function onRequestPost({ request, env }) {
   catch (error) { return auth.authServiceUnavailableResponse(request, env, error); }
   if (!user) return auth.jsonResponse({ error: 'Sign in again to enable lesson video access.' }, 401, headers);
   const token = body.accessToken;
-  let maxAge = 3600;
-  try {
-    const claims = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-    if (Number.isFinite(claims.exp)) maxAge = Math.max(1, claims.exp - Math.floor(Date.now() / 1000));
-  } catch (error) {}
+  // Bind the cookie to the same account whose signed token was remotely validated.
+  // The subject is only trusted after getAuthenticatedUser accepts the token.
+  if (auth.accessTokenSubject(token) !== user.id) return auth.jsonResponse({ error: 'Sign in again to enable lesson video access.' }, 401, headers);
+  const expiresAt = auth.accessTokenExpiration(token);
+  const remainingLifetime = expiresAt - Math.floor(Date.now() / 1000);
+  if (!Number.isFinite(expiresAt) || remainingLifetime <= 0) return auth.jsonResponse({ error: 'Sign in again to enable lesson video access.' }, 401, headers);
+  const maxAge = Math.min(3600, remainingLifetime);
   headers.append('Set-Cookie', auth.videoCookie(token, maxAge));
   return auth.jsonResponse({ ok: true, user: { id: user.id } }, 200, headers);
 }
