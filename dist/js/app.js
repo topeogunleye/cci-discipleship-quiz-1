@@ -379,7 +379,20 @@
     }).catch(function () { return normalizeLessonVideos(fallback, transcriptFallback); });
   }
   function lessonVideosForDeck(deckId) {
-    return LESSON_VIDEOS.filter(function (item) { return item.deckId === deckId; });
+    return LESSON_VIDEOS.filter(function (item) {
+      return item.deckId === deckId || (deckId && item.deckId && (item.deckId.indexOf(deckId) === 0 || deckId.indexOf(item.deckId) === 0));
+    });
+  }
+  function cardMatchesVideo(card, video) {
+    if (!card || !video || !card.ref) return false;
+    var normRef = String(card.ref).toLowerCase().replace(/[^a-z0-9]/g, '');
+    var normTitle = String(video.title).toLowerCase().replace(/[^a-z0-9]/g, '');
+    var normId = String(video.id).replace(/^section-\d+-/, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return normRef.indexOf(normTitle) >= 0 || normTitle.indexOf(normRef) >= 0 || normRef.indexOf(normId) >= 0 || normId.indexOf(normRef) >= 0;
+  }
+  function cardsForVideo(deckItem, video) {
+    if (!deckItem || !video || !Array.isArray(deckItem.cards)) return [];
+    return deckItem.cards.filter(function (card) { return cardMatchesVideo(card, video); });
   }
   function nativeTicketUrl(value, ticket) {
     if (!value || !ticket || !account || !account.apiBase) return '';
@@ -1940,7 +1953,17 @@
       '<section class="lesson-video-frame' + (video && canStartPlayback ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
       '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title" tabindex="-1">' + esc(title) + '</h1><p>' + (canStartPlayback ? 'Watch this lesson video, then reinforce Chapter ' + section + ' (' + esc(parsed.topic) + ') with study activities covering all ' + d.cards.length + ' questions across the chapter’s ' + videos.length + ' recordings.' : 'Study Chapter ' + section + ' (' + esc(parsed.topic) + ') locally with flashcards or a quiz covering all ' + d.cards.length + ' questions.' + (accountStatus.user ? ' Secure video access is being prepared.' : ' Sign in to watch its lesson videos.')) + '</p></div>' + (video && canStartPlayback ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">' + (V.videoTime > 0 ? 'Resume lesson' : 'Play lesson') + '</button>' : '') + '</section>' +
       videoNavigation +
-      '<div class="lesson-video-study-actions" role="group" aria-label="Study Chapter ' + section + ' (' + esc(parsed.topic) + ')"><button type="button" class="btn" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" aria-label="Study Chapter ' + section + ' Flashcards, ' + d.cards.length + ' cards">Chapter Flashcards (' + d.cards.length + ')</button><button type="button" class="btn" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" aria-label="Take Chapter ' + section + ' Quiz, ' + d.cards.length + ' questions">Chapter Quiz (' + d.cards.length + ')</button></div>' +
+      (function () {
+        var videoCards = video ? cardsForVideo(d, video) : [];
+        var videoStudyButtons = videoCards.length
+          ? '<button type="button" class="btn primary" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" data-video-id="' + esc(video.id) + '" aria-label="Study Video Flashcards, ' + videoCards.length + ' cards">Video Flashcards (' + videoCards.length + ')</button>' +
+            '<button type="button" class="btn primary" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" data-video-id="' + esc(video.id) + '" aria-label="Take Video Quiz, ' + videoCards.length + ' questions">Video Quiz (' + videoCards.length + ')</button>'
+          : '';
+        var chapterStudyButtons =
+          '<button type="button" class="btn' + (videoCards.length ? ' ghost sm' : '') + '" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" aria-label="Study Chapter ' + section + ' (' + esc(parsed.topic) + ') Flashcards, ' + d.cards.length + ' cards">Chapter Flashcards (' + d.cards.length + ')</button>' +
+          '<button type="button" class="btn' + (videoCards.length ? ' ghost sm' : '') + '" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" aria-label="Take Chapter ' + section + ' (' + esc(parsed.topic) + ') Quiz, ' + d.cards.length + ' questions">Chapter Quiz (' + d.cards.length + ')</button>';
+        return '<div class="lesson-video-study-actions" role="group" aria-label="Study Chapter ' + section + ' (' + esc(parsed.topic) + ')">' + videoStudyButtons + chapterStudyButtons + '</div>';
+      })() +
       transcriptPanel +
       videoNav +
     '</main>';
@@ -3068,7 +3091,7 @@
   }
 
   /* ---------- sessions ---------- */
-  function setup(mode, id) {
+  function setup(mode, id, videoId) {
     var ids = id === '*' ? (SEL.size ? Array.from(SEL) : S.decks.map(function (d) { return d.id; })) : [id];
     if (!ids.length) ids = S.decks.map(function (d) { return d.id; });
     var returnToVideo = null;
@@ -3082,7 +3105,22 @@
       };
       if (currentVideo && !currentVideo.paused) currentVideo.pause();
     }
-    V.setup = { mode: mode, ids: ids, returnToVideo: returnToVideo };
+    var targetVideo = null, videoCards = [];
+    if (videoId && returnToVideo && returnToVideo.deckId === id) {
+      var matchedVideos = lessonVideosForDeck(id);
+      targetVideo = matchedVideos.filter(function (v) { return v.id === videoId; })[0] || null;
+      if (targetVideo) {
+        var d = deck(id);
+        videoCards = d ? cardsForVideo(d, targetVideo) : [];
+      }
+    }
+    V.setup = {
+      mode: mode,
+      ids: ids,
+      videoId: targetVideo ? targetVideo.id : null,
+      cards: videoCards.length ? videoCards.map(function (c) { return { deckId: id, card: c }; }) : null,
+      returnToVideo: returnToVideo
+    };
     var q = mode === 'quiz';
     var scopeNote = '';
     var resumeBtn = '';
@@ -3091,17 +3129,25 @@
       if (targetDeck) {
         var targetParsed = MobileStudy.parseChapterTitle(targetDeck.title);
         var targetVideos = lessonVideosForDeck(targetDeck.id);
-        scopeNote = '<p class="note" style="margin-top:4px;margin-bottom:var(--space-md);">' +
-          'Chapter ' + (targetParsed.sectionNum || 1) + ': ' + esc(targetParsed.topic) +
-          ' · ' + targetVideos.length + ' ' + (targetVideos.length === 1 ? 'video' : 'videos') +
-          ' · ' + targetDeck.cards.length + ' ' + (targetDeck.cards.length === 1 ? 'question' : 'questions') + '</p>';
+        if (targetVideo && videoCards.length) {
+          var targetIndex = targetVideos.findIndex(function (v) { return v.id === targetVideo.id; });
+          scopeNote = '<p class="note" style="margin-top:4px;margin-bottom:var(--space-md);">' +
+            'Video ' + (targetIndex >= 0 ? targetIndex + 1 : 1) + ': ' + esc(targetVideo.title) +
+            ' · ' + videoCards.length + ' ' + (videoCards.length === 1 ? 'question' : 'questions') +
+            ' · Chapter ' + (targetParsed.sectionNum || 1) + '</p>';
+        } else {
+          scopeNote = '<p class="note" style="margin-top:4px;margin-bottom:var(--space-md);">' +
+            'Chapter ' + (targetParsed.sectionNum || 1) + ': ' + esc(targetParsed.topic) +
+            ' · ' + targetVideos.length + ' ' + (targetVideos.length === 1 ? 'video' : 'videos') +
+            ' · ' + targetDeck.cards.length + ' ' + (targetDeck.cards.length === 1 ? 'question' : 'questions') + '</p>';
+        }
       }
       if (S.pausedSession && S.pausedSession.returnToVideo && S.pausedSession.returnToVideo.deckId === ids[0] && S.pausedSession.name === mode && S.pausedSession.cards && S.pausedSession.cards.length) {
         var savedCardNum = Math.min((S.pausedSession.i || 0) + 1, S.pausedSession.cards.length);
         resumeBtn = '<button type="button" class="btn primary full" data-act="resume-video-study" style="margin-bottom:var(--space-md);">Resume saved ' + (q ? 'quiz' : 'flashcards') + ' (' + savedCardNum + ' of ' + S.pausedSession.cards.length + ')</button>';
       }
     }
-    openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setup-title"><h2 id="setup-title">' + (q ? 'Start quiz' : 'Start flashcards') + '</h2>' +
+    openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setup-title"><h2 id="setup-title">' + (targetVideo && videoCards.length ? (q ? 'Start video quiz' : 'Start video flashcards') : (q ? 'Start quiz' : 'Start flashcards')) + '</h2>' +
       scopeNote +
       resumeBtn +
       (q ? '<label class="field"><span>Questions</span><select id="s-len"><option value="0">All cards</option><option value="10">10</option><option value="20">20</option><option value="30">30</option></select></label>'
@@ -3890,7 +3936,7 @@
       case 'rocket-challenge': closeRocketMenu(); startChallenge(); break;
       case 'rocket-exam': closeRocketMenu(); setupExam(); break;
       case 'close-picker': go({ name: V.from || 'home' }); break;
-      case 'setup': setup(t.dataset.mode, t.dataset.id); break;
+      case 'setup': setup(t.dataset.mode, t.dataset.id, t.dataset.videoId); break;
       case 'picker-multi':
         V.pickerMulti = !V.pickerMulti;
         if (!V.pickerMulti && SEL.size > 1) SEL = new Set([Array.from(SEL).pop()]);
