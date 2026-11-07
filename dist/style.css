@@ -971,7 +971,7 @@ a:hover { color: var(--link-hover); }
 .bible-reference-preview {
   display: none;
   position: fixed;
-  z-index: 1200;
+  z-index: 2200;
   width: min(340px, calc(100vw - 24px));
   padding: var(--space-md);
   border: 1px solid var(--line);
@@ -986,6 +986,11 @@ a:hover { color: var(--link-hover); }
 }
 
 .bible-reference-wrap.is-open > .bible-reference-preview {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.bible-reference-preview.is-open {
   display: grid;
   gap: var(--space-sm);
 }
@@ -9480,13 +9485,14 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 
 @media (min-width: 768px) {
   #modal .video-study-modal {
-    top: 50% !important;
-    left: 50% !important;
-    right: auto !important;
-    bottom: auto !important;
-    transform: translate(-50%, -50%) !important;
+    top: 24px !important;
+    right: 24px !important;
+    bottom: 24px !important;
+    left: 24px !important;
+    margin: auto !important;
     width: min(720px, calc(100vw - 48px)) !important;
     max-width: 720px !important;
+    height: fit-content !important;
     max-height: min(860px, calc(100vh - 48px)) !important;
     max-height: min(860px, calc(100dvh - 48px)) !important;
     border-radius: 24px !important;
