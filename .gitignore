@@ -21,3 +21,9 @@ ios/**/*.xcuserdatad/
 /audit/video-experience-2026-11-06/
 /scripts/capture-video-audit.js
 /scripts/capture-video-after.js
+
+# Keep generated screenshots and design exports out of Git while retaining pointers.
+/screenshots/*
+!/screenshots/README.md
+/design-reference/*
+!/design-reference/README.md
