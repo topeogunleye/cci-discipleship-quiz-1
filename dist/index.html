@@ -13511,13 +13511,15 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       videoNavigation +
       (function () {
         var videoCards = video ? cardsForVideo(d, video) : [];
+        var isLastVideo = !videos.length || index >= videos.length - 1;
         var videoStudyButtons = videoCards.length
           ? '<button type="button" class="btn primary" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" data-video-id="' + esc(video.id) + '" aria-label="Study Video Flashcards, ' + videoCards.length + ' cards">Video Flashcards (' + videoCards.length + ')</button>' +
             '<button type="button" class="btn primary" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" data-video-id="' + esc(video.id) + '" aria-label="Take Video Quiz, ' + videoCards.length + ' questions">Video Quiz (' + videoCards.length + ')</button>'
+          : (isLastVideo ? '' : '<p class="note" style="margin:var(--space-xs) 0;">Video practice questions in preparation · Chapter quiz available on the final lesson</p>');
+        var chapterStudyButtons = isLastVideo
+          ? '<button type="button" class="btn' + (videoCards.length ? ' ghost sm' : '') + '" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" aria-label="Study Chapter ' + section + ' (' + esc(parsed.topic) + ') Flashcards, ' + d.cards.length + ' cards">Chapter Flashcards (' + d.cards.length + ')</button>' +
+            '<button type="button" class="btn' + (videoCards.length ? ' ghost sm' : '') + '" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" aria-label="Take Chapter ' + section + ' (' + esc(parsed.topic) + ') Quiz, ' + d.cards.length + ' questions">Chapter Quiz (' + d.cards.length + ')</button>'
           : '';
-        var chapterStudyButtons =
-          '<button type="button" class="btn' + (videoCards.length ? ' ghost sm' : '') + '" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" aria-label="Study Chapter ' + section + ' (' + esc(parsed.topic) + ') Flashcards, ' + d.cards.length + ' cards">Chapter Flashcards (' + d.cards.length + ')</button>' +
-          '<button type="button" class="btn' + (videoCards.length ? ' ghost sm' : '') + '" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" aria-label="Take Chapter ' + section + ' (' + esc(parsed.topic) + ') Quiz, ' + d.cards.length + ' questions">Chapter Quiz (' + d.cards.length + ')</button>';
         return '<div class="lesson-video-study-actions" role="group" aria-label="Study Chapter ' + section + ' (' + esc(parsed.topic) + ')">' + videoStudyButtons + chapterStudyButtons + '</div>';
       })() +
       transcriptPanel +
