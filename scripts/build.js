@@ -36,7 +36,9 @@ function normalizeTextFiles(directory) {
 normalizeTextFile(path.join(root, 'js/supabase.bundle.js'));
 
 html = replaceOnce(html, '<link rel="stylesheet" href="style.css">', `<style>\n${read('style.css')}\n</style>`);
-html = replaceOnce(html, '<script type="application/json" id="starter-fallback">""</script>', `<script type="application/json" id="starter-fallback">${inlineJson}</script>`);
+// Keep starter-fallback lightweight in dist/index.html to save 1.09 MB of payload bloat
+// Decks are loaded dynamically via decks/manifest.json and decks/starter-decks.js
+// html = replaceOnce(html, '<script type="application/json" id="starter-fallback">""</script>', `<script type="application/json" id="starter-fallback">${inlineJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="devotionals-fallback">[]</script>', `<script type="application/json" id="devotionals-fallback">${devotionalsJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="lesson-videos-fallback">{"schemaVersion":1,"videos":[]}</script>', `<script type="application/json" id="lesson-videos-fallback">${lessonVideosJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="lesson-transcripts-fallback">{"schemaVersion":1,"transcripts":[]}</script>', `<script type="application/json" id="lesson-transcripts-fallback">${lessonTranscriptsJson}</script>`);
@@ -62,6 +64,9 @@ for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html',
 for (const directory of ['decks', 'icons', 'content', 'js']) {
   fs.cpSync(path.join(root, directory), path.join(outputDir, directory), { recursive: true });
 }
+const starterDecksJs = `window.CCI_STARTER_DECKS = ${inlineJson};\n`;
+fs.writeFileSync(path.join(root, 'decks', 'starter-decks.js'), starterDecksJs);
+fs.writeFileSync(path.join(outputDir, 'decks', 'starter-decks.js'), starterDecksJs);
 require('./lesson-transcripts.js').writeLessonTranscripts(root);
 normalizeTextFile(path.join(outputDir, 'style.css'));
 normalizeTextFiles(path.join(outputDir, 'js'));
