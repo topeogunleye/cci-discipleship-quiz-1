@@ -20,6 +20,12 @@ function loadHandler(fetchImpl, mockCaches) {
   });
 }
 
+function allowedRateLimiter() {
+  return {
+    fetch: async () => new Response(null, { status: 204 })
+  };
+}
+
 test('ESV passage function requires a configured secret and validates passage references', async () => {
   let requests = 0;
   const handlers = loadHandler(async () => { requests++; throw new Error('unexpected upstream request'); });
@@ -53,8 +59,10 @@ test('ESV passage function calls the official API with its secret header and ret
   });
 
   const response = await handlers.onRequestGet({
-    request: new Request('https://study.example/api/esv-passage?q=John+3%3A16'),
-    env: { ESV_API_KEY: 'test-esv-key' }
+    request: new Request('https://study.example/api/esv-passage?q=John+3%3A16', {
+      headers: { 'CF-Connecting-IP': '198.51.100.7' }
+    }),
+    env: { ESV_API_KEY: 'test-esv-key', ESV_RATE_LIMITER: allowedRateLimiter() }
   });
 
   assert.equal(response.status, 200);
@@ -91,8 +99,10 @@ test('ESV passage text is not persisted through the Cloudflare Cache API', async
 
   // Each request goes to ESV and returns a no-store response.
   const first = await handlers.onRequestGet({
-    request: new Request('https://study.example/api/esv-passage?q=John+1%3A1'),
-    env: { ESV_API_KEY: 'test-esv-key' }
+    request: new Request('https://study.example/api/esv-passage?q=John+1%3A1', {
+      headers: { 'CF-Connecting-IP': '198.51.100.7' }
+    }),
+    env: { ESV_API_KEY: 'test-esv-key', ESV_RATE_LIMITER: allowedRateLimiter() }
   });
   assert.equal(first.status, 200);
   assert.equal(upstreamRequests, 1);
@@ -101,8 +111,10 @@ test('ESV passage text is not persisted through the Cloudflare Cache API', async
 
   // A repeated request is not served from a persistent application cache.
   const second = await handlers.onRequestGet({
-    request: new Request('https://study.example/api/esv-passage?q=John+1%3A1'),
-    env: { ESV_API_KEY: 'test-esv-key' }
+    request: new Request('https://study.example/api/esv-passage?q=John+1%3A1', {
+      headers: { 'CF-Connecting-IP': '198.51.100.7' }
+    }),
+    env: { ESV_API_KEY: 'test-esv-key', ESV_RATE_LIMITER: allowedRateLimiter() }
   });
   assert.equal(second.status, 200);
   assert.equal(second.headers.get('Cache-Control'), 'no-store');
