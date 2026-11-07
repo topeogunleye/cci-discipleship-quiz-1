@@ -121,8 +121,8 @@
     var request = { id: ++biblePreviewRequestSequence, controller: controller, link: link, preview: preview };
     biblePreviewRequest = request;
     var timeout = window.setTimeout(function () { controller.abort(); }, 8000);
-    fetch('/api/esv-passage?q=' + encodeURIComponent(reference), {
-      credentials: 'same-origin',
+    var apiBase = account ? account.apiBase : (window.CCI_API_BASE || (Account && Account.DEFAULT_API_BASE) || '');
+    fetch(apiBase + '/api/esv-passage?q=' + encodeURIComponent(reference), {
       headers: { Accept: 'application/json' },
       signal: controller.signal
     }).then(function (response) {
