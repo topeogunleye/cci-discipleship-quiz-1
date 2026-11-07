@@ -13,6 +13,7 @@ const auth = require('../functions/_lib/auth.cjs');
 function loadFunction(file, exportName) {
   const source = fs.readFileSync(path.join(root, file), 'utf8')
     .replace(/import auth from ['"][^'"]+['"];/, "const auth = require('../functions/_lib/auth.cjs');")
+    .replace(/import videoCatalog from ['"][^'"]+['"];/, "const videoCatalog = require('../functions/_lib/video-catalog.cjs');")
     .replace(/export async function /g, 'async function ')
     .replace(/export function /g, 'function ');
   return vm.runInNewContext(source + `\n${exportName}`, { require, URL, Response, Headers, Request });
