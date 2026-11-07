@@ -697,6 +697,7 @@ test('hybrid video study scopes questions to active video and preserves Section 
       getS: () => S,
       setup: setup,
       start: start,
+      render: render,
       lessonVideosForDeck: lessonVideosForDeck,
       cardsForVideo: cardsForVideo,
       setLessonVideos: val => { LESSON_VIDEOS = val; }
@@ -746,4 +747,35 @@ test('hybrid video study scopes questions to active video and preserves Section 
   assert.equal(t.getV().setup.cards.length, 1);
   assert.match(elements.modal.innerHTML, /Start video quiz/);
   assert.match(elements.modal.innerHTML, /Video 1: DID JESUS RISE FROM THE DEAD\. V/);
+
+  // Progressive study scoping: intermediate videos only have video actions, final video includes chapter capstone
+  const v1 = { id: 'test-v1', deckId: 'd-test', title: 'Part One' };
+  const v2 = { id: 'test-v2', deckId: 'd-test', title: 'Part Two' };
+  t.setLessonVideos([v1, v2]);
+  testDeck.cards = [
+    { id: 'c1', question: 'Q1', ref: 'Part One' },
+    { id: 'c2', question: 'Q2', ref: 'Part Two' }
+  ];
+
+  // 1. Intermediate video (index 0): only Video buttons, NO Chapter buttons
+  t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 0 });
+  t.render();
+  assert.match(elements.app.innerHTML, /Video Flashcards \(1\)/);
+  assert.match(elements.app.innerHTML, /Video Quiz \(1\)/);
+  assert.doesNotMatch(elements.app.innerHTML, /Chapter Flashcards/);
+  assert.doesNotMatch(elements.app.innerHTML, /Chapter Quiz/);
+
+  // 2. Final video (index 1): has both Video and Chapter buttons
+  t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 1 });
+  t.render();
+  assert.match(elements.app.innerHTML, /Video Flashcards \(1\)/);
+  assert.match(elements.app.innerHTML, /Video Quiz \(1\)/);
+  assert.match(elements.app.innerHTML, /Chapter Flashcards \(2\)/);
+  assert.match(elements.app.innerHTML, /Chapter Quiz \(2\)/);
+
+  // 3. Intermediate video with 0 cards renders graceful fallback message
+  testDeck.cards = [{ id: 'c2', question: 'Q2', ref: 'Part Two' }];
+  t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 0 });
+  t.render();
+  assert.match(elements.app.innerHTML, /Video practice questions in preparation · Chapter quiz available on the final lesson/);
 });
