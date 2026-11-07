@@ -780,6 +780,22 @@ test('hybrid video study scopes questions to active video and preserves Section 
   assert.match(elements.app.innerHTML, /Video practice questions in preparation · Chapter quiz available on the final lesson/);
 
   // Dynamic question count dropdown filtering
+  // Roman numeral boundary matching: BAPTISM I must only match Part I, not II, III, IV, or V
+  const multiPartDeck = {
+    id: 'd-test',
+    cards: [
+      { id: 'b1', question: 'Q1', ref: 'BAPTISM I — 01:35' },
+      { id: 'b2', question: 'Q2', ref: 'BAPTISM II — 04:52' },
+      { id: 'b3', question: 'Q3', ref: 'BAPTISM III — 11:44' },
+      { id: 'b4', question: 'Q4', ref: 'BAPTISM IV — 06:41' },
+      { id: 'b5', question: 'Q5', ref: 'BAPTISM V — 05:23' }
+    ]
+  };
+  const b1Video = { id: 'section-12-baptism-i', deckId: 'd-test', title: 'BAPTISM I' };
+  const matchedBaptism = t.cardsForVideo(multiPartDeck, b1Video);
+  assert.equal(matchedBaptism.length, 1, 'BAPTISM I must match only Part I card');
+  assert.equal(matchedBaptism[0].id, 'b1');
+
   // Case A: 27 questions (reproduces user scenario: 30 option must not be shown)
   const cards27 = [];
   for (let i = 1; i <= 27; i++) {

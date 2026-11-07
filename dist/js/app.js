@@ -385,10 +385,31 @@
   }
   function cardMatchesVideo(card, video) {
     if (!card || !video || !card.ref) return false;
-    var normRef = String(card.ref).toLowerCase().replace(/[^a-z0-9]/g, '');
     var normTitle = String(video.title).toLowerCase().replace(/[^a-z0-9]/g, '');
     var normId = String(video.id).replace(/^section-\d+-/, '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    return normRef.indexOf(normTitle) >= 0 || normTitle.indexOf(normRef) >= 0 || normRef.indexOf(normId) >= 0 || normId.indexOf(normRef) >= 0;
+
+    var refPrefix = card.ref.split(/[—–\[\(\-]/)[0].trim();
+    var normRefPrefix = refPrefix.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    if (normRefPrefix && (normRefPrefix === normTitle || normRefPrefix === normId)) return true;
+
+    var titleParts = video.title.trim().split(/\s+/);
+    var lastWord = titleParts[titleParts.length - 1].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (/^[IVXLCDM]+$/.test(lastWord)) {
+      var baseTitle = titleParts.slice(0, -1).join(' ').replace(/[^a-zA-Z0-9]/g, '');
+      var romanRegex = new RegExp('\\b' + baseTitle.split('').join('[^a-zA-Z0-9]*') + '[^a-zA-Z0-9]+' + lastWord + '\\b', 'i');
+      if (romanRegex.test(card.ref)) return true;
+    }
+
+    if (/^\d+$/.test(lastWord)) {
+      var baseTitleNum = titleParts.slice(0, -1).join(' ').replace(/[^a-zA-Z0-9]/g, '');
+      var numRegex = new RegExp('\\b' + baseTitleNum.split('').join('[^a-zA-Z0-9]*') + '[^a-zA-Z0-9]+' + lastWord + '\\b', 'i');
+      if (numRegex.test(card.ref)) return true;
+    }
+
+    var cleanTitle = video.title.replace(/[^a-zA-Z0-9]/g, '');
+    var boundaryRegex = new RegExp('\\b' + cleanTitle.split('').join('[^a-zA-Z0-9]*') + '\\b', 'i');
+    return boundaryRegex.test(card.ref);
   }
   function cardsForVideo(deckItem, video) {
     if (!deckItem || !video || !Array.isArray(deckItem.cards)) return [];
