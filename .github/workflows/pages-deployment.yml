@@ -62,6 +62,14 @@ jobs:
       - name: Build the app
         run: node scripts/build.js
 
+      - name: Deploy private ESV rate-limiter Worker
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config=workers/esv-rate-limiter/wrangler.toml
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v4
         with:
