@@ -15,3 +15,9 @@ ios/DerivedData/
 ios/Pods/
 ios/**/*.xcuserstate
 ios/**/*.xcuserdatad/
+
+# Local audit evidence and temporary capture helpers
+/audit/account-transcript-verification-2026-11-05/
+/audit/video-experience-2026-11-06/
+/scripts/capture-video-audit.js
+/scripts/capture-video-after.js
