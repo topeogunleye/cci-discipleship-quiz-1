@@ -22,6 +22,7 @@ const CORE_FILES = [
   'js/transcripts.js',
   'js/app.js',
   'decks/manifest.json',
+  'decks/starter-decks.js',
   'content/devotionals.json',
   'content/lesson-videos.json',
   'content/lesson-transcripts.json'

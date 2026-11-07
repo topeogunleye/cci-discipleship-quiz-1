@@ -261,9 +261,21 @@
       return typeof text === 'string' ? text : '';
     } catch (e) { return ''; }
   }
+  function loadStarterFallbackScript() {
+    return new Promise(function (resolve) {
+      if (typeof window !== 'undefined' && window.CCI_STARTER_DECKS) return resolve(window.CCI_STARTER_DECKS);
+      if (typeof document === 'undefined' || !document.createElement || !document.head) return resolve('');
+      var s = document.createElement('script');
+      s.src = 'decks/starter-decks.js';
+      s.onload = function () { resolve((typeof window !== 'undefined' && window.CCI_STARTER_DECKS) || ''); };
+      s.onerror = function () { resolve(''); };
+      document.head.appendChild(s);
+    });
+  }
   function loadStarterText() {
-    var fallback = inlineStarterText();
-    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(fallback);
+    var fallback = inlineStarterText() || (typeof window !== 'undefined' && window.CCI_STARTER_DECKS) || '';
+    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return fallback ? Promise.resolve(fallback) : loadStarterFallbackScript();
+
     return window.fetch('decks/manifest.json').then(function (response) {
       if (!response.ok) throw new Error('Could not load deck manifest');
       return response.json();
@@ -276,7 +288,7 @@
           return response.text();
         });
       }));
-    }).then(function (texts) { return texts.join('\n\n'); }).catch(function () { return fallback; });
+    }).then(function (texts) { return texts.join('\n\n'); }).catch(function () { return fallback ? fallback : loadStarterFallbackScript(); });
   }
 
   function inlineDevotionalsData() {
@@ -292,6 +304,7 @@
     if (!el) return Promise.resolve([]);
     var fallback = inlineDevotionalsData();
     if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(fallback);
+
     return window.fetch('content/devotionals.json').then(function (response) {
       if (!response.ok) throw new Error('Could not load devotionals');
       return response.json();
