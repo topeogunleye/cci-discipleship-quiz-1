@@ -346,3 +346,61 @@ test('repeating an explicit guest import does not add the same attempts twice', 
   assert.equal(second.deviceId, first.deviceId);
   assert.equal(second.snapshot.deviceCounters[second.deviceId].guestImport.progress.d1.cards.q1.attempts, 3);
 });
+
+
+test('cloud progress sync applies backoff delays when resolving compare-and-set conflicts', async () => {
+  let call = 0;
+  const sleepDelays = [];
+  const session = { access_token: 'header.payload.signature', user: { id: 'user-backoff' } };
+  const remoteData = { schemaVersion: 2, progress: { d1: { cards: { q1: { attempts: 1, misses: 0, lastSeen: 10 } }, best: null } }, completedToday: {}, streak: { lastStreakDate: null }, deviceCounters: {} };
+  const Supabase = { createClient: () => ({ auth: {
+    onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; },
+    async getSession() { return { data: { session } }; }
+  }, async rpc(name, args) {
+    if (name === 'get_user_progress') return { data: { version: call, data: remoteData } };
+    call++;
+    if (call < 3) return { data: { ok: false, version: call, data: remoteData } };
+    return { data: { ok: true, version: call + 1, data: args.p_data } };
+  } }) };
+  const fetch = async () => new Response(JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }));
+  const sleep = async ms => { sleepDelays.push(ms); };
+  const service = create({ apiBase: 'https://study.example', fetch, Supabase, localStorage: null, sleep });
+  await service.init();
+
+  const local = Sync.empty();
+  const result = await service.syncProgress(local, Sync);
+  assert.equal(result.version, 4);
+  assert.equal(call, 3);
+  assert.equal(sleepDelays.length, 2);
+  assert.ok(sleepDelays[0] >= 30, 'first backoff delay should be at least base delay');
+  assert.ok(sleepDelays[1] >= sleepDelays[0], 'second backoff delay should be >= first');
+});
+
+test('cloud progress sync aborts before calling writeProgress when snapshot exceeds 5 MB limit', async () => {
+  let writeCalled = false;
+  const session = { access_token: 'header.payload.signature', user: { id: 'user-limit' } };
+  const Supabase = { createClient: () => ({ auth: {
+    onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; },
+    async getSession() { return { data: { session } }; }
+  }, async rpc(name, args) {
+    if (name === 'get_user_progress') return { data: { version: 0, data: null } };
+    if (name === 'sync_user_progress') { writeCalled = true; return { data: { ok: true, version: 1, data: args.p_data } }; }
+    return { data: null };
+  } }) };
+  const fetch = async () => new Response(JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }));
+  const service = create({ apiBase: 'https://study.example', fetch, Supabase, localStorage: null });
+  await service.init();
+
+  const oversized = {
+    schemaVersion: 2,
+    progress: { d1: { cards: { q1: { attempts: 1, misses: 0, overflow: 'z'.repeat(Sync.MAX_SNAPSHOT_BYTES + 50) } }, best: null } },
+    completedToday: {},
+    streak: { lastStreakDate: null }
+  };
+
+  await assert.rejects(
+    async () => { await service.syncProgress(oversized, Sync); },
+    /Progress snapshot exceeds maximum allowed size of 5 MB/
+  );
+  assert.equal(writeCalled, false, 'writeProgress RPC must NOT be called when payload exceeds 5 MB');
+});

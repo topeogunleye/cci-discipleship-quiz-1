@@ -316,5 +316,32 @@
     return result;
   }
 
-  return { empty: emptySnapshot, extract: extract, merge: merge, mergeForDevice: mergeForDevice, importCheckpoint: importCheckpoint, delta: delta, apply: apply, hasProgress: hasProgress };
+
+  var MAX_SNAPSHOT_BYTES = 5242880;
+  var WARN_SNAPSHOT_BYTES = 4194304;
+
+  function payloadSize(snapshot) {
+    try {
+      var serialized = typeof snapshot === 'string' ? snapshot : JSON.stringify(snapshot);
+      if (typeof TextEncoder !== 'undefined') {
+        return new TextEncoder().encode(serialized).length;
+      }
+      return unescape(encodeURIComponent(serialized)).length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function validateSnapshotSize(snapshot) {
+    var size = payloadSize(snapshot);
+    if (size > MAX_SNAPSHOT_BYTES) {
+      var error = new Error('Progress snapshot exceeds maximum allowed size of 5 MB (' + (size / (1024 * 1024)).toFixed(2) + ' MB).');
+      error.name = 'ProgressPayloadTooLargeError';
+      error.size = size;
+      throw error;
+    }
+    return { valid: true, size: size, nearLimit: size >= WARN_SNAPSHOT_BYTES };
+  }
+
+  return { empty: emptySnapshot, extract: extract, merge: merge, mergeForDevice: mergeForDevice, importCheckpoint: importCheckpoint, delta: delta, apply: apply, hasProgress: hasProgress, validateSnapshotSize: validateSnapshotSize, payloadSize: payloadSize, MAX_SNAPSHOT_BYTES: MAX_SNAPSHOT_BYTES, WARN_SNAPSHOT_BYTES: WARN_SNAPSHOT_BYTES };
 });
