@@ -14,7 +14,7 @@
     var isNativeApp = typeof window !== 'undefined' && window.CciNative && window.CciNative.isNative;
     var apiBase = String(options.apiBase || (typeof window !== 'undefined' && window.CCI_API_BASE) || (typeof window !== 'undefined' && !isNativeApp && /^https?:$/.test(window.location.protocol) ? window.location.origin : DEFAULT_API_BASE)).replace(/\/$/, '');
     var client = null, authSubscription = null, onChange = null, currentSession = null, configured = false, videoReady = false, videoReadyUserId = null, videoAccessError = '';
-    var cookieSync = Promise.resolve(), lastToken = null, lastUserId = null, cachedDeviceId = null, videoRefreshTimer = null;
+    var cookieSync = Promise.resolve(), lastToken = null, lastUserId = null, cachedDeviceId = null, videoRetryTimer = null;
     var resumeHandler = null;
     var initializationState = 'idle', initializationError = '', initializationPromise = null, lifecycleId = 0;
 
@@ -26,18 +26,18 @@
       if (typeof onChange === 'function') onChange(status());
     }
 
-    function clearVideoRefreshTimer() {
-      if (videoRefreshTimer !== null) clearTimeout(videoRefreshTimer);
-      videoRefreshTimer = null;
+    function clearVideoRetryTimer() {
+      if (videoRetryTimer !== null) clearTimeout(videoRetryTimer);
+      videoRetryTimer = null;
     }
 
-    function scheduleVideoRefresh(token, delay) {
-      clearVideoRefreshTimer();
+    function scheduleVideoRetry(token, delay) {
+      clearVideoRetryTimer();
       if (!token || typeof window === 'undefined' || !currentSession || currentSession.access_token !== token) return;
-      videoRefreshTimer = setTimeout(function () {
-        videoRefreshTimer = null;
+      videoRetryTimer = setTimeout(function () {
+        videoRetryTimer = null;
         if (currentSession && currentSession.access_token === token) syncVideoSession(currentSession, true);
-      }, Number.isFinite(delay) && delay > 0 ? delay : 240000);
+      }, Number.isFinite(delay) && delay > 0 ? delay : 30000);
     }
 
     function syncVideoSession(session, force) {
@@ -45,9 +45,9 @@
       var userId = session && session.user && session.user.id || null;
       if (token === lastToken && !force) { videoReady = !!token && videoReady; notify(); return Promise.resolve(videoReady); }
       var wasVideoReady = videoReady;
-      var nextRetryDelay = 240000;
+      var nextRetryDelay = 0;
       lastToken = token;
-      clearVideoRefreshTimer();
+      clearVideoRetryTimer();
       cookieSync = cookieSync.catch(function () {}).then(function () {
         if (!fetcher) throw new Error('Network access is unavailable.');
         return fetcher(apiBase + '/api/auth/session', {
@@ -89,7 +89,7 @@
         }
         return false;
       }).then(function (result) {
-        if (token && currentSession && currentSession.access_token === token && nextRetryDelay > 0) scheduleVideoRefresh(token, nextRetryDelay);
+        if (token && currentSession && currentSession.access_token === token && nextRetryDelay > 0) scheduleVideoRetry(token, nextRetryDelay);
         notify();
         return result;
       });
@@ -157,7 +157,7 @@
     function cleanUpClient() {
       if (authSubscription && typeof authSubscription.unsubscribe === 'function') authSubscription.unsubscribe();
       if (client && client.auth && typeof client.auth.stopAutoRefresh === 'function') client.auth.stopAutoRefresh();
-      clearVideoRefreshTimer();
+      clearVideoRetryTimer();
       if (resumeHandler && typeof window !== 'undefined' && window.removeEventListener) {
         window.removeEventListener('focus', resumeHandler);
         window.removeEventListener('online', resumeHandler);

@@ -208,6 +208,50 @@ test('account service prepares a private video session cookie without exposing t
   assert.equal(service.status().videoReady, false);
 });
 
+test('video sessions do not remotely revalidate every four minutes; transient failures still retry', async () => {
+  const fs = require('node:fs');
+  const vm = require('node:vm');
+  const timers = new Map();
+  let nextTimer = 1, change, session = null, mode = 'ready';
+  const browser = {
+    location: { protocol: 'https:', origin: 'https://study.example' },
+    addEventListener() {}, removeEventListener() {}
+  };
+  const Supabase = { createClient: () => ({ auth: {
+    onAuthStateChange(callback) { change = callback; return { data: { subscription: { unsubscribe() {} } } }; },
+    async getSession() { return { data: { session } }; },
+    async signInWithPassword() {
+      session = { access_token: 'same-access-token', user: { id: 'user-renewal', email: 'learner@example.com' } };
+      change('SIGNED_IN', session);
+      return { data: { session, user: session.user } };
+    },
+    async signOut() { session = null; change('SIGNED_OUT', null); return {}; }
+  } }) };
+  const context = {
+    self: browser, window: browser, Supabase,
+    setTimeout(callback, delay) { const id = nextTimer++; timers.set(id, { callback, delay }); return id; },
+    clearTimeout(id) { timers.delete(id); }
+  };
+  vm.runInNewContext(fs.readFileSync(require.resolve('../js/account.js'), 'utf8'), context);
+  const fetch = async url => {
+    if (url.endsWith('/api/auth/config')) return new Response(JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }));
+    if (mode === 'unavailable') return new Response('{}', { status: 503 });
+    return new Response('{"ok":true}', { status: 200 });
+  };
+  const service = browser.CCIAccount.create({ apiBase: 'https://study.example', fetch, Supabase, localStorage: localStore() });
+  await service.init();
+  const signedIn = await service.signIn('learner@example.com', 'long-password');
+  assert.equal(signedIn.videoReady, true);
+  assert.equal(timers.size, 0, 'a successful cookie setup should not schedule a forced remote validation');
+
+  mode = 'unavailable';
+  await service.syncVideoSession(signedIn.session, true);
+  assert.deepEqual(Array.from(timers.values()).map(timer => timer.delay), [30000], 'transient failures keep a bounded retry');
+  await service.signOut();
+  assert.equal(timers.size, 0, 'sign-out cancels pending video-session retries');
+  service.destroy();
+});
+
 test('transient video-session failures preserve the signed-in user and ready player state', async () => {
   let change, session = null, mode = 'ready';
   const token = 'header.payload.signature-private-token';

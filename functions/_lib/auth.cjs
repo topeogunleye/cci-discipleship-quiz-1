@@ -1,6 +1,9 @@
 'use strict';
 
 const VIDEO_COOKIE = '__Host-cci-video-session';
+const JWKS_TTL_MS = 5 * 60 * 1000;
+const jwksCache = new Map();
+const jwksInflight = new Map();
 
 function jsonResponse(body, status, headers) {
   const resultHeaders = new Headers(headers || {});
@@ -80,6 +83,10 @@ function authServiceUnavailableResponse(request, env, error) {
   return jsonResponse({ error: 'Authentication service is temporarily unavailable. Please retry.' }, 503, headers);
 }
 
+function isUserId(value) {
+  return typeof value === 'string' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
+}
+
 async function getAuthenticatedUser(accessToken, env, fetcher) {
   if (typeof accessToken !== 'string' || accessToken.length < 20 || accessToken.length > 8192) return null;
   const config = supabaseConfig(env);
@@ -100,8 +107,123 @@ async function getAuthenticatedUser(accessToken, env, fetcher) {
   let user;
   try { user = await response.json(); }
   catch (error) { throw authServiceUnavailable(30); }
-  if (!user || typeof user.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(user.id)) throw authServiceUnavailable(30);
+  if (!user || !isUserId(user.id)) throw authServiceUnavailable(30);
   return user;
+}
+
+function decodeBase64Url(value) {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Invalid encoded token segment.');
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, character => character.charCodeAt(0));
+}
+
+function decodeJwt(token) {
+  if (typeof token !== 'string' || token.length < 20 || token.length > 8192) return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const header = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[0])));
+    const claims = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[1])));
+    if (!header || typeof header !== 'object' || Array.isArray(header) || !claims || typeof claims !== 'object' || Array.isArray(claims)) return null;
+    return { header, claims, signature: decodeBase64Url(parts[2]), signingInput: new TextEncoder().encode(parts[0] + '.' + parts[1]) };
+  } catch (error) { return null; }
+}
+
+function accessTokenExpiration(token) {
+  const decoded = decodeJwt(token);
+  return decoded && Number.isFinite(decoded.claims.exp) ? decoded.claims.exp : null;
+}
+
+function accessTokenSubject(token) {
+  const decoded = decodeJwt(token);
+  return decoded && isUserId(decoded.claims.sub) ? decoded.claims.sub : null;
+}
+
+async function fetchJwks(url, fetcher, forceRefresh) {
+  const now = Date.now();
+  const cached = jwksCache.get(url);
+  if (!forceRefresh && cached && cached.expiresAt > now) return cached.keys;
+  if (forceRefresh) jwksCache.delete(url);
+  if (jwksInflight.has(url)) return jwksInflight.get(url);
+  const requestFetch = fetcher || fetch;
+  const request = Promise.resolve().then(() => requestFetch(url + '/auth/v1/.well-known/jwks.json', {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store'
+  })).then(async response => {
+    if (!response || !response.ok) throw authServiceUnavailable(30);
+    let data;
+    try { data = await response.json(); } catch (error) { throw authServiceUnavailable(30); }
+    if (!data || !Array.isArray(data.keys)) throw authServiceUnavailable(30);
+    const keys = data.keys.filter(key => key && typeof key === 'object' && typeof key.kid === 'string');
+    jwksCache.set(url, { keys, expiresAt: Date.now() + JWKS_TTL_MS });
+    return keys;
+  }).catch(error => {
+    if (error && error.name === 'AuthServiceUnavailableError') throw error;
+    throw authServiceUnavailable(30);
+  }).finally(() => jwksInflight.delete(url));
+  jwksInflight.set(url, request);
+  return request;
+}
+
+function validAccessClaims(claims, issuer, nowSeconds) {
+  const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  return claims.iss === issuer
+    && audiences.includes('authenticated')
+    && claims.role === 'authenticated'
+    && isUserId(claims.sub)
+    && Number.isFinite(claims.exp)
+    && claims.exp > nowSeconds
+    && (claims.nbf === undefined || (Number.isFinite(claims.nbf) && claims.nbf <= nowSeconds + 30));
+}
+
+async function verifySupabaseAccessToken(accessToken, env, fetcher, nowMilliseconds) {
+  const config = supabaseConfig(env);
+  if (!config) throw authServiceUnavailable(30);
+  const decoded = decodeJwt(accessToken);
+  if (!decoded) return null;
+  const header = decoded.header;
+  const claims = decoded.claims;
+  if ((Array.isArray(header.crit) && header.crit.length) || header.b64 === false) return null;
+  if (!validAccessClaims(claims, config.url + '/auth/v1', Math.floor((nowMilliseconds === undefined ? Date.now() : nowMilliseconds) / 1000))) return null;
+  const subtle = typeof crypto !== 'undefined' && crypto && crypto.subtle;
+  if (!subtle) throw authServiceUnavailable(30);
+
+  let key;
+  let algorithm;
+  try {
+    if (header.alg === 'HS256') {
+      const secret = typeof (env || {}).SUPABASE_JWT_SECRET === 'string' ? env.SUPABASE_JWT_SECRET : '';
+      if (!secret) {
+        if ((env || {}).VIDEO_AUTH_MODE === 'remote') return getAuthenticatedUser(accessToken, env, fetcher);
+        throw authServiceUnavailable(30);
+      }
+      key = await subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+      algorithm = { name: 'HMAC' };
+    } else if (header.alg === 'ES256' || header.alg === 'RS256') {
+      if (typeof header.kid !== 'string' || !header.kid || header.kid.length > 200) return null;
+      let keys = await fetchJwks(config.url, fetcher, false);
+      let jwk = keys.find(candidate => candidate.kid === header.kid && candidate.alg === header.alg);
+      if (!jwk) {
+        keys = await fetchJwks(config.url, fetcher, true);
+        jwk = keys.find(candidate => candidate.kid === header.kid && candidate.alg === header.alg);
+      }
+      if (!jwk || (jwk.use && jwk.use !== 'sig') || (Array.isArray(jwk.key_ops) && !jwk.key_ops.includes('verify'))) return null;
+      if (header.alg === 'ES256' && jwk.kty === 'EC' && jwk.crv === 'P-256') {
+        key = await subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+        algorithm = { name: 'ECDSA', hash: 'SHA-256' };
+      } else if (header.alg === 'RS256' && jwk.kty === 'RSA') {
+        key = await subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+        algorithm = { name: 'RSASSA-PKCS1-v1_5' };
+      } else return null;
+    } else return null;
+    const valid = await subtle.verify(algorithm, key, decoded.signature, decoded.signingInput);
+    return valid ? { id: claims.sub } : null;
+  } catch (error) {
+    if (error && error.name === 'AuthServiceUnavailableError') throw error;
+    return null;
+  }
 }
 
 function videoToken(request) {
@@ -117,7 +239,9 @@ function videoToken(request) {
 
 function videoCookie(accessToken, maxAge) {
   if (!accessToken) return VIDEO_COOKIE + '=; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=0';
-  return VIDEO_COOKIE + '=' + encodeURIComponent(accessToken) + '; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=' + Math.max(1, Math.min(300, Math.floor(maxAge || 300)));
+  const requestedAge = Number(maxAge);
+  const lifetime = Number.isFinite(requestedAge) ? requestedAge : 3600;
+  return VIDEO_COOKIE + '=' + encodeURIComponent(accessToken) + '; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=' + Math.max(1, Math.min(3600, Math.floor(lifetime)));
 }
 
-module.exports = { VIDEO_COOKIE, jsonResponse, isPublishableKey, supabaseConfig, allowedOrigins, withCors, originAllowed, authServiceUnavailable, authServiceUnavailableResponse, getAuthenticatedUser, videoToken, videoCookie };
+module.exports = { VIDEO_COOKIE, jsonResponse, isPublishableKey, supabaseConfig, allowedOrigins, withCors, originAllowed, authServiceUnavailable, authServiceUnavailableResponse, getAuthenticatedUser, verifySupabaseAccessToken, accessTokenExpiration, accessTokenSubject, videoToken, videoCookie, __test: { decodeJwt, validAccessClaims, resetJwksCache: () => { jwksCache.clear(); jwksInflight.clear(); } } };
