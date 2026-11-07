@@ -338,6 +338,14 @@ test('progress migration enforces row-level security and version-checked owner-s
   assert.doesNotMatch(migration, /grant\s+(?:select|insert|update|all)[^;]+on table public\.user_progress to authenticated/i);
 });
 
+test('Phase 4 migration hardens progress indexes and bounds RPC statement timeouts for connection pooling', () => {
+  const migration = fs.readFileSync(path.join(root, 'supabase/migrations/20261107000000_progress_indexing_and_pooling.sql'), 'utf8');
+  assert.match(migration, /create index if not exists idx_user_progress_updated_at\s+on public\.user_progress\s*\(updated_at desc\);/i);
+  assert.match(migration, /create index if not exists idx_user_progress_user_version\s+on public\.user_progress\s*\(user_id,\s*version\);/i);
+  assert.match(migration, /alter function public\.get_user_progress\(\)\s+set statement_timeout = '5s';/i);
+  assert.match(migration, /alter function public\.sync_user_progress\(bigint,\s*jsonb\)\s+set statement_timeout = '10s';/i);
+});
+
 
 test('session endpoint generates and returns a scoped playback ticket in JSON response', async () => {
   const env = { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_test_key', ALLOWED_APP_ORIGINS: 'capacitor://localhost' };
