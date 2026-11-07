@@ -700,7 +700,10 @@ test('hybrid video study scopes questions to active video and preserves Section 
       render: render,
       lessonVideosForDeck: lessonVideosForDeck,
       cardsForVideo: cardsForVideo,
-      setLessonVideos: val => { LESSON_VIDEOS = val; }
+      setLessonVideos: val => { LESSON_VIDEOS = val; },
+      parseReferenceLinks: parseReferenceLinks,
+      resolveVideoForRef: resolveVideoForRef,
+      renderReferenceNote: renderReferenceNote
     };
   `);
   vm.runInNewContext(testWrapper, {
@@ -828,4 +831,38 @@ test('hybrid video study scopes questions to active video and preserves Section 
   assert.match(elements.modal.innerHTML, /<option value="20">20<\/option>/);
   assert.match(elements.modal.innerHTML, /<option value="30">30<\/option>/);
   assert.match(elements.modal.innerHTML, /<option value="50">50<\/option>/);
+
+  // Interactive Reference Timestamp Linking
+  t.setLessonVideos(catalog.videos);
+  // 1. Single reference with timestamp
+  const refSingle = 'BAPTISM I — [01:35] - [02:50]';
+  const linksSingle = t.parseReferenceLinks(refSingle, 'd-discipleship-experience-section-12-church-history');
+  assert.equal(linksSingle.length, 1);
+  assert.equal(linksSingle[0].timeStr, '01:35');
+  assert.equal(linksSingle[0].timeSec, 95);
+  assert.equal(linksSingle[0].video.id, 'section-12-baptism-i');
+
+  // 2. Render reference note with 3s pre-roll (95 - 3 = 92)
+  const cardWithRef = { id: 'c-test', ref: refSingle };
+  const htmlRef = t.renderReferenceNote(cardWithRef, 'd-discipleship-experience-section-12-church-history');
+  assert.match(htmlRef, /class="ref-timestamp-btn"/);
+  assert.match(htmlRef, /data-act="seek-video-reference"/);
+  assert.match(htmlRef, /data-video-id="section-12-baptism-i"/);
+  assert.match(htmlRef, /data-time="92"/);
+  assert.match(htmlRef, /BAPTISM I · 01:35/);
+
+  // 3. Multi-video reference parsing
+  const refMulti = 'HOW TO ATTRACT ANGELS I — [13:17] - [14:06]; HOW TO ATTRACT ANGELS II — [03:27] - [04:50]';
+  const linksMulti = t.parseReferenceLinks(refMulti, 'd-discipleship-experience-section-12-church-history');
+  assert.equal(linksMulti.length, 2);
+  assert.equal(linksMulti[0].video.id, 'section-12-how-to-attract-angels-i');
+  assert.equal(linksMulti[0].timeStr, '13:17');
+  assert.equal(linksMulti[1].video.id, 'section-12-how-to-attract-angels-ii');
+  assert.equal(linksMulti[1].timeStr, '03:27');
+
+  // 4. Non-timestamp fallback
+  const refNoTime = 'Not found in the provided sources — N/A';
+  const htmlNoTime = t.renderReferenceNote({ id: 'c-none', ref: refNoTime });
+  assert.doesNotMatch(htmlNoTime, /ref-timestamp-btn/);
+  assert.match(htmlNoTime, /Not found in the provided sources/);
 });

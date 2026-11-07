@@ -415,6 +415,69 @@
     if (!deckItem || !video || !Array.isArray(deckItem.cards)) return [];
     return deckItem.cards.filter(function (card) { return cardMatchesVideo(card, video); });
   }
+  function parseTimeToSeconds(timeStr) {
+    if (!timeStr) return 0;
+    var parts = timeStr.trim().split(':').map(Number);
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return 0;
+  }
+  function resolveVideoForRef(refSegment, currentDeckId) {
+    if (!refSegment) return null;
+    var candidateVideos = currentDeckId ? lessonVideosForDeck(currentDeckId) : LESSON_VIDEOS;
+    for (var i = 0; i < candidateVideos.length; i++) {
+      if (cardMatchesVideo({ ref: refSegment }, candidateVideos[i])) return candidateVideos[i];
+    }
+    if (candidateVideos !== LESSON_VIDEOS) {
+      for (var j = 0; j < LESSON_VIDEOS.length; j++) {
+        if (cardMatchesVideo({ ref: refSegment }, LESSON_VIDEOS[j])) return LESSON_VIDEOS[j];
+      }
+    }
+    return null;
+  }
+  function parseReferenceLinks(refText, currentDeckId) {
+    if (!refText || typeof refText !== 'string') return [];
+    var parts = refText.split(';');
+    var results = [];
+    var lastResolvedVideo = null;
+    parts.forEach(function (part) {
+      var trimmed = part.trim();
+      if (!trimmed) return;
+      var timeMatch = trimmed.match(/(?:\[|\()?\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);
+      var timeStr = timeMatch ? timeMatch[1] : null;
+      var timeSec = timeStr ? parseTimeToSeconds(timeStr) : 0;
+      var video = resolveVideoForRef(trimmed, currentDeckId);
+      if (!video && lastResolvedVideo) video = lastResolvedVideo;
+      if (video) lastResolvedVideo = video;
+      results.push({
+        raw: trimmed,
+        video: video,
+        timeStr: timeStr,
+        timeSec: timeSec
+      });
+    });
+    return results;
+  }
+  function renderReferenceNote(card, currentDeckId) {
+    if (!card || !card.ref) return '';
+    var links = parseReferenceLinks(card.ref, currentDeckId);
+    var hasClickable = links.some(function (l) { return l.video && l.timeStr; });
+    if (!hasClickable) {
+      return '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(card.ref) + '</p>';
+    }
+    var partsHtml = links.map(function (link) {
+      if (!link.video || !link.timeStr) {
+        return esc(link.raw);
+      }
+      var preRollSec = Math.max(0, link.timeSec - 3);
+      var label = (link.video.title ? link.video.title + ' ' : '') + '· ' + link.timeStr;
+      return '<button type="button" class="ref-timestamp-btn" data-act="seek-video-reference" data-deck-id="' + esc(link.video.deckId) + '" data-video-id="' + esc(link.video.id) + '" data-time="' + preRollSec + '" aria-label="Watch video from ' + esc(link.timeStr) + '" title="Watch video from ' + esc(link.timeStr) + ' (with 3s lead-in)">' +
+        '<span class="ref-play-icon" aria-hidden="true">▶</span> ' + esc(label) +
+      '</button>';
+    }).join(' <span class="ref-separator">·</span> ');
+
+    return '<p class="card-note card-ref"><strong>Reference:</strong> ' + partsHtml + '</p>';
+  }
   function nativeTicketUrl(value, ticket) {
     if (!value || !ticket || !account || !account.apiBase) return '';
     try {
@@ -1977,6 +2040,9 @@
       (function () {
         var videoCards = video ? cardsForVideo(d, video) : [];
         var isLastVideo = !videos.length || index >= videos.length - 1;
+        var resumePausedBtn = (S.pausedSession && S.pausedSession.cards && S.pausedSession.cards.length)
+          ? '<button type="button" class="btn primary resume-study-btn" data-act="resume-paused-study" style="margin-bottom:var(--space-xs);width:100%;">Resume ' + (S.pausedSession.name === 'quiz' ? 'Quiz' : 'Flashcards') + ' (' + (Math.min((S.pausedSession.i || 0) + 1, S.pausedSession.cards.length)) + ' of ' + S.pausedSession.cards.length + ')</button>'
+          : '';
         var videoStudyButtons = videoCards.length
           ? '<button type="button" class="btn primary" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" data-video-id="' + esc(video.id) + '" aria-label="Study Video Flashcards, ' + videoCards.length + ' cards">Video Flashcards (' + videoCards.length + ')</button>' +
             '<button type="button" class="btn primary" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" data-video-id="' + esc(video.id) + '" aria-label="Take Video Quiz, ' + videoCards.length + ' questions">Video Quiz (' + videoCards.length + ')</button>'
@@ -1985,7 +2051,7 @@
           ? '<button type="button" class="btn' + (videoCards.length ? ' ghost sm' : '') + '" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" aria-label="Study Chapter ' + section + ' (' + esc(parsed.topic) + ') Flashcards, ' + d.cards.length + ' cards">Chapter Flashcards (' + d.cards.length + ')</button>' +
             '<button type="button" class="btn' + (videoCards.length ? ' ghost sm' : '') + '" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" aria-label="Take Chapter ' + section + ' (' + esc(parsed.topic) + ') Quiz, ' + d.cards.length + ' questions">Chapter Quiz (' + d.cards.length + ')</button>'
           : '';
-        return '<div class="lesson-video-study-actions" role="group" aria-label="Study Chapter ' + section + ' (' + esc(parsed.topic) + ')">' + videoStudyButtons + chapterStudyButtons + '</div>';
+        return '<div class="lesson-video-study-actions" role="group" aria-label="Study Chapter ' + section + ' (' + esc(parsed.topic) + ')">' + resumePausedBtn + videoStudyButtons + chapterStudyButtons + '</div>';
       })() +
       transcriptPanel +
       videoNav +
@@ -2174,7 +2240,7 @@
     var title = s.opts && s.opts.daily ? 'Today’s Study' : (d ? d.title : 'Flashcards');
     var parsed = MobileStudy.parseChapterTitle(title);
     var displayTitle = parsed.topic || title;
-    var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') + bibleNote(c);
+    var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + renderReferenceNote(c, it.deckId) + bibleNote(c);
     var isLast = s.i === s.cards.length - 1;
     var cardFace = s.flipped
       ? '<div class="flip on flash-card-back" data-flip-surface="true">' +
@@ -2257,7 +2323,7 @@
               '</div>' +
               (!ok ? '<p class="feedback-answer"><span class="feedback-answer-letter" aria-label="Correct option ' + LET[answerAt] + '">' + LET[answerAt] + '</span><span>' + esc(c.options[order[answerAt]]) + '</span></p>' : '') +
               (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') +
-              (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') +
+              renderReferenceNote(c, it.deckId) +
               bibleNote(c) +
             '</div>';
         };
@@ -2340,7 +2406,7 @@
           selected +
           '<p class="answer-review-line correct-answer"><span class="answer-label">Correct answer</span><span class="answer-copy"><b>' + card.answer + '</b> ' + esc(card.options[LET.indexOf(card.answer)]) + '</span></p>' +
           (card.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(card.explanation) + '</p>' : '') +
-          (card.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(card.ref) + '</p>' : '') +
+          renderReferenceNote(card, entry.item ? entry.item.deckId : '') +
           bibleNote(card) +
         '</li>';
       }).join('');
@@ -3058,8 +3124,18 @@
       };
       ['play', 'pause', 'ended', 'timeupdate', 'loadedmetadata'].forEach(function (eventName) { renderedVideo.addEventListener(eventName, syncVideoAction); });
       var seekTime = Number(V.videoTime);
-      if (Number.isFinite(seekTime) && seekTime > 0) {
-        var seekVideo = function () { try { renderedVideo.currentTime = Math.min(seekTime, Number.isFinite(renderedVideo.duration) ? renderedVideo.duration : seekTime); } catch (e) {} };
+      if (Number.isFinite(seekTime) && seekTime >= 0 && (seekTime > 0 || V.autoPlayVideo)) {
+        var seekVideo = function () {
+          try {
+            if (seekTime > 0) {
+              renderedVideo.currentTime = Math.min(seekTime, Number.isFinite(renderedVideo.duration) ? renderedVideo.duration : seekTime);
+            }
+            if (V.autoPlayVideo) {
+              delete V.autoPlayVideo;
+              renderedVideo.play().catch(function () {});
+            }
+          } catch (e) {}
+        };
         if (renderedVideo.readyState >= 1) seekVideo();
         else renderedVideo.addEventListener('loadedmetadata', seekVideo, { once: true });
       }
@@ -3788,6 +3864,68 @@
       case 'lesson-transcript-seek':
         var transcriptVideo = document.getElementById('lesson-video-player'), seekTime = Number(t.dataset.time);
         if (transcriptVideo && Number.isFinite(seekTime) && seekTime >= 0) transcriptVideo.currentTime = seekTime;
+        break;
+      case 'seek-video-reference':
+        var refDeckId = t.dataset.deckId;
+        var refVideoId = t.dataset.videoId;
+        var targetTime = Number(t.dataset.time);
+        if (!Number.isFinite(targetTime) || targetTime < 0) targetTime = 0;
+
+        if (V.videoStudy) {
+          var vPlayer = document.getElementById('lesson-video-player');
+          var activeVideos = lessonVideosForDeck(V.id);
+          var currentVideoObj = activeVideos[Number.isInteger(V.videoIndex) ? V.videoIndex : 0];
+
+          if (vPlayer && currentVideoObj && currentVideoObj.id === refVideoId) {
+            closeVideoStudyModal();
+            try {
+              vPlayer.currentTime = targetTime;
+              vPlayer.play().catch(function () {});
+              vPlayer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (e) {}
+            break;
+          }
+
+          closeVideoStudyModal();
+          var newIdx = 0;
+          activeVideos.forEach(function (v, idx) {
+            if (v.id === refVideoId) newIdx = idx;
+          });
+          go({ name: 'lesson-video', id: refDeckId || V.id, videoIndex: newIdx, videoTime: targetTime, autoPlayVideo: true });
+          break;
+        }
+
+        if (isStudySession(V.name)) {
+          if (V.name === 'exam') stopExamTimer();
+          S.pausedSession = MobileStudy.snapshot(V);
+          save();
+        }
+
+        var targetDeckVideos = lessonVideosForDeck(refDeckId);
+        var targetVideoIdx = 0;
+        targetDeckVideos.forEach(function (v, idx) {
+          if (v.id === refVideoId) targetVideoIdx = idx;
+        });
+
+        go({
+          name: 'lesson-video',
+          id: refDeckId,
+          videoIndex: targetVideoIdx,
+          videoTime: targetTime,
+          autoPlayVideo: true
+        });
+        break;
+      case 'resume-paused-study':
+        var restoredPaused = MobileStudy.restore(S.pausedSession, S.decks);
+        if (restoredPaused) {
+          var currPlayer = document.getElementById('lesson-video-player');
+          if (currPlayer && !currPlayer.paused) currPlayer.pause();
+          if (restoredPaused.returnToVideo) {
+            startVideoStudyModal(restoredPaused.name, restoredPaused.cards, restoredPaused.opts, restoredPaused.ids, restoredPaused.returnToVideo, restoredPaused);
+          } else {
+            begin(restoredPaused.name, restoredPaused.cards, restoredPaused.opts, restoredPaused.ids, null, restoredPaused);
+          }
+        }
         break;
       case 'chapter-info':
         openLessonDetailSheet(t.dataset.id);
