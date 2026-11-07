@@ -1,7 +1,33 @@
 const ESV_PASSAGE_TEXT_URL = 'https://api.esv.org/v3/passage/text/';
-const MAX_REFERENCE_LENGTH = 180;
+// The app requests one linked citation at a time. Accept a single chapter,
+// optionally narrowed to verse numbers/ranges, and cap the result at the
+// longest biblical chapter (Psalm 119). This prevents callers from turning the
+// public proxy into a multi-book or large-range ESV quota sink.
+const MAX_REFERENCE_LENGTH = 80;
+const MAX_CHAPTER = 150;
+const MAX_VERSE = 176;
+const MAX_VERSES_PER_REQUEST = 176;
 const UPSTREAM_TIMEOUT_MS = 5000;
-const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
+
+function isBoundedPassageReference(reference) {
+  const match = /^([1-3]\s+)?[A-Za-z]+(?:\s+[A-Za-z]+)*\s+(\d{1,3})(?::\s*(\d{1,3}(?:\s*[-\u2013\u2014]\s*\d{1,3})?(?:\s*,\s*\d{1,3}(?:\s*[-\u2013\u2014]\s*\d{1,3})?)*))?$/.exec(reference);
+  if (!match) return false;
+  const chapter = Number(match[2]);
+  if (chapter < 1 || chapter > MAX_CHAPTER) return false;
+  if (!match[3]) return true;
+
+  let verseCount = 0;
+  for (const part of match[3].split(',')) {
+    const range = /^(\d{1,3})(?:\s*[-\u2013\u2014]\s*(\d{1,3}))?$/.exec(part.trim());
+    if (!range) return false;
+    const firstVerse = Number(range[1]);
+    const lastVerse = Number(range[2] || range[1]);
+    if (firstVerse < 1 || lastVerse > MAX_VERSE || firstVerse > lastVerse) return false;
+    verseCount += lastVerse - firstVerse + 1;
+    if (verseCount > MAX_VERSES_PER_REQUEST) return false;
+  }
+  return true;
+}
 
 function jsonResponse(body, status, customHeaders) {
   const headers = new Headers({
@@ -38,12 +64,12 @@ export function onRequestOptions() {
 
 async function checkRateLimit(request, env) {
   const limiterService = env && env.ESV_RATE_LIMITER;
-  if (!limiterService || typeof limiterService.fetch !== 'function') return 'unavailable';
+  if (!limiterService || typeof limiterService.fetch !== 'function') return { status: 'unavailable' };
 
   // Cloudflare supplies this header at the edge. Do not trust client-provided
   // forwarding headers as a substitute for the actual connecting IP.
   const clientIp = request.headers.get('CF-Connecting-IP');
-  if (!clientIp) return 'unavailable';
+  if (!clientIp) return { status: 'unavailable' };
 
   try {
     const limiterRequest = new Request('https://esv-rate-limiter.internal/check', {
@@ -51,20 +77,23 @@ async function checkRateLimit(request, env) {
       headers: { 'X-ESV-Client-IP': clientIp }
     });
     const result = await limiterService.fetch(limiterRequest);
-    if (result.status === 429) return 'limited';
-    return result.ok ? 'allowed' : 'unavailable';
+    if (result.status === 429) {
+      return { status: 'limited', retryAfter: result.headers.get('Retry-After') || '60' };
+    }
+    return { status: result.ok ? 'allowed' : 'unavailable' };
   } catch (error) {
     // Fail closed if the private rate-limiter Worker is unavailable so requests
     // do not continue to consume the shared upstream ESV quota unprotected.
-    return 'unavailable';
+    return { status: 'unavailable' };
   }
 }
 
 export async function onRequestGet(context) {
   const { request, env } = context || {};
   const url = new URL(request.url);
-  const reference = url.searchParams.get('q') || '';
-  if (!reference || reference.length > MAX_REFERENCE_LENGTH || !/^[A-Za-z0-9][A-Za-z0-9 .,:;\u2013\u2014-]*$/.test(reference)) {
+  const references = url.searchParams.getAll('q');
+  const reference = references.length === 1 ? references[0].trim().replace(/\s+/g, ' ') : '';
+  if (!reference || reference.length > MAX_REFERENCE_LENGTH || !isBoundedPassageReference(reference)) {
     return jsonResponse({ error: 'Enter a valid Bible passage reference.' }, 400);
   }
   if (!env || !env.ESV_API_KEY) {
@@ -72,12 +101,12 @@ export async function onRequestGet(context) {
   }
 
   const rateLimit = await checkRateLimit(request, env);
-  if (rateLimit === 'limited') {
-    return jsonResponse({ error: 'Too many passage requests. Please try again shortly.' }, 429, {
-      'Retry-After': String(RATE_LIMIT_RETRY_AFTER_SECONDS)
+  if (rateLimit.status === 'limited') {
+    return jsonResponse({ error: 'Too many passage requests. Please try again later.' }, 429, {
+      'Retry-After': String(rateLimit.retryAfter)
     });
   }
-  if (rateLimit === 'unavailable') {
+  if (rateLimit.status === 'unavailable') {
     return jsonResponse({ error: 'The ESV passage service is temporarily unavailable.' }, 503, {
       'Retry-After': '30'
     });

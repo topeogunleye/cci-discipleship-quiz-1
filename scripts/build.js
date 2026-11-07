@@ -65,6 +65,10 @@ html = replaceOnce(html, '<script src="js/app.js"></script>', `<script>\n${read(
 for (const retired of ['content/sermons', 'content/sermons.json', 'js/sermons.js', 'js/sermons-ui.js', 'js/sermon-audio.js']) {
   fs.rmSync(path.join(outputDir, retired), { recursive: true, force: true });
 }
+// Raw lesson transcripts are source material. Only the authenticated VTT
+// function may serve mapped captions; never leave legacy Markdown/SRT files in
+// an output directory reused by a later build.
+fs.rmSync(path.join(outputDir, 'transcripts'), { recursive: true, force: true });
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(path.join(outputDir, 'index.html'), html);
 for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html', 'favicon.ico', 'style.css']) {

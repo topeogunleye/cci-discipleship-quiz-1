@@ -63,6 +63,7 @@ jobs:
         run: node scripts/build.js
 
       - name: Deploy private ESV rate-limiter Worker
+        if: github.ref == 'refs/heads/main'
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
