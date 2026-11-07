@@ -598,3 +598,63 @@ test('authenticated video byte ranges are served from Cloudflare edge cache with
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test('video endpoint accepts scoped playback ticket via token or ticket query param', async () => {
+  const auth = require('../functions/_lib/auth.cjs');
+  const seen = [];
+  const handlers = loadHandlers();
+  const bucket = {
+    get: async (key, options) => {
+      seen.push({ key, options });
+      return { size: 10, httpEtag: 'etag', range: { offset: 0, length: 5 }, body: new Response('01234').body };
+    },
+    head: async key => ({ size: 10, httpEtag: 'etag' })
+  };
+  const env = {
+    ...environment(bucket),
+    ALLOWED_APP_ORIGINS: 'capacitor://localhost'
+  };
+  const validKey = catalogData.videos[0].objectKey;
+  const validTicket = await auth.createPlaybackTicket('123e4567-e89b-12d3-a456-426614174000', validKey, 3600, env);
+  const mismatchTicket = await auth.createPlaybackTicket('123e4567-e89b-12d3-a456-426614174000', 'other/video.mp4', 3600, env);
+  const expiredTicket = await auth.createPlaybackTicket('123e4567-e89b-12d3-a456-426614174000', validKey, -10, env);
+
+  // 1. Success with ?token= and Range header, no cookies
+  const tokenResponse = await handlers.onRequest({
+    request: new Request('https://study.example/api/videos?key=' + encodeURIComponent(validKey) + '&token=' + encodeURIComponent(validTicket), {
+      headers: { Range: 'bytes=0-4', Origin: 'capacitor://localhost' }
+    }),
+    env
+  });
+  assert.equal(tokenResponse.status, 206);
+  assert.equal(await tokenResponse.text(), '01234');
+  assert.equal(tokenResponse.headers.get('access-control-allow-origin'), 'capacitor://localhost');
+
+  // 2. Success with ?ticket=
+  const ticketResponse = await handlers.onRequest({
+    request: new Request('https://study.example/api/videos?key=' + encodeURIComponent(validKey) + '&ticket=' + encodeURIComponent(validTicket), {
+      headers: { Range: 'bytes=0-4', Origin: 'capacitor://localhost' }
+    }),
+    env
+  });
+  assert.equal(ticketResponse.status, 206);
+
+  // 3. Rejects mismatched object key in ticket
+  const mismatchResponse = await handlers.onRequest({
+    request: new Request('https://study.example/api/videos?key=' + encodeURIComponent(validKey) + '&token=' + encodeURIComponent(mismatchTicket), {
+      headers: { Range: 'bytes=0-4', Origin: 'capacitor://localhost' }
+    }),
+    env
+  });
+  assert.equal(mismatchResponse.status, 401);
+
+  // 4. Rejects expired ticket
+  const expiredResponse = await handlers.onRequest({
+    request: new Request('https://study.example/api/videos?key=' + encodeURIComponent(validKey) + '&token=' + encodeURIComponent(expiredTicket), {
+      headers: { Range: 'bytes=0-4', Origin: 'capacitor://localhost' }
+    }),
+    env
+  });
+  assert.equal(expiredResponse.status, 401);
+});

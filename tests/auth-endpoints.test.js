@@ -337,3 +337,37 @@ test('progress migration enforces row-level security and version-checked owner-s
   assert.match(migration, /grant execute on function public\.sync_user_progress\(bigint, jsonb\) to authenticated/i);
   assert.doesNotMatch(migration, /grant\s+(?:select|insert|update|all)[^;]+on table public\.user_progress to authenticated/i);
 });
+
+
+test('session endpoint generates and returns a scoped playback ticket in JSON response', async () => {
+  const env = { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_test_key', ALLOWED_APP_ORIGINS: 'capacitor://localhost' };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ id: '123e4567-e89b-12d3-a456-426614174000' }), { status: 200 });
+  try {
+    const sessionToken = makeRemoteValidatedSessionToken();
+    const response = await session.onRequestPost({
+      request: new Request('https://study.example/api/auth/session', {
+        method: 'POST',
+        headers: { Origin: 'capacitor://localhost', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: sessionToken, key: 'lesson/video1.mp4' })
+      }),
+      env
+    });
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    assert.equal(data.ok, true);
+    assert.equal(data.user.id, '123e4567-e89b-12d3-a456-426614174000');
+    assert.ok(typeof data.ticket === 'string' && data.ticket.length > 20);
+
+    // Verify the ticket directly with auth.verifyPlaybackTicket
+    const verified = await auth.verifyPlaybackTicket(data.ticket, 'lesson/video1.mp4', env);
+    assert.ok(verified);
+    assert.equal(verified.id, '123e4567-e89b-12d3-a456-426614174000');
+
+    // Scoped ticket for 'lesson/video1.mp4' fails for 'lesson/video2.mp4'
+    const wrongKey = await auth.verifyPlaybackTicket(data.ticket, 'lesson/video2.mp4', env);
+    assert.equal(wrongKey, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

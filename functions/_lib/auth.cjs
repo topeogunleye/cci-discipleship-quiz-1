@@ -226,13 +226,88 @@ async function verifySupabaseAccessToken(accessToken, env, fetcher, nowMilliseco
   }
 }
 
+function encodeBase64Url(bytes) {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlJson(obj) {
+  return encodeBase64Url(new TextEncoder().encode(JSON.stringify(obj)));
+}
+
+async function ticketSigningKey(env) {
+  const subtle = typeof crypto !== 'undefined' && crypto.subtle ? crypto.subtle : null;
+  if (!subtle) return null;
+  const config = supabaseConfig(env);
+  const secret = (env && (env.VIDEO_TICKET_SECRET || env.SUPABASE_JWT_SECRET)) || (config && config.anonKey) || 'cci-video-ticket-secret';
+  const encoder = new TextEncoder();
+  return subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+}
+
+async function createPlaybackTicket(userId, objectKey, lifetimeSeconds, env) {
+  if (!isUserId(userId) || typeof objectKey !== 'string') return null;
+  const subtle = typeof crypto !== 'undefined' && crypto.subtle ? crypto.subtle : null;
+  if (!subtle) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const exp = now + (Number.isFinite(lifetimeSeconds) && lifetimeSeconds < 0 ? Math.floor(lifetimeSeconds) : Math.max(60, Math.min(7200, Math.floor(lifetimeSeconds || 3600))));
+  const header = { alg: 'HS256', typ: 'TICKET' };
+  const claims = { sub: userId, key: objectKey, exp: exp, typ: 'ticket' };
+  const signingInput = base64UrlJson(header) + '.' + base64UrlJson(claims);
+  const key = await ticketSigningKey(env);
+  if (!key) return null;
+  const signatureBytes = await subtle.sign('HMAC', key, new TextEncoder().encode(signingInput));
+  return signingInput + '.' + encodeBase64Url(new Uint8Array(signatureBytes));
+}
+
+function isPlaybackTicket(token) {
+  if (typeof token !== 'string' || token.length < 20 || token.length > 8192) return false;
+  const decoded = decodeJwt(token);
+  return !!(decoded && decoded.header && decoded.header.alg === 'HS256' && decoded.header.typ === 'TICKET');
+}
+
+async function verifyPlaybackTicket(ticket, requestedObjectKey, env) {
+  if (typeof ticket !== 'string' || ticket.length < 20 || ticket.length > 8192) return null;
+  const decoded = decodeJwt(ticket);
+  if (!decoded || !decoded.header || decoded.header.alg !== 'HS256' || decoded.header.typ !== 'TICKET') return null;
+  const claims = decoded.claims;
+  if (!claims || claims.typ !== 'ticket' || !isUserId(claims.sub)) return null;
+  if (typeof claims.key === 'string' && claims.key !== '*' && claims.key !== requestedObjectKey) return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (!Number.isFinite(claims.exp) || claims.exp <= now) return null;
+  try {
+    const subtle = typeof crypto !== 'undefined' && crypto.subtle ? crypto.subtle : null;
+    if (!subtle) return null;
+    const key = await ticketSigningKey(env);
+    if (!key) return null;
+    const valid = await subtle.verify('HMAC', key, decoded.signature, decoded.signingInput);
+    return valid ? { id: claims.sub, ticket: true } : null;
+  } catch (e) { return null; }
+}
 function videoToken(request) {
-  const raw = request.headers.get('Cookie') || '';
-  for (const part of raw.split(';')) {
-    const separator = part.indexOf('=');
-    if (separator < 0 || part.slice(0, separator).trim() !== VIDEO_COOKIE) continue;
-    try { return decodeURIComponent(part.slice(separator + 1).trim()); }
-    catch (error) { return ''; }
+  if (!request) return '';
+  if (typeof request.url === 'string') {
+    try {
+      const url = new URL(request.url);
+      const queryToken = url.searchParams.get('token') || url.searchParams.get('ticket');
+      if (queryToken && typeof queryToken === 'string' && queryToken.length >= 20 && queryToken.length <= 8192) {
+        return queryToken.trim();
+      }
+    } catch (e) {}
+  }
+  if (request.headers && typeof request.headers.get === 'function') {
+    const authHeader = request.headers.get('Authorization') || '';
+    if (authHeader.startsWith('Bearer ')) {
+      const bearer = authHeader.slice(7).trim();
+      if (bearer.length >= 20 && bearer.length <= 8192) return bearer;
+    }
+    const raw = request.headers.get('Cookie') || '';
+    for (const part of raw.split(';')) {
+      const separator = part.indexOf('=');
+      if (separator < 0 || part.slice(0, separator).trim() !== VIDEO_COOKIE) continue;
+      try { return decodeURIComponent(part.slice(separator + 1).trim()); }
+      catch (error) { return ''; }
+    }
   }
   return '';
 }
@@ -244,4 +319,4 @@ function videoCookie(accessToken, maxAge) {
   return VIDEO_COOKIE + '=' + encodeURIComponent(accessToken) + '; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=' + Math.max(1, Math.min(3600, Math.floor(lifetime)));
 }
 
-module.exports = { VIDEO_COOKIE, jsonResponse, isPublishableKey, supabaseConfig, allowedOrigins, withCors, originAllowed, authServiceUnavailable, authServiceUnavailableResponse, getAuthenticatedUser, verifySupabaseAccessToken, accessTokenExpiration, accessTokenSubject, videoToken, videoCookie, __test: { decodeJwt, validAccessClaims, resetJwksCache: () => { jwksCache.clear(); jwksInflight.clear(); } } };
+module.exports = { VIDEO_COOKIE, jsonResponse, isPublishableKey, supabaseConfig, allowedOrigins, withCors, originAllowed, authServiceUnavailable, authServiceUnavailableResponse, getAuthenticatedUser, verifySupabaseAccessToken, accessTokenExpiration, accessTokenSubject, createPlaybackTicket, verifyPlaybackTicket, isPlaybackTicket, videoToken, videoCookie, __test: { decodeJwt, validAccessClaims, resetJwksCache: () => { jwksCache.clear(); jwksInflight.clear(); } } };

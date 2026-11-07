@@ -16,13 +16,19 @@ export async function onRequest(context) {
   const pathname = new URL(request.url).pathname;
   const match = /^\/transcript\/([A-Za-z0-9._-]+\.vtt)$/i.exec(pathname);
   if (!match) return auth.jsonResponse({ error: 'Transcript not found.' }, 404, headersFor(request, env));
+  const filename = match[1];
 
   let user;
-  try { user = await auth.getAuthenticatedUser(auth.videoToken(request), env); }
+  try {
+    const token = auth.videoToken(request);
+    if (auth.isPlaybackTicket(token)) {
+      user = await auth.verifyPlaybackTicket(token, filename, env);
+    } else {
+      user = await auth.getAuthenticatedUser(token, env);
+    }
+  }
   catch (error) { return auth.authServiceUnavailableResponse(request, env, error); }
   if (!user) return auth.jsonResponse({ error: 'Sign in to view this lesson transcript.' }, 401, headersFor(request, env));
-
-  const filename = match[1];
   if (!Object.hasOwn(transcripts, filename)) return auth.jsonResponse({ error: 'Transcript not found.' }, 404, headersFor(request, env));
   const text = transcripts[filename];
   const headers = headersFor(request, env);
