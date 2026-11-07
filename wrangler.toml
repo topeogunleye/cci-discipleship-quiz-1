@@ -4,15 +4,10 @@ pages_build_output_dir = "./dist"
 
 [vars]
 ALLOWED_APP_ORIGINS = "https://localhost,capacitor://localhost,http://localhost"
-ESV_RATE_LIMIT_REQUIRED = "true"
 
-[[ratelimits]]
-name = "ESV_RATE_LIMITER"
-namespace_id = "846209317"
-
-  [ratelimits.simple]
-  limit = 15
-  period = 60
+[[services]]
+binding = "ESV_RATE_LIMITER"
+service = "cci-esv-rate-limiter"
 
 [[r2_buckets]]
 binding = "LESSON_VIDEOS"

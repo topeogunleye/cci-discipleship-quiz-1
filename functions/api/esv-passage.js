@@ -37,10 +37,8 @@ export function onRequestOptions() {
 }
 
 async function checkRateLimit(request, env) {
-  const limiter = env && env.ESV_RATE_LIMITER;
-  if (!limiter || typeof limiter.limit !== 'function') {
-    return env && env.ESV_RATE_LIMIT_REQUIRED === 'true' ? 'unavailable' : 'allowed';
-  }
+  const limiterService = env && env.ESV_RATE_LIMITER;
+  if (!limiterService || typeof limiterService.fetch !== 'function') return 'unavailable';
 
   // Cloudflare supplies this header at the edge. Do not trust client-provided
   // forwarding headers as a substitute for the actual connecting IP.
@@ -48,11 +46,16 @@ async function checkRateLimit(request, env) {
   if (!clientIp) return 'unavailable';
 
   try {
-    const result = await limiter.limit({ key: 'esv-passage:' + clientIp });
-    return result && result.success === true ? 'allowed' : 'limited';
+    const limiterRequest = new Request('https://esv-rate-limiter.internal/check', {
+      method: 'POST',
+      headers: { 'X-ESV-Client-IP': clientIp }
+    });
+    const result = await limiterService.fetch(limiterRequest);
+    if (result.status === 429) return 'limited';
+    return result.ok ? 'allowed' : 'unavailable';
   } catch (error) {
-    // Fail closed if the configured limiter is unavailable so requests do not
-    // continue to consume the shared upstream ESV quota without protection.
+    // Fail closed if the private rate-limiter Worker is unavailable so requests
+    // do not continue to consume the shared upstream ESV quota unprotected.
     return 'unavailable';
   }
 }
