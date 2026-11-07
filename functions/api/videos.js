@@ -34,24 +34,13 @@ function unauthorized(request, env) {
   return auth.jsonResponse({ error: 'Sign in to watch this lesson.' }, 401, cors(request, env));
 }
 
-function getMediaCacheKey(key, rangeHeader, method) {
-  const cacheUrl = new URL('https://media-cache.cci-study.internal/video');
-  cacheUrl.searchParams.set('key', key);
-  if (method === 'HEAD') {
-    cacheUrl.pathname = '/meta';
-  } else if (rangeHeader) {
-    cacheUrl.searchParams.set('range', rangeHeader.trim());
-  }
-  return new Request(cacheUrl.toString(), { method: 'GET' });
-}
-
 export function onRequestOptions({ request, env }) {
   if (!auth.originAllowed(request, env)) return new Response(null, { status: 403, headers: { 'Cache-Control': 'no-store' } });
   return new Response(null, { status: 204, headers: cors(request, env) });
 }
 
 export async function onRequest(context) {
-  const { request, env, waitUntil } = context || {};
+  const { request, env } = context || {};
   if (!['GET', 'HEAD'].includes(request.method)) return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD, OPTIONS', 'Cache-Control': 'no-store' } });
   if (!auth.originAllowed(request, env)) return auth.jsonResponse({ error: 'This app origin is not allowed.' }, 403, cors(request, env));
   const key = new URL(request.url).searchParams.get('key') || '';
@@ -59,7 +48,7 @@ export async function onRequest(context) {
   try {
     const token = auth.videoToken(request);
     if (auth.isPlaybackTicket(token)) {
-      user = await auth.verifyPlaybackTicket(token, key, env);
+      user = await auth.verifyPlaybackTicket(token, videoCatalog.videoIdForObjectKey(key), env);
     } else {
       user = env && env.VIDEO_AUTH_MODE === 'remote'
         ? await auth.getAuthenticatedUser(token, env)
@@ -78,34 +67,6 @@ export async function onRequest(context) {
   headers.set('Content-Type', 'video/mp4');
   headers.set('Content-Disposition', 'inline');
 
-  const cache = typeof caches !== 'undefined' && caches && caches.default ? caches.default : null;
-  const rangeHeader = request.headers.get('Range');
-  const cacheKey = getMediaCacheKey(key, rangeHeader, request.method);
-
-  if (cache) {
-    try {
-      const cached = await cache.match(cacheKey);
-      if (cached) {
-        const cachedHeaders = cors(request, env);
-        cachedHeaders.set('Cache-Control', 'private, no-store');
-        cachedHeaders.set('X-Content-Type-Options', 'nosniff');
-        cachedHeaders.set('Cross-Origin-Resource-Policy', 'cross-origin');
-        cachedHeaders.set('Accept-Ranges', 'bytes');
-        cachedHeaders.set('Content-Type', 'video/mp4');
-        cachedHeaders.set('Content-Disposition', 'inline');
-        if (cached.headers.has('ETag')) cachedHeaders.set('ETag', cached.headers.get('ETag'));
-        if (cached.headers.has('Content-Length')) cachedHeaders.set('Content-Length', cached.headers.get('Content-Length'));
-        if (cached.headers.has('Content-Range')) cachedHeaders.set('Content-Range', cached.headers.get('Content-Range'));
-
-        if (request.method === 'HEAD') {
-          return new Response(null, { status: 200, headers: cachedHeaders });
-        }
-        const status = Number(cached.headers.get('X-Original-Status')) || (cached.headers.has('Content-Range') ? 206 : 200);
-        return new Response(cached.body, { status, headers: cachedHeaders });
-      }
-    } catch (cacheMatchError) {}
-  }
-
   try {
     const object = request.method === 'HEAD'
       ? await env.LESSON_VIDEOS.head(key)
@@ -120,20 +81,6 @@ export async function onRequest(context) {
 
     if (request.method === 'HEAD') {
       headers.set('Content-Length', String(object.size));
-      if (cache) {
-        try {
-          const metaHeaders = new Headers({
-            'Cache-Control': 'public, max-age=604800, s-maxage=2592000',
-            'Content-Type': 'video/mp4',
-            'Content-Length': String(object.size),
-            'X-Original-Status': '200'
-          });
-          if (object.httpEtag) metaHeaders.set('ETag', object.httpEtag);
-          const putMeta = cache.put(cacheKey, new Response(null, { status: 200, headers: metaHeaders })).catch(() => {});
-          if (typeof waitUntil === 'function') waitUntil(putMeta);
-          else if (context && typeof context.waitUntil === 'function') context.waitUntil(putMeta);
-        } catch (putMetaErr) {}
-      }
       return new Response(null, { status: 200, headers });
     }
     if (!object.body) return auth.jsonResponse({ error: 'Lesson video could not be opened.' }, 503, headers);
@@ -143,49 +90,12 @@ export async function onRequest(context) {
       headers.set('Content-Length', String(length));
       headers.set('Content-Range', 'bytes ' + start + '-' + (start + length - 1) + '/' + object.size);
 
-      let returnBody = object.body;
-      if (cache && typeof object.body.tee === 'function') {
-        try {
-          const [userStream, cacheStream] = object.body.tee();
-          returnBody = userStream;
-          const storeHeaders = new Headers({
-            'Cache-Control': 'public, max-age=604800, s-maxage=2592000',
-            'Content-Type': 'video/mp4',
-            'Content-Length': String(length),
-            'Content-Range': 'bytes ' + start + '-' + (start + length - 1) + '/' + object.size,
-            'X-Original-Status': '206'
-          });
-          if (object.httpEtag) storeHeaders.set('ETag', object.httpEtag);
-          const storeResponse = new Response(cacheStream, { status: 200, headers: storeHeaders });
-          const putPromise = cache.put(cacheKey, storeResponse).catch(() => {});
-          if (typeof waitUntil === 'function') waitUntil(putPromise);
-          else if (context && typeof context.waitUntil === 'function') context.waitUntil(putPromise);
-        } catch (teeErr) {}
-      }
-      return new Response(returnBody, { status: 206, headers });
+      return new Response(object.body, { status: 206, headers });
     }
     if (range) return auth.jsonResponse({ error: 'The requested video range could not be served.' }, 502, headers);
     headers.set('Content-Length', String(object.size));
 
-    let returnBody = object.body;
-    if (cache && typeof object.body.tee === 'function') {
-      try {
-        const [userStream, cacheStream] = object.body.tee();
-        returnBody = userStream;
-        const storeHeaders = new Headers({
-          'Cache-Control': 'public, max-age=604800, s-maxage=2592000',
-          'Content-Type': 'video/mp4',
-          'Content-Length': String(object.size),
-          'X-Original-Status': '200'
-        });
-        if (object.httpEtag) storeHeaders.set('ETag', object.httpEtag);
-        const storeResponse = new Response(cacheStream, { status: 200, headers: storeHeaders });
-        const putPromise = cache.put(cacheKey, storeResponse).catch(() => {});
-        if (typeof waitUntil === 'function') waitUntil(putPromise);
-        else if (context && typeof context.waitUntil === 'function') context.waitUntil(putPromise);
-      } catch (teeErr) {}
-    }
-    return new Response(returnBody, { status: 200, headers });
+    return new Response(object.body, { status: 200, headers });
   } catch (error) {
     if (request.headers.has('Range')) {
       try {
@@ -203,4 +113,4 @@ export async function onRequest(context) {
   }
 }
 
-export const __test = { safeObjectKey, parseRange, getMediaCacheKey };
+export const __test = { safeObjectKey, parseRange };

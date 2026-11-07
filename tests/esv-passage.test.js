@@ -40,7 +40,7 @@ test('ESV passage function requires a configured secret and validates passage re
   assert.equal(requests, 0);
 });
 
-test('ESV passage function calls the official API with its secret header and returns edge-cached text with CORS', async () => {
+test('ESV passage function calls the official API with its secret header and returns no-store text with CORS', async () => {
   let upstreamUrl;
   let upstreamHeaders;
   const handlers = loadHandler(async (url, options) => {
@@ -58,7 +58,7 @@ test('ESV passage function calls the official API with its secret header and ret
   });
 
   assert.equal(response.status, 200);
-  assert.match(response.headers.get('Cache-Control'), /public.*max-age=604800/);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
   assert.equal(response.headers.get('Access-Control-Allow-Origin'), '*');
   assert.deepEqual(await response.json(), { text: 'For God so loved the world. (ESV)' });
   assert.equal(upstreamUrl.origin + upstreamUrl.pathname, 'https://api.esv.org/v3/passage/text/');
@@ -72,19 +72,12 @@ test('ESV passage function calls the official API with its secret header and ret
   assert.equal(optionsResponse.headers.get('Access-Control-Allow-Origin'), '*');
 });
 
-test('ESV passage function uses Cloudflare Cache API and avoids upstream fetch on cache hit', async () => {
-  let upstreamRequests = 0;
-  const cachedEntries = new Map();
+test('ESV passage text is not persisted through the Cloudflare Cache API', async () => {
+  let upstreamRequests = 0, cacheCalls = 0;
   const mockCaches = {
     default: {
-      match: async req => {
-        const url = req.url || (typeof req === 'string' ? req : '');
-        return cachedEntries.get(url) || null;
-      },
-      put: async (req, res) => {
-        const url = req.url || (typeof req === 'string' ? req : '');
-        cachedEntries.set(url, res);
-      }
+      match: async () => { cacheCalls++; return null; },
+      put: async () => { cacheCalls++; }
     }
   };
 
@@ -96,22 +89,24 @@ test('ESV passage function uses Cloudflare Cache API and avoids upstream fetch o
     });
   }, mockCaches);
 
-  // First request: cache miss, calls upstream and stores in cache
+  // Each request goes to ESV and returns a no-store response.
   const first = await handlers.onRequestGet({
     request: new Request('https://study.example/api/esv-passage?q=John+1%3A1'),
     env: { ESV_API_KEY: 'test-esv-key' }
   });
   assert.equal(first.status, 200);
   assert.equal(upstreamRequests, 1);
+  assert.equal(first.headers.get('Cache-Control'), 'no-store');
   assert.deepEqual(await first.json(), { text: 'In the beginning was the Word. (ESV)' });
-  assert.equal(cachedEntries.size, 1);
 
-  // Second request: cache hit, does NOT call upstream
+  // A repeated request is not served from a persistent application cache.
   const second = await handlers.onRequestGet({
     request: new Request('https://study.example/api/esv-passage?q=John+1%3A1'),
     env: { ESV_API_KEY: 'test-esv-key' }
   });
   assert.equal(second.status, 200);
-  assert.equal(upstreamRequests, 1, 'upstream API must NOT be called on cache hit');
+  assert.equal(second.headers.get('Cache-Control'), 'no-store');
+  assert.equal(upstreamRequests, 2, 'ESV text remains uncached at the edge');
+  assert.equal(cacheCalls, 0);
   assert.deepEqual(await second.json(), { text: 'In the beginning was the Word. (ESV)' });
 });

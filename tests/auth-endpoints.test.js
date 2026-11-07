@@ -338,17 +338,16 @@ test('progress migration enforces row-level security and version-checked owner-s
   assert.doesNotMatch(migration, /grant\s+(?:select|insert|update|all)[^;]+on table public\.user_progress to authenticated/i);
 });
 
-test('Phase 4 migration hardens progress indexes and bounds RPC statement timeouts for connection pooling', () => {
-  const migration = fs.readFileSync(path.join(root, 'supabase/migrations/20261107000000_progress_indexing_and_pooling.sql'), 'utf8');
-  assert.match(migration, /create index if not exists idx_user_progress_updated_at\s+on public\.user_progress\s*\(updated_at desc\);/i);
-  assert.match(migration, /create index if not exists idx_user_progress_user_version\s+on public\.user_progress\s*\(user_id,\s*version\);/i);
+test('Phase 4 migration only bounds progress RPC statement timeouts', () => {
+  const migration = fs.readFileSync(path.join(root, 'supabase/migrations/20261107000000_progress_statement_timeouts.sql'), 'utf8');
   assert.match(migration, /alter function public\.get_user_progress\(\)\s+set statement_timeout = '5s';/i);
   assert.match(migration, /alter function public\.sync_user_progress\(bigint,\s*jsonb\)\s+set statement_timeout = '10s';/i);
+  assert.doesNotMatch(migration, /create index/i);
 });
 
 
-test('session endpoint generates and returns a scoped playback ticket in JSON response', async () => {
-  const env = { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_test_key', ALLOWED_APP_ORIGINS: 'capacitor://localhost' };
+test('session endpoint issues a lesson-scoped playback ticket only with the dedicated signing secret', async () => {
+  const env = { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_test_key', VIDEO_TICKET_SECRET: 'test-video-ticket-secret-at-least-32-bytes', ALLOWED_APP_ORIGINS: 'capacitor://localhost' };
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify({ id: '123e4567-e89b-12d3-a456-426614174000' }), { status: 200 });
   try {
@@ -357,7 +356,7 @@ test('session endpoint generates and returns a scoped playback ticket in JSON re
       request: new Request('https://study.example/api/auth/session', {
         method: 'POST',
         headers: { Origin: 'capacitor://localhost', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken: sessionToken, key: 'lesson/video1.mp4' })
+        body: JSON.stringify({ accessToken: sessionToken, videoId: 'section-01-born-again' })
       }),
       env
     });
@@ -368,13 +367,14 @@ test('session endpoint generates and returns a scoped playback ticket in JSON re
     assert.ok(typeof data.ticket === 'string' && data.ticket.length > 20);
 
     // Verify the ticket directly with auth.verifyPlaybackTicket
-    const verified = await auth.verifyPlaybackTicket(data.ticket, 'lesson/video1.mp4', env);
+    const verified = await auth.verifyPlaybackTicket(data.ticket, 'section-01-born-again', env);
     assert.ok(verified);
     assert.equal(verified.id, '123e4567-e89b-12d3-a456-426614174000');
 
-    // Scoped ticket for 'lesson/video1.mp4' fails for 'lesson/video2.mp4'
-    const wrongKey = await auth.verifyPlaybackTicket(data.ticket, 'lesson/video2.mp4', env);
+    // The ticket cannot be used for a different catalog video.
+    const wrongKey = await auth.verifyPlaybackTicket(data.ticket, 'section-01-justification', env);
     assert.equal(wrongKey, null);
+    assert.ok(Number.isFinite(data.ticketExpiresAt));
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -6,7 +6,7 @@
   var S = defaultStudyState();
   var STARTER_DECKS = [], DEVOTIONALS = [], LESSON_VIDEOS = [];
   var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, biblePreviewCache = null, suppressBiblePreviewFocus = null;
-  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), activeStorageOwnerId = null, requestedStorageOwnerId = null, guestProgressForImport = null, account = Account ? Account.create() : null, accountStatus = { configured: false, user: null, videoReady: false }, accountBootReady = false, accountMessage = '', accountEmailDraft = '', accountBusy = false, accountSwitchQueue = Promise.resolve(), cloudSyncQueue = Promise.resolve(), cloudSyncTimer = null, lessonTranscriptCache = Object.create(null), lessonTranscriptRequests = Object.create(null), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
+  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), activeStorageOwnerId = null, requestedStorageOwnerId = null, guestProgressForImport = null, account = Account ? Account.create() : null, accountStatus = { configured: false, user: null, videoReady: false, videoSessionVersion: 0 }, accountBootReady = false, accountMessage = '', accountEmailDraft = '', accountBusy = false, accountSwitchQueue = Promise.resolve(), cloudSyncQueue = Promise.resolve(), cloudSyncTimer = null, lessonTranscriptCache = Object.create(null), lessonTranscriptRequests = Object.create(null), lastVideoSessionVersion = 0, V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
   var quizFeedbackDrag = null, quizFeedbackIgnoreClick = false;
   var browserLocalStorage = null, browserIndexedDB = null, animateRouteChange = false;
   var lessonTranscriptGeneration = 0;
@@ -381,6 +381,58 @@
   function lessonVideosForDeck(deckId) {
     return LESSON_VIDEOS.filter(function (item) { return item.deckId === deckId; });
   }
+  function nativeTicketUrl(value, ticket) {
+    if (!value || !ticket || !account || !account.apiBase) return '';
+    try {
+      var url = new URL(value, account.apiBase + '/');
+      var api = new URL(account.apiBase);
+      if (url.origin !== api.origin || (url.pathname !== '/api/videos' && !/^\/transcript\/[A-Za-z0-9._-]+\.vtt$/i.test(url.pathname))) return '';
+      url.searchParams.set('ticket', ticket);
+      return url.toString();
+    } catch (e) { return ''; }
+  }
+  function refreshNativeVideoTicket(force) {
+    if (!account || !window.CciNative || !window.CciNative.isNative || V.name !== 'lesson-video' || !accountStatus.user || !accountStatus.videoReady || typeof account.preparePlaybackTicket !== 'function') return;
+    var video = lessonVideosForDeck(V.id)[Number.isInteger(V.videoIndex) ? V.videoIndex : 0];
+    if (!video) return;
+    account.preparePlaybackTicket(video.id, !!force).then(function (ticket) {
+      if (!ticket || V.name !== 'lesson-video' || V.id !== video.deckId || lessonVideosForDeck(V.id)[V.videoIndex] !== video) return;
+      var player = document.getElementById('lesson-video-player');
+      if (!player) { render(true); return; }
+      var videoUrl = nativeTicketUrl(video.videoUrl, ticket);
+      var captionsUrl = nativeTicketUrl(video.captionsUrl, ticket);
+      if (!videoUrl) return;
+      var source = player.querySelector('source');
+      if (!source || source.src === videoUrl) return;
+      var currentTime = Number.isFinite(player.currentTime) ? player.currentTime : 0;
+      var wasPlaying = !player.paused && !player.ended;
+      var restored = false;
+      var restorePlayback = function () {
+        if (restored) return;
+        restored = true;
+        try { player.currentTime = Math.min(currentTime, Number.isFinite(player.duration) ? player.duration : currentTime); } catch (e) {}
+        if (wasPlaying) {
+          var playbackAttempt = player.play();
+          if (playbackAttempt && playbackAttempt.catch) playbackAttempt.catch(function () {});
+        }
+      };
+      source.src = videoUrl;
+      var track = player.querySelector('track');
+      if (track && captionsUrl) track.src = captionsUrl;
+      var transcript = app.querySelector('.lesson-transcript');
+      if (transcript && captionsUrl) {
+        transcript.dataset.transcriptUrl = captionsUrl;
+        transcript.dataset.loaded = 'false';
+        var cues = transcript.querySelector('.lesson-transcript-cues');
+        if (cues) { cues.replaceChildren(); cues.hidden = true; }
+        var status = transcript.querySelector('.lesson-transcript-status');
+        if (status) status.textContent = 'Open to load transcript segments.';
+      }
+      player.addEventListener('loadedmetadata', restorePlayback, { once: true });
+      player.load();
+      if (player.readyState >= 1) restorePlayback();
+    }).catch(function () {});
+  }
   function loadLessonTranscript(url) {
     if (lessonTranscriptCache[url]) return Promise.resolve(lessonTranscriptCache[url]);
     if (lessonTranscriptRequests[url]) return lessonTranscriptRequests[url];
@@ -626,6 +678,8 @@
     return account.init(function (status) {
       var hadVideoAccess = !!(accountStatus.user && accountStatus.videoReady);
       var priorUserId = accountStatus.user && accountStatus.user.id;
+      var sessionRefreshed = Number(status.videoSessionVersion) > lastVideoSessionVersion;
+      lastVideoSessionVersion = Number(status.videoSessionVersion) || 0;
       accountStatus = status;
       if (!accountBootReady) return;
       // Remove protected media on account changes, but keep an existing player mounted for same-user renewal outcomes.
@@ -635,6 +689,7 @@
       if (nextOwner !== requestedStorageOwnerId) switchStorageOwner(nextOwner);
       else if (nextOwner && nextOwner === activeStorageOwnerId && status.videoReady && !cloudSyncTimer) scheduleCloudProgressSync();
       else if (V.name === 'settings') render(true);
+      if (sessionRefreshed) refreshNativeVideoTicket(true);
     }).catch(function () {});
   }
   var pendingVideoReturnKey = 'cci-pending-video-return';
@@ -1850,33 +1905,40 @@
       '</nav>'
       : '';
     var canWatchVideo = !!(accountStatus.user && accountStatus.videoReady);
-    var tokenParam = canWatchVideo && (account && typeof account.playbackTicket === 'function' ? account.playbackTicket() : (accountStatus.ticket || (accountStatus.session && accountStatus.session.access_token) || ''));
     var isNative = typeof window !== 'undefined' && window.CciNative && window.CciNative.isNative;
+    var tokenParam = canWatchVideo && isNative && account && typeof account.playbackTicket === 'function' ? account.playbackTicket(video && video.id) : '';
+    var ticketError = isNative && account && typeof account.playbackTicketError === 'function' ? account.playbackTicketError(video && video.id) : '';
+    if (canWatchVideo && isNative && video && !tokenParam && !ticketError && account && typeof account.preparePlaybackTicket === 'function') {
+      account.preparePlaybackTicket(video.id).then(function () {
+        if (V.name === 'lesson-video' && V.id === d.id && lessonVideosForDeck(V.id)[V.videoIndex] && lessonVideosForDeck(V.id)[V.videoIndex].id === video.id) render(true);
+      });
+    }
     var videoSourceUrl = video ? video.videoUrl : '';
     var captionsSourceUrl = video ? video.captionsUrl : '';
     var transcriptSourceUrl = video ? video.transcriptUrl : '';
     if (tokenParam && isNative) {
-      if (videoSourceUrl) videoSourceUrl += (videoSourceUrl.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(tokenParam);
-      if (captionsSourceUrl) captionsSourceUrl += (captionsSourceUrl.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(tokenParam);
-      if (transcriptSourceUrl) transcriptSourceUrl += (transcriptSourceUrl.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(tokenParam);
+      videoSourceUrl = nativeTicketUrl(videoSourceUrl, tokenParam);
+      captionsSourceUrl = nativeTicketUrl(captionsSourceUrl, tokenParam);
+      transcriptSourceUrl = nativeTicketUrl(transcriptSourceUrl, tokenParam);
     }
+    var canStartPlayback = canWatchVideo && (!isNative || !!tokenParam);
     var player = video
-      ? (canWatchVideo
+      ? (canStartPlayback
           ? '<video class="lesson-video-player" id="lesson-video-player" controls playsinline preload="metadata" crossorigin="use-credentials"' + (video.posterUrl ? ' poster="' + esc(video.posterUrl) + '"' : '') + ' aria-label="Video lesson: ' + esc(title) + '"><source src="' + esc(videoSourceUrl) + '" type="video/mp4">' + (captionsSourceUrl ? '<track kind="captions" src="' + esc(captionsSourceUrl) + '" srclang="' + esc(video.captionsLanguage) + '" label="' + esc(video.captionsLabel) + '" default>' : '') + '<span>Your browser does not support video playback.</span></video>'
-          : '<div class="lesson-video-unavailable lesson-video-auth-required" role="status"><strong>' + (accountStatus.user ? 'Preparing secure video access' : 'Sign in to watch this lesson') + '</strong><p>' + (accountStatus.user ? 'Your lesson files stay private. Video access is being prepared for your account.' : 'Create a free account or sign in to watch. You can continue studying locally without an account.') + '</p><button type="button" class="btn primary" data-act="nav-tab" data-tab="settings" data-return-video="' + esc(d.id) + '" data-return-video-index="' + index + '" data-return-video-asset-id="' + esc(video.id) + '">' + (accountStatus.user ? 'Account settings' : 'Sign in or create account') + '</button></div>')
+          : '<div class="lesson-video-unavailable lesson-video-auth-required" role="status"><strong>' + (canWatchVideo ? (ticketError ? 'Secure video access needs attention' : 'Preparing secure video access') : (accountStatus.user ? 'Preparing secure video access' : 'Sign in to watch this lesson')) + '</strong><p>' + (ticketError ? esc(ticketError) : (accountStatus.user ? 'Your lesson files stay private. ' + (isNative ? 'A short-lived ticket for this lesson is being prepared.' : 'Video access is being prepared for your account.') : 'Create a free account or sign in to watch. You can continue studying locally without an account.')) + '</p>' + (canWatchVideo && isNative ? '<button type="button" class="btn primary" data-act="video-ticket-retry" data-video-id="' + esc(video.id) + '"' + (ticketError ? '' : ' disabled') + '>' + (ticketError ? 'Retry secure access' : 'Preparing…') + '</button>' : '<button type="button" class="btn primary" data-act="nav-tab" data-tab="settings" data-return-video="' + esc(d.id) + '" data-return-video-index="' + index + '" data-return-video-asset-id="' + esc(video.id) + '">' + (accountStatus.user ? 'Account settings' : 'Sign in or create account') + '</button>') + '</div>')
       : '<div class="lesson-video-unavailable" role="status"><strong>Lesson video not available yet</strong><p>The ' + esc(parsed.topic) + ' video has not been added yet. Use Flashcards or Take quiz below.</p></div>';
     var transcriptPanel = video && transcriptSourceUrl
       ? (canWatchVideo
           ? '<details class="lesson-transcript" data-video-id="' + esc(video.id) + '" data-transcript-url="' + esc(transcriptSourceUrl) + '"><summary>Search transcript</summary><div class="lesson-transcript-body"><label for="lesson-transcript-search">Find a word or phrase</label><input id="lesson-transcript-search" type="search" autocomplete="off" aria-controls="lesson-transcript-cues"><p class="lesson-transcript-status" role="status" aria-live="polite">Open to load transcript segments.</p><ol class="lesson-transcript-cues" id="lesson-transcript-cues" hidden></ol></div></details>'
           : '<p class="lesson-transcript-note">English captions and a searchable transcript are available after you sign in to watch.</p>')
-      : (video && canWatchVideo ? '<p class="lesson-transcript-note">Captions and a searchable transcript are not available for this recording yet.</p>' : '');
+      : (video && canStartPlayback ? '<p class="lesson-transcript-note">Captions and a searchable transcript are not available for this recording yet.</p>' : '');
     var videoNav = videos.length > 1
       ? '<nav class="lesson-video-segments" aria-label="Videos in this chapter">' + videos.map(function (item, itemIndex) { return '<button type="button" class="lesson-video-segment' + (itemIndex === index ? ' is-active' : '') + '" data-act="lesson-video-select" data-index="' + itemIndex + '" aria-current="' + (itemIndex === index ? 'true' : 'false') + '">' + (itemIndex + 1) + '. ' + esc(item.title) + '</button>'; }).join('') + '</nav>'
       : '<div class="lesson-video-progress" aria-label="Chapter ' + section + ' of ' + S.decks.length + '"><span>Chapter ' + section + ' of ' + S.decks.length + '</span><progress value="' + section + '" max="' + S.decks.length + '">Chapter ' + section + ' of ' + S.decks.length + '</progress></div>';
     return '<main class="lesson-video-page" aria-labelledby="lesson-video-title">' +
       '<header class="lesson-video-topbar"><button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button><div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong></div><span class="lesson-video-section-count">' + section + ' / ' + S.decks.length + '</span></header>' +
-      '<section class="lesson-video-frame' + (video && canWatchVideo ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
-      '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title" tabindex="-1">' + esc(title) + '</h1><p>' + (canWatchVideo ? 'Watch this lesson video, then reinforce Chapter ' + section + ' (' + esc(parsed.topic) + ') with study activities covering all ' + d.cards.length + ' questions across the chapter’s ' + videos.length + ' recordings.' : 'Study Chapter ' + section + ' (' + esc(parsed.topic) + ') locally with flashcards or a quiz covering all ' + d.cards.length + ' questions. Sign in to watch its lesson videos.') + '</p></div>' + (video && canWatchVideo ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">' + (V.videoTime > 0 ? 'Resume lesson' : 'Play lesson') + '</button>' : '') + '</section>' +
+      '<section class="lesson-video-frame' + (video && canStartPlayback ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
+      '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title" tabindex="-1">' + esc(title) + '</h1><p>' + (canStartPlayback ? 'Watch this lesson video, then reinforce Chapter ' + section + ' (' + esc(parsed.topic) + ') with study activities covering all ' + d.cards.length + ' questions across the chapter’s ' + videos.length + ' recordings.' : 'Study Chapter ' + section + ' (' + esc(parsed.topic) + ') locally with flashcards or a quiz covering all ' + d.cards.length + ' questions.' + (accountStatus.user ? ' Secure video access is being prepared.' : ' Sign in to watch its lesson videos.')) + '</p></div>' + (video && canStartPlayback ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">' + (V.videoTime > 0 ? 'Resume lesson' : 'Play lesson') + '</button>' : '') + '</section>' +
       videoNavigation +
       '<div class="lesson-video-study-actions" role="group" aria-label="Study Chapter ' + section + ' (' + esc(parsed.topic) + ')"><button type="button" class="btn" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" aria-label="Study Chapter ' + section + ' Flashcards, ' + d.cards.length + ' cards">Chapter Flashcards (' + d.cards.length + ')</button><button type="button" class="btn" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" aria-label="Take Chapter ' + section + ' Quiz, ' + d.cards.length + ' questions">Chapter Quiz (' + d.cards.length + ')</button></div>' +
       transcriptPanel +
@@ -3616,6 +3678,15 @@
             ? (lessonVideoElement.pause(), null)
             : lessonVideoElement.play();
           if (playbackAttempt && playbackAttempt.catch) playbackAttempt.catch(function () { toast('Video playback could not start. Check the video source and try again.'); });
+        }
+        break;
+      case 'video-ticket-retry':
+        if (account && typeof account.preparePlaybackTicket === 'function' && V.name === 'lesson-video' && lessonVideosForDeck(V.id)[V.videoIndex] && lessonVideosForDeck(V.id)[V.videoIndex].id === t.dataset.videoId) {
+          t.disabled = true;
+          account.preparePlaybackTicket(t.dataset.videoId, true).then(function () {
+            accountStatus = account.status();
+            if (V.name === 'lesson-video' && lessonVideosForDeck(V.id)[V.videoIndex] && lessonVideosForDeck(V.id)[V.videoIndex].id === t.dataset.videoId) render(true);
+          });
         }
         break;
       case 'study-return-video':

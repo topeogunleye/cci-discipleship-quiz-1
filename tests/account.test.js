@@ -406,7 +406,7 @@ test('cloud progress sync aborts before calling writeProgress when snapshot exce
 });
 
 
-test('account service exposes playback ticket from session response and clears on sign out', async () => {
+test('account service issues in-memory playback tickets per lesson and clears them on sign out', async () => {
   let change, session = null;
   const token = 'header.payload.signature-test-token';
   const Supabase = { createClient: () => ({ auth: {
@@ -415,19 +415,22 @@ test('account service exposes playback ticket from session response and clears o
     async signInWithPassword() { session = { access_token: token, user: { id: 'user-ticket', email: 'learner@example.com' } }; change('SIGNED_IN', session); return { data: { session, user: session.user } }; },
     async signOut() { session = null; change('SIGNED_OUT', null); return {}; }
   } }) };
-  const fetch = async url => {
+  const fetch = async (url, options) => {
     if (url.endsWith('/api/auth/config')) return new Response(JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }));
-    return new Response(JSON.stringify({ ok: true, ticket: 'signed-ticket-abc-123' }), { status: 200 });
+    const body = JSON.parse(options.body);
+    if (body.videoId) return new Response(JSON.stringify({ ok: true, ticket: 'signed-ticket-abc-123', ticketExpiresAt: Math.floor(Date.now() / 1000) + 1200 }), { status: 200 });
+    return new Response(JSON.stringify({ ok: true, ticket: null }), { status: 200 });
   };
   const service = create({ apiBase: 'https://study.example', fetch, Supabase, localStorage: localStore() });
   await service.init();
-  assert.equal(service.playbackTicket(), '');
+  assert.equal(service.playbackTicket('section-01-born-again'), '');
   const signedIn = await service.signIn('learner@example.com', 'long-password');
   assert.equal(signedIn.user.id, 'user-ticket');
   assert.equal(signedIn.videoReady, true);
-  assert.equal(service.status().ticket, 'signed-ticket-abc-123');
-  assert.equal(service.playbackTicket(), 'signed-ticket-abc-123');
+  assert.equal(service.playbackTicket(), '', 'a session access token must never be exposed as a playback URL credential');
+  assert.equal(await service.preparePlaybackTicket('section-01-born-again'), 'signed-ticket-abc-123');
+  assert.equal(service.playbackTicket('section-01-born-again'), 'signed-ticket-abc-123');
+  assert.equal(service.playbackTicket('section-02-assurance'), '', 'tickets are scoped to one video');
   await service.signOut();
-  assert.equal(service.status().ticket, null);
-  assert.equal(service.playbackTicket(), '');
+  assert.equal(service.playbackTicket('section-01-born-again'), '');
 });

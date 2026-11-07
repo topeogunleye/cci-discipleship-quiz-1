@@ -239,20 +239,22 @@ function base64UrlJson(obj) {
 async function ticketSigningKey(env) {
   const subtle = typeof crypto !== 'undefined' && crypto.subtle ? crypto.subtle : null;
   if (!subtle) return null;
-  const config = supabaseConfig(env);
-  const secret = (env && (env.VIDEO_TICKET_SECRET || env.SUPABASE_JWT_SECRET)) || (config && config.anonKey) || 'cci-video-ticket-secret';
+  const secret = env && typeof env.VIDEO_TICKET_SECRET === 'string' ? env.VIDEO_TICKET_SECRET : '';
   const encoder = new TextEncoder();
+  if (encoder.encode(secret).byteLength < 32) return null;
   return subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 }
 
-async function createPlaybackTicket(userId, objectKey, lifetimeSeconds, env) {
-  if (!isUserId(userId) || typeof objectKey !== 'string') return null;
+async function createPlaybackTicket(userId, videoId, lifetimeSeconds, env) {
+  if (!isUserId(userId) || typeof videoId !== 'string' || !/^[A-Za-z0-9._-]{1,120}$/.test(videoId)) return null;
   const subtle = typeof crypto !== 'undefined' && crypto.subtle ? crypto.subtle : null;
   if (!subtle) return null;
   const now = Math.floor(Date.now() / 1000);
-  const exp = now + (Number.isFinite(lifetimeSeconds) && lifetimeSeconds < 0 ? Math.floor(lifetimeSeconds) : Math.max(60, Math.min(7200, Math.floor(lifetimeSeconds || 3600))));
+  const requestedLifetime = Number.isFinite(lifetimeSeconds) ? Math.floor(lifetimeSeconds) : 3600;
+  if (requestedLifetime <= 0) return null;
+  const exp = now + Math.min(3600, requestedLifetime);
   const header = { alg: 'HS256', typ: 'TICKET' };
-  const claims = { sub: userId, key: objectKey, exp: exp, typ: 'ticket' };
+  const claims = { iss: 'cci-study', aud: 'cci-study-video', sub: userId, key: videoId, iat: now, nbf: now, exp: exp, typ: 'ticket' };
   const signingInput = base64UrlJson(header) + '.' + base64UrlJson(claims);
   const key = await ticketSigningKey(env);
   if (!key) return null;
@@ -266,15 +268,15 @@ function isPlaybackTicket(token) {
   return !!(decoded && decoded.header && decoded.header.alg === 'HS256' && decoded.header.typ === 'TICKET');
 }
 
-async function verifyPlaybackTicket(ticket, requestedObjectKey, env) {
+async function verifyPlaybackTicket(ticket, requestedVideoId, env) {
   if (typeof ticket !== 'string' || ticket.length < 20 || ticket.length > 8192) return null;
   const decoded = decodeJwt(ticket);
   if (!decoded || !decoded.header || decoded.header.alg !== 'HS256' || decoded.header.typ !== 'TICKET') return null;
   const claims = decoded.claims;
-  if (!claims || claims.typ !== 'ticket' || !isUserId(claims.sub)) return null;
-  if (typeof claims.key === 'string' && claims.key !== '*' && claims.key !== requestedObjectKey) return null;
+  if (!claims || claims.typ !== 'ticket' || claims.iss !== 'cci-study' || claims.aud !== 'cci-study-video' || !isUserId(claims.sub)) return null;
+  if (typeof requestedVideoId !== 'string' || !/^[A-Za-z0-9._-]{1,120}$/.test(requestedVideoId) || claims.key !== requestedVideoId) return null;
   const now = Math.floor(Date.now() / 1000);
-  if (!Number.isFinite(claims.exp) || claims.exp <= now) return null;
+  if (!Number.isFinite(claims.iat) || claims.iat > now + 30 || !Number.isFinite(claims.nbf) || claims.nbf > now + 30 || !Number.isFinite(claims.exp) || claims.exp <= now || claims.exp <= claims.iat || claims.exp - claims.iat > 3600) return null;
   try {
     const subtle = typeof crypto !== 'undefined' && crypto.subtle ? crypto.subtle : null;
     if (!subtle) return null;
@@ -289,7 +291,7 @@ function videoToken(request) {
   if (typeof request.url === 'string') {
     try {
       const url = new URL(request.url);
-      const queryToken = url.searchParams.get('token') || url.searchParams.get('ticket');
+      const queryToken = url.searchParams.get('ticket');
       if (queryToken && typeof queryToken === 'string' && queryToken.length >= 20 && queryToken.length <= 8192) {
         return queryToken.trim();
       }
