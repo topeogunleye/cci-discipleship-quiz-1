@@ -778,4 +778,38 @@ test('hybrid video study scopes questions to active video and preserves Section 
   t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 0 });
   t.render();
   assert.match(elements.app.innerHTML, /Video practice questions in preparation · Chapter quiz available on the final lesson/);
+
+  // Dynamic question count dropdown filtering
+  // Case A: 27 questions (reproduces user scenario: 30 option must not be shown)
+  const cards27 = [];
+  for (let i = 1; i <= 27; i++) {
+    cards27.push({ id: 'c' + i, question: 'Q' + i, ref: 'Part One' });
+  }
+  testDeck.cards = cards27;
+  t.setup('quiz', 'd-test', v1.id);
+  assert.match(elements.modal.innerHTML, /<option value="0">All cards \(27\)<\/option>/);
+  assert.match(elements.modal.innerHTML, /<option value="10">10<\/option>/);
+  assert.match(elements.modal.innerHTML, /<option value="20">20<\/option>/);
+  assert.doesNotMatch(elements.modal.innerHTML, /<option value="30">30<\/option>/);
+  assert.doesNotMatch(elements.modal.innerHTML, /<option value="50">50<\/option>/);
+
+  // Case B: 8 questions (small count: offers 5, omits 10/20/30)
+  testDeck.cards = cards27.slice(0, 8);
+  t.setup('quiz', 'd-test', v1.id);
+  assert.match(elements.modal.innerHTML, /<option value="0">All cards \(8\)<\/option>/);
+  assert.match(elements.modal.innerHTML, /<option value="5">5<\/option>/);
+  assert.doesNotMatch(elements.modal.innerHTML, /<option value="10">10<\/option>/);
+
+  // Case C: Chapter quiz with 75 cards (shows 10, 20, 30, 50, but not 100)
+  const cards75 = [];
+  for (let i = 1; i <= 75; i++) {
+    cards75.push({ id: 'ch' + i, question: 'Q' + i, ref: 'Part One' });
+  }
+  testDeck.cards = cards75;
+  t.setup('quiz', 'd-test');
+  assert.match(elements.modal.innerHTML, /<option value="0">All cards \(75\)<\/option>/);
+  assert.match(elements.modal.innerHTML, /<option value="10">10<\/option>/);
+  assert.match(elements.modal.innerHTML, /<option value="20">20<\/option>/);
+  assert.match(elements.modal.innerHTML, /<option value="30">30<\/option>/);
+  assert.match(elements.modal.innerHTML, /<option value="50">50<\/option>/);
 });
