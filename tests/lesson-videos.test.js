@@ -18,9 +18,9 @@ const source = fs.readFileSync(path.join(root, 'functions/api/videos.js'), 'utf8
   .replace(/export async function /g, 'async function ')
   .replace(/export const __test = /, 'const __test = ');
 
-function loadHandlers(fetcher) {
+function loadHandlers(fetcher, mockCaches) {
   return vm.runInNewContext(source + '\n({ onRequest, onRequestOptions, __test })', {
-    require: request => request === '../_lib/auth.cjs' ? require('../functions/_lib/auth.cjs') : (request === '../_lib/video-catalog.cjs' ? videoCatalog : require(request)), URL, Request, Response, Headers, fetch: fetcher
+    require: request => request === '../_lib/auth.cjs' ? require('../functions/_lib/auth.cjs') : (request === '../_lib/video-catalog.cjs' ? videoCatalog : require(request)), URL, Request, Response, Headers, caches: mockCaches || undefined, fetch: fetcher
   });
 }
 
@@ -496,3 +496,105 @@ test('lesson video study modal launches overlay without unmounting player, pause
   assert.match(elements.modal.innerHTML, /Resume saved flashcards/);
 });
 
+
+test('authenticated video byte ranges are served from Cloudflare edge cache without reading R2', async () => {
+  const cachedEntries = new Map();
+  const mockCaches = {
+    default: {
+      match: async req => {
+        const url = req.url || (typeof req === 'string' ? req : '');
+        return cachedEntries.get(url) || null;
+      },
+      put: async (req, res) => {
+        const url = req.url || (typeof req === 'string' ? req : '');
+        cachedEntries.set(url, res);
+      }
+    }
+  };
+
+  let r2Gets = 0;
+  let r2Heads = 0;
+  const bucket = {
+    get: async (key, options) => {
+      r2Gets++;
+      return {
+        size: 100,
+        httpEtag: 'video-etag-1',
+        range: { offset: 10, length: 20 },
+        body: new Response('01234567890123456789').body
+      };
+    },
+    head: async key => {
+      r2Heads++;
+      return { size: 100, httpEtag: 'video-etag-1' };
+    }
+  };
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ id: '123e4567-e89b-12d3-a456-426614174000' }), { status: 200 });
+  const handlers = loadHandlers(
+    globalThis.fetch,
+    mockCaches
+  );
+
+  const catalogKey = catalogData.videos[0].objectKey;
+  const catalogUrl = 'https://study.example/api/videos?key=' + encodeURIComponent(catalogKey);
+  const authHeaders = {
+    Cookie: '__Host-cci-video-session=header.payload.signature',
+    Range: 'bytes=10-29',
+    Origin: 'https://study.example'
+  };
+
+  // First request: Cache miss -> Reads R2 and stores chunk in cache
+  const first = await handlers.onRequest({
+    request: new Request(catalogUrl, { headers: authHeaders }),
+    env: environment(bucket)
+  });
+  assert.equal(first.status, 206);
+  assert.equal(first.headers.get('content-range'), 'bytes 10-29/100');
+  assert.equal(first.headers.get('cache-control'), 'private, no-store');
+  assert.equal(first.headers.get('access-control-allow-origin'), 'https://study.example');
+  assert.equal(await first.text(), '01234567890123456789');
+  assert.equal(r2Gets, 1);
+  assert.ok(cachedEntries.size >= 1, 'response must be placed in edge cache');
+
+  // Second request: Cache hit -> Served from edge cache, R2 is NOT contacted!
+  const second = await handlers.onRequest({
+    request: new Request(catalogUrl, { headers: authHeaders }),
+    env: environment(bucket)
+  });
+  assert.equal(second.status, 206);
+  assert.equal(second.headers.get('content-range'), 'bytes 10-29/100');
+  assert.equal(second.headers.get('cache-control'), 'private, no-store');
+  assert.equal(await second.text(), '01234567890123456789');
+  assert.equal(r2Gets, 1, 'subsequent range request must NOT call R2 get');
+
+  // HEAD request: First call caches metadata, second call uses cache
+  const firstHead = await handlers.onRequest({
+    request: new Request(catalogUrl, { method: 'HEAD', headers: authHeaders }),
+    env: environment(bucket)
+  });
+  assert.equal(firstHead.status, 200);
+  assert.equal(firstHead.headers.get('content-length'), '100');
+  assert.equal(r2Heads, 1);
+
+  const secondHead = await handlers.onRequest({
+    request: new Request(catalogUrl, { method: 'HEAD', headers: authHeaders }),
+    env: environment(bucket)
+  });
+  assert.equal(secondHead.status, 200);
+  assert.equal(secondHead.headers.get('content-length'), '100');
+  assert.equal(r2Heads, 1, 'subsequent HEAD request must NOT call R2 head');
+
+  // Unauthenticated request: Must fail with 401 and NOT return cached media
+  try {
+    const unauth = await handlers.onRequest({
+      request: new Request(catalogUrl, { headers: { Range: 'bytes=10-29' } }),
+      env: environment(bucket)
+    });
+    assert.equal(unauth.status, 401);
+    assert.equal(r2Gets, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
