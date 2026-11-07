@@ -11,3 +11,11 @@ namespace_id = "846209317"
   [ratelimits.simple]
   limit = 15
   period = 60
+
+[[durable_objects.bindings]]
+name = "ESV_DAILY_QUOTA"
+class_name = "EsvDailyQuota"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["EsvDailyQuota"]

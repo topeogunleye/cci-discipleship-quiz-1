@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v53';
+const CACHE_NAME = CACHE_PREFIX + 'v54';
 const CORE_FILES = [
   './',
   'offline.html',
@@ -79,6 +79,12 @@ self.addEventListener('fetch', event => {
   const esvPreviewPath = new URL('api/esv-passage', self.registration.scope).pathname;
   const apiBasePath = new URL('./api/', self.registration.scope).pathname;
   const transcriptPath = new URL('transcript/', self.registration.scope).pathname;
+  const rawTranscriptsPath = new URL('transcripts/', self.registration.scope).pathname;
+  if (url.pathname === rawTranscriptsPath.slice(0, -1) || url.pathname.startsWith(rawTranscriptsPath)) {
+    // Source transcripts are not public assets and must never enter an offline cache.
+    event.respondWith(fetch(request, { cache: 'no-store' }));
+    return;
+  }
   if (url.pathname === esvPreviewPath) {
     event.respondWith(fetch(request, { cache: 'no-store' }).catch(() => new Response(
       JSON.stringify({ error: 'The ESV passage service is temporarily unavailable.' }),
