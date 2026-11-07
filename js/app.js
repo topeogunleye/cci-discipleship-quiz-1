@@ -153,7 +153,14 @@
       biblePreviewRequest = null;
     }
     current.wrapper.classList.remove('is-open', 'is-pinned');
+    current.preview.classList.remove('is-open');
     current.link.setAttribute('aria-expanded', 'false');
+    if (current.originalParent && current.link.isConnected && current.wrapper.contains(current.link)) {
+      if (current.originalNextSibling && current.originalNextSibling.parentNode === current.originalParent) current.originalParent.insertBefore(current.preview, current.originalNextSibling);
+      else current.originalParent.appendChild(current.preview);
+    } else if (current.preview.parentNode) {
+      current.preview.parentNode.removeChild(current.preview);
+    }
     activeBiblePreview = null;
     if (restoreFocus && current.link.isConnected) {
       suppressBiblePreviewFocus = current.link;
@@ -161,6 +168,9 @@
       window.setTimeout(function () { if (suppressBiblePreviewFocus === current.link) suppressBiblePreviewFocus = null; }, 0);
     }
     return true;
+  }
+  function isWithinActiveBiblePreview(target) {
+    return !!(activeBiblePreview && target && (activeBiblePreview.wrapper.contains(target) || activeBiblePreview.preview.contains(target)));
   }
   function repositionActiveBiblePreview() {
     if (!activeBiblePreview) return;
@@ -178,9 +188,18 @@
     if (activeBiblePreview && activeBiblePreview.link === link) {
       if (pinned) { activeBiblePreview.pinned = true; wrapper.classList.add('is-pinned'); }
     } else {
-      activeBiblePreview = { link: link, wrapper: wrapper, preview: preview, pinned: !!pinned };
+      activeBiblePreview = {
+        link: link,
+        wrapper: wrapper,
+        preview: preview,
+        originalParent: preview.parentNode,
+        originalNextSibling: preview.nextSibling,
+        pinned: !!pinned
+      };
+      document.body.appendChild(preview);
     }
     wrapper.classList.add('is-open');
+    preview.classList.add('is-open');
     if (pinned) wrapper.classList.add('is-pinned');
     link.setAttribute('aria-expanded', 'true');
     positionBiblePreview(link, preview);
@@ -192,7 +211,7 @@
     biblePreviewCloseTimer = window.setTimeout(function () {
       biblePreviewCloseTimer = null;
       if (!activeBiblePreview || activeBiblePreview.pinned) return;
-      if (activeBiblePreview.wrapper.contains(document.activeElement)) return;
+      if (isWithinActiveBiblePreview(document.activeElement)) return;
       closeBiblePreview(false);
     }, 180);
   }
@@ -1015,6 +1034,7 @@
   var toastT; function toast(m) { toastEl.textContent = m; toastEl.className = 'show'; clearTimeout(toastT); toastT = setTimeout(function () { toastEl.className = ''; }, 3200); }
   function openModal(html, options) {
     options = options || {};
+    closeBiblePreview(false);
     if (!options.preserveReturnFocus) returnFocus = document.activeElement;
     modal.innerHTML = html;
     var rocketEl = document.querySelector('.rocket-container');
@@ -1073,6 +1093,7 @@
   }
   function ask(msg, label, fn) { pendingAsk = fn; openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><h2 id="dialog-title" class="dialog-title">Please confirm</h2><p>' + esc(msg) + '</p><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn danger" data-act="askok">' + esc(label) + '</button></div></div>'); }
   function closeModal() {
+    closeBiblePreview(false);
     modal.innerHTML = ''; pendingAsk = null;
     var rocketEl = document.querySelector('.rocket-container');
     if (rocketEl) rocketEl.style.display = '';
@@ -3410,7 +3431,7 @@
     var target = e.target && e.target.closest ? e.target : null;
     if (!target) return;
     var wrapper = target.closest('.bible-reference-wrap');
-    if (activeBiblePreview && wrapper === activeBiblePreview.wrapper && biblePreviewCloseTimer) {
+    if (activeBiblePreview && (wrapper === activeBiblePreview.wrapper || activeBiblePreview.preview.contains(target)) && biblePreviewCloseTimer) {
       window.clearTimeout(biblePreviewCloseTimer); biblePreviewCloseTimer = null;
     }
     var link = target.closest('.bible-reference-link');
@@ -3420,7 +3441,7 @@
     var target = e.target && e.target.closest ? e.target : null;
     if (!target || !activeBiblePreview) return;
     var wrapper = target.closest('.bible-reference-wrap');
-    if (wrapper !== activeBiblePreview.wrapper || (e.relatedTarget && wrapper.contains(e.relatedTarget))) return;
+    if ((wrapper !== activeBiblePreview.wrapper && !activeBiblePreview.preview.contains(target)) || isWithinActiveBiblePreview(e.relatedTarget)) return;
     scheduleBiblePreviewClose();
   });
   document.addEventListener('focusin', function (e) {
@@ -3428,7 +3449,7 @@
     if (!target) return;
     if (target === suppressBiblePreviewFocus) { suppressBiblePreviewFocus = null; return; }
     var wrapper = target.closest('.bible-reference-wrap');
-    if (activeBiblePreview && wrapper === activeBiblePreview.wrapper && biblePreviewCloseTimer) {
+    if (activeBiblePreview && (wrapper === activeBiblePreview.wrapper || activeBiblePreview.preview.contains(target)) && biblePreviewCloseTimer) {
       window.clearTimeout(biblePreviewCloseTimer); biblePreviewCloseTimer = null;
     }
     var link = target.closest('.bible-reference-link');
@@ -3438,11 +3459,11 @@
     var target = e.target && e.target.closest ? e.target : null;
     if (!target || !activeBiblePreview) return;
     var wrapper = target.closest('.bible-reference-wrap');
-    if (wrapper !== activeBiblePreview.wrapper || (e.relatedTarget && wrapper.contains(e.relatedTarget))) return;
+    if ((wrapper !== activeBiblePreview.wrapper && !activeBiblePreview.preview.contains(target)) || isWithinActiveBiblePreview(e.relatedTarget)) return;
     scheduleBiblePreviewClose();
   });
   document.addEventListener('pointerdown', function (e) {
-    if (activeBiblePreview && !activeBiblePreview.wrapper.contains(e.target)) closeBiblePreview(false);
+    if (activeBiblePreview && !isWithinActiveBiblePreview(e.target)) closeBiblePreview(false);
   });
   function setQuizFeedbackExpanded(control, expanded) {
     if (!control) return;
@@ -3502,7 +3523,17 @@
   document.addEventListener('click', function (e) {
     var flipSurface = e.target.closest('[data-flip-surface]');
     if (flipSurface && !e.target.closest('a, button, input, select, textarea, [contenteditable="true"]')) {
-      V.flipped = false; saveActiveSession(); render(true); return;
+      if (V.videoStudy) {
+        V.videoStudy.flipped = false;
+        S.pausedSession = MobileStudy.snapshot(V.videoStudy);
+        save();
+        renderVideoStudyModal();
+      } else {
+        V.flipped = false;
+        saveActiveSession();
+        render(true);
+      }
+      return;
     }
     var t = e.target.closest('[data-act]'); if (!t) return;
     if (quizFeedbackIgnoreClick && t.matches('.quiz-feedback-resize-control')) { quizFeedbackIgnoreClick = false; e.preventDefault(); return; }
@@ -4048,7 +4079,7 @@
   }, true);
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && activeBiblePreview) {
-      e.preventDefault(); closeBiblePreview(activeBiblePreview.wrapper.contains(document.activeElement)); return;
+      e.preventDefault(); closeBiblePreview(isWithinActiveBiblePreview(document.activeElement)); return;
     }
     var feedbackResizeControl = e.target && e.target.closest ? e.target.closest('.quiz-feedback-resize-control') : null;
     if (feedbackResizeControl && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {

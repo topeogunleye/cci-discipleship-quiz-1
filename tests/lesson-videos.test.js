@@ -247,7 +247,27 @@ test('lesson video study modal launches overlay without unmounting player, pause
   assert.match(styleSource, /.video-study-header/);
   assert.match(styleSource, /.video-study-close-btn/);
   assert.match(styleSource, /.video-study-body/);
+  assert.match(styleSource, /\.bible-reference-preview\.is-open\s*\{/);
+  assert.match(styleSource, /\.bible-reference-preview\s*\{[^}]*z-index:\s*2200/s);
+  const videoModalStart = styleSource.indexOf('/* ---------- Video Lesson In-Page Study Modal ---------- */');
+  const desktopModalStart = styleSource.indexOf('@media (min-width: 768px)', videoModalStart);
+  const desktopModalStyles = styleSource.slice(desktopModalStart, styleSource.indexOf('.video-study-header', desktopModalStart));
+  assert.doesNotMatch(desktopModalStyles, /transform:\s*translate\(-50%/);
 
+  const body = {
+    appendChild(node) {
+      if (node.parentNode && node.parentNode.children) node.parentNode.children = node.parentNode.children.filter(child => child !== node);
+      this.children.push(node);
+      node.parentNode = this;
+      return node;
+    },
+    removeChild(node) {
+      this.children = this.children.filter(child => child !== node);
+      node.parentNode = null;
+      return node;
+    },
+    children: []
+  };
   const elements = {
     app: { innerHTML: '', querySelector: () => null, querySelectorAll: () => [] },
     modal: { innerHTML: '', querySelector: () => null, querySelectorAll: () => [] },
@@ -259,12 +279,13 @@ test('lesson video study modal launches overlay without unmounting player, pause
   };
   let capturedEvents = {};
   const doc = {
+    body,
     getElementById: id => elements[id],
     querySelector: () => null,
     querySelectorAll: () => [],
-    addEventListener: (name, fn) => { capturedEvents[name] = fn; },
+    addEventListener: (name, fn) => { (capturedEvents[name] || (capturedEvents[name] = [])).push(fn); },
     activeElement: { focus() {} },
-    documentElement: { setAttribute() {}, removeAttribute() {} },
+    documentElement: { clientWidth: 390, setAttribute() {}, removeAttribute() {} },
     contains: () => true
   };
   const win = {
@@ -275,6 +296,9 @@ test('lesson video study modal launches overlay without unmounting player, pause
     StudyLogic: require('../js/study.js'),
     CCIAccount: { create: () => ({ init: () => Promise.resolve({ configured: false }) }) },
     location: { protocol: 'https:', origin: 'https://study.example', href: 'https://study.example/' },
+    innerHeight: 844,
+    setTimeout: () => 0,
+    clearTimeout: () => {},
     scrollTo: () => {},
     localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
     indexedDB: null
@@ -288,7 +312,10 @@ test('lesson video study modal launches overlay without unmounting player, pause
       setup: setup,
       start: start,
       closeVideoStudyModal: closeVideoStudyModal,
-      stepVideoStudy: stepVideoStudy
+      stepVideoStudy: stepVideoStudy,
+      renderVideoStudyModal: renderVideoStudyModal,
+      openBiblePreview: openBiblePreview,
+      closeBiblePreview: closeBiblePreview
     };
   `);
   vm.runInNewContext(testWrapper, {
@@ -298,6 +325,8 @@ test('lesson video study modal launches overlay without unmounting player, pause
     Request,
     Response,
     Headers,
+    AbortController,
+    fetch: () => new Promise(() => {}),
     setTimeout: () => {},
     clearTimeout: () => {}
   });
@@ -322,6 +351,80 @@ test('lesson video study modal launches overlay without unmounting player, pause
   assert.equal(t.getV().name, 'lesson-video', 'V.name must remain lesson-video');
   assert.ok(t.getV().videoStudy, 'videoStudy session must be active');
   assert.match(elements.modal.innerHTML, /video-study-modal/);
+
+  // Clicking the answer-side surface in the modal returns to the question and persists that state.
+  t.getV().videoStudy.flipped = true;
+  t.getS().pausedSession = require('../js/mobile-study.js').snapshot(t.getV().videoStudy);
+  t.renderVideoStudyModal();
+  assert.match(elements.modal.innerHTML, /flash-card-back/);
+  const flipSurfaceClick = capturedEvents.click.find(handler => handler.toString().includes("closest('[data-flip-surface]')"));
+  assert.ok(flipSurfaceClick, 'global flip-surface click handler should be registered');
+  const flipSurface = {};
+  flipSurfaceClick({ target: { closest: selector => selector === '[data-flip-surface]' ? flipSurface : null } });
+  assert.equal(t.getV().videoStudy.flipped, false);
+  assert.equal(t.getS().pausedSession.flipped, false);
+  assert.match(elements.modal.innerHTML, /class="flip" data-act="flip"/);
+
+  // The explicit answer-side cue and keyboard activation also toggle in both directions.
+  const modalClickHandler = flipSurfaceClick;
+  const flipButton = { dataset: { act: 'flip' }, matches: () => false };
+  modalClickHandler({ target: { closest: selector => selector === '[data-act]' ? flipButton : null } });
+  assert.equal(t.getV().videoStudy.flipped, true, 'answer-side flip cue should return to the answer');
+  const flashKeydownHandler = capturedEvents.keydown.find(handler => handler.toString().includes('button.flip-cue-button') && handler.toString().includes('V.videoStudy.flipped'));
+  assert.ok(flashKeydownHandler, 'flashcard keyboard handler should be registered');
+  const keyboardFlipTarget = { tagName: 'BUTTON', closest: selector => selector.includes('button.flip-cue-button') ? {} : null };
+  let defaultPrevented = false;
+  flashKeydownHandler({ key: ' ', target: keyboardFlipTarget, preventDefault() { defaultPrevented = true; } });
+  assert.equal(defaultPrevented, true);
+  assert.equal(t.getV().videoStudy.flipped, false, 'Space should flip the answer back to the question');
+  flashKeydownHandler({ key: 'Enter', target: keyboardFlipTarget, preventDefault() {} });
+  assert.equal(t.getV().videoStudy.flipped, true, 'Enter should flip the question to the answer');
+  t.getV().videoStudy.flipped = false;
+  t.getS().pausedSession = require('../js/mobile-study.js').snapshot(t.getV().videoStudy);
+  t.renderVideoStudyModal();
+
+  // Bible previews are moved outside the modal clipping/transform context while open, then restored.
+  const previewClasses = new Set();
+  const wrapperClasses = new Set();
+  const wrapper = {
+    children: [],
+    classList: { add: name => wrapperClasses.add(name), remove: name => wrapperClasses.delete(name) },
+    contains: node => node === link,
+    appendChild(node) {
+      if (node.parentNode && node.parentNode.children) node.parentNode.children = node.parentNode.children.filter(child => child !== node);
+      this.children.push(node); node.parentNode = this; return node;
+    },
+    insertBefore(node, sibling) { this.children.splice(this.children.indexOf(sibling), 0, node); node.parentNode = this; return node; }
+  };
+  const link = {
+    isConnected: true,
+    textContent: 'Romans 8:33–34',
+    attrs: { 'aria-controls': 'bible-reference-preview-test' },
+    closest: selector => selector === '.bible-reference-wrap' ? wrapper : null,
+    getAttribute: name => link.attrs[name],
+    setAttribute: (name, value) => { link.attrs[name] = value; },
+    getBoundingClientRect: () => ({ left: 350, right: 380, top: 100, bottom: 120, width: 30, height: 20 })
+  };
+  const previewParts = { '.bible-preview-text': { textContent: '', hidden: true }, '.bible-preview-fallback': { textContent: '', hidden: false } };
+  const preview = {
+    parentNode: wrapper,
+    nextSibling: null,
+    classList: { add: name => previewClasses.add(name), remove: name => previewClasses.delete(name) },
+    style: {},
+    contains: node => node === preview,
+    getBoundingClientRect: () => ({ left: 0, top: 0, right: 300, bottom: 180, width: 300, height: 180 }),
+    querySelector: selector => previewParts[selector]
+  };
+  wrapper.children.push(preview);
+  elements['bible-reference-preview-test'] = preview;
+  t.openBiblePreview(link, true);
+  assert.equal(preview.parentNode, body, 'open preview should be portaled to document.body');
+  assert.ok(previewClasses.has('is-open'));
+  assert.equal(link.attrs['aria-expanded'], 'true');
+  t.closeBiblePreview(false);
+  assert.equal(preview.parentNode, wrapper, 'closed preview should return to its citation wrapper');
+  assert.ok(!previewClasses.has('is-open'));
+  assert.equal(link.attrs['aria-expanded'], 'false');
 
   // Advance card
   t.stepVideoStudy(1);
