@@ -164,7 +164,11 @@ test('catalog maps all uploaded objects to manifest decks without publishing med
   const catalog = JSON.parse(fs.readFileSync(path.join(root, 'content/lesson-videos.json'), 'utf8'));
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'decks/manifest.json'), 'utf8'));
   const titles = new Set(manifest.map(file => fs.readFileSync(path.join(root, 'decks', file), 'utf8').match(/^DECK:\s*(.+)$/m)?.[1]).filter(Boolean));
-  const deckIds = new Set([...titles].map(title => 'd-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')));
+  const deckIds = new Set([...titles].flatMap(title => {
+    const raw = 'd-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const slugged = 'd-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+    return [raw, slugged];
+  }));
   assert.equal(catalog.videos.length, 109);
   assert.equal(new Set(catalog.videos.map(item => item.id)).size, 109);
   for (const item of catalog.videos) {
@@ -276,6 +280,8 @@ test('lesson video view clearly communicates chapter study scope and card counts
   assert.match(appSource, /aria-label="Study Chapter ' \+ section \+ ' \(/);
   assert.match(appSource, /reinforce Chapter ' \+ section \+ ' \(/);
   assert.match(appSource, /scopeNote = '<p class="note" style="margin-top:4px;margin-bottom:var\(--space-md\);">' \+/);
+  assert.match(appSource, /Video Flashcards \(' \+ videoCards\.length \+ '\)/);
+  assert.match(appSource, /Video Quiz \(' \+ videoCards\.length \+ '\)/);
 });
 
 test('lesson video study modal launches overlay without unmounting player, pauses video, and auto-saves progress', () => {
@@ -644,4 +650,100 @@ test('video endpoint accepts a catalog-scoped playback ticket and rejects access
     env
   });
   assert.equal(tokenQueryResponse.status, 401);
+});
+
+
+test('hybrid video study scopes questions to active video and preserves Section 11 mappings', () => {
+  const appSource = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
+  const elements = {
+    app: { innerHTML: '', querySelector: () => null, querySelectorAll: () => [] },
+    modal: { innerHTML: '', querySelector: () => null, querySelectorAll: () => [] },
+    toast: { textContent: '', className: '' },
+    'lesson-video-player': { paused: false, currentTime: 25.0, pause() { this.paused = true; }, addEventListener() {}, removeEventListener() {}, getAttribute() { return ''; } },
+    's-unk': { checked: false },
+    's-shuf': { checked: false },
+    's-len': { value: '0' }
+  };
+  const doc = {
+    body: { appendChild: n => n, removeChild: n => n },
+    getElementById: id => elements[id],
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: () => {},
+    activeElement: { focus() {} },
+    documentElement: { clientWidth: 390, setAttribute() {}, removeAttribute() {} },
+    contains: () => true
+  };
+  const win = {
+    DeckParser: require('../js/parser.js'),
+    StudyStorage: require('../js/storage.js'),
+    CCITranscripts: require('../js/transcripts.js'),
+    MobileStudy: require('../js/mobile-study.js'),
+    StudyLogic: require('../js/study.js'),
+    CCIAccount: { create: () => ({ init: () => Promise.resolve({ configured: false }) }) },
+    location: { protocol: 'https:', origin: 'https://study.example', href: 'https://study.example/' },
+    innerHeight: 844,
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+    scrollTo: () => {},
+    localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+    indexedDB: null
+  };
+  const testWrapper = appSource.replace('  boot();', `
+    boot();
+    window._test = {
+      getV: () => V,
+      setV: val => { V = val; },
+      getS: () => S,
+      setup: setup,
+      start: start,
+      lessonVideosForDeck: lessonVideosForDeck,
+      cardsForVideo: cardsForVideo,
+      setLessonVideos: val => { LESSON_VIDEOS = val; }
+    };
+  `);
+  vm.runInNewContext(testWrapper, {
+    window: win,
+    document: doc,
+    URL,
+    Request,
+    Response,
+    Headers,
+    AbortController,
+    fetch: () => new Promise(() => {}),
+    setTimeout: () => {},
+    clearTimeout: () => {}
+  });
+  const t = win._test;
+
+  const catalog = JSON.parse(fs.readFileSync(path.join(root, 'content/lesson-videos.json'), 'utf8'));
+  t.setLessonVideos(catalog.videos);
+
+  // Verify Section 11 videos are found even with truncated slug
+  const sec11Videos = t.lessonVideosForDeck('d-discipleship-experience-section-11-believers-authority-chari');
+  assert.equal(sec11Videos.length, 15, 'Section 11 must return all 15 videos');
+
+  // Verify cardsForVideo matching
+  const testDeck = {
+    id: 'd-test',
+    cards: [
+      { id: 'c1', question: 'Q1', ref: 'DID JESUS RISE FROM THE DEAD. V — 01:19' },
+      { id: 'c2', question: 'Q2', ref: 'DID JESUS RISE FROM THE DEAD. IV — 05:20' },
+      { id: 'c3', question: 'Q3', ref: 'OTHER LESSON' }
+    ]
+  };
+  const video = { id: 'section-10-did-jesus-rise-from-the-dead-v', deckId: 'd-test', title: 'DID JESUS RISE FROM THE DEAD. V' };
+  t.setLessonVideos([...catalog.videos, video]);
+  const matched = t.cardsForVideo(testDeck, video);
+  assert.equal(matched.length, 1);
+  assert.equal(matched[0].id, 'c1');
+
+  // Verify scoped setup
+  t.getS().decks = [testDeck];
+  t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 0 });
+  t.setup('quiz', 'd-test', video.id);
+  assert.equal(t.getV().setup.videoId, video.id);
+  assert.equal(t.getV().setup.cards.length, 1);
+  assert.match(elements.modal.innerHTML, /Start video quiz/);
+  assert.match(elements.modal.innerHTML, /Video 1: DID JESUS RISE FROM THE DEAD\. V/);
 });

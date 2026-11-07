@@ -21,8 +21,17 @@ function replaceOnce(source, search, replacement) {
 }
 
 function normalizeTextFile(file) {
-  const content = fs.readFileSync(file, 'utf8').replace(/[ \t]+$/gm, '');
-  fs.writeFileSync(file, content);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const content = fs.readFileSync(file, 'utf8').replace(/[ \t]+$/gm, '');
+      fs.writeFileSync(file, content);
+      break;
+    } catch (e) {
+      if (attempt === 4) throw e;
+      const start = Date.now();
+      while (Date.now() - start < 150) {}
+    }
+  }
 }
 
 function normalizeTextFiles(directory) {
