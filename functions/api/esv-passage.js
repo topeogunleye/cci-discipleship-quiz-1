@@ -1,6 +1,5 @@
 const ESV_PASSAGE_TEXT_URL = 'https://api.esv.org/v3/passage/text/';
 const MAX_REFERENCE_LENGTH = 180;
-const CACHE_CONTROL_SUCCESS = 'public, max-age=604800, s-maxage=2592000, stale-while-revalidate=86400';
 
 function jsonResponse(body, status, customHeaders) {
   const headers = new Headers({
@@ -36,7 +35,7 @@ export function onRequestOptions() {
 }
 
 export async function onRequestGet(context) {
-  const { request, env, waitUntil } = context || {};
+  const { request, env } = context || {};
   const url = new URL(request.url);
   const reference = url.searchParams.get('q') || '';
   if (!reference || reference.length > MAX_REFERENCE_LENGTH || !/^[A-Za-z0-9][A-Za-z0-9 .,:;\u2013\u2014-]*$/.test(reference)) {
@@ -47,17 +46,6 @@ export async function onRequestGet(context) {
   }
 
   const canonicalRef = reference.trim().replace(/\s+/g, ' ');
-  const cacheKeyUrl = new URL(request.url);
-  cacheKeyUrl.searchParams.set('q', canonicalRef);
-  const cacheKey = new Request(cacheKeyUrl.toString(), { method: 'GET' });
-
-  const cache = typeof caches !== 'undefined' && caches && caches.default ? caches.default : null;
-  if (cache) {
-    try {
-      const cached = await cache.match(cacheKey);
-      if (cached) return cached;
-    } catch (cacheError) {}
-  }
 
   const apiUrl = new URL(ESV_PASSAGE_TEXT_URL);
   apiUrl.searchParams.set('q', canonicalRef);
@@ -82,16 +70,7 @@ export async function onRequestGet(context) {
       : '';
     if (!text) return jsonResponse({ error: 'The ESV passage could not be found.' }, 404);
 
-    const successResponse = jsonResponse({ text: text }, 200, { 'Cache-Control': CACHE_CONTROL_SUCCESS });
-    if (cache) {
-      try {
-        const storePromise = cache.put(cacheKey, successResponse.clone());
-        if (typeof waitUntil === 'function') waitUntil(storePromise);
-        else if (context && typeof context.waitUntil === 'function') context.waitUntil(storePromise);
-        else await storePromise;
-      } catch (putError) {}
-    }
-    return successResponse;
+    return jsonResponse({ text: text }, 200);
   } catch (error) {
     return jsonResponse({ error: 'The ESV passage service is temporarily unavailable.' }, 502);
   }

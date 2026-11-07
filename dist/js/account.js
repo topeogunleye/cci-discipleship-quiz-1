@@ -14,13 +14,14 @@
     var localStorage = Object.prototype.hasOwnProperty.call(options, 'localStorage') ? options.localStorage : (typeof window !== 'undefined' ? window.localStorage : null);
     var isNativeApp = typeof window !== 'undefined' && window.CciNative && window.CciNative.isNative;
     var apiBase = String(options.apiBase || (typeof window !== 'undefined' && window.CCI_API_BASE) || (typeof window !== 'undefined' && !isNativeApp && /^https?:$/.test(window.location.protocol) ? window.location.origin : DEFAULT_API_BASE)).replace(/\/$/, '');
-    var client = null, authSubscription = null, onChange = null, currentSession = null, configured = false, videoReady = false, videoReadyUserId = null, videoAccessError = '', currentTicket = null;
+    var client = null, authSubscription = null, onChange = null, currentSession = null, configured = false, videoReady = false, videoReadyUserId = null, videoAccessError = '';
+    var playbackTickets = Object.create(null), playbackTicketRequests = Object.create(null), playbackTicketErrors = Object.create(null), videoSessionVersion = 0;
     var cookieSync = Promise.resolve(), lastToken = null, lastUserId = null, cachedDeviceId = null, videoRetryTimer = null;
     var resumeHandler = null;
     var initializationState = 'idle', initializationError = '', initializationPromise = null, lifecycleId = 0;
 
     function status() {
-      return { configured: configured, user: currentSession && currentSession.user ? currentSession.user : null, session: currentSession, videoReady: videoReady, videoAccessError: videoAccessError, ticket: currentTicket, apiBase: apiBase, initializationState: initializationState, initializationError: initializationError };
+      return { configured: configured, user: currentSession && currentSession.user ? currentSession.user : null, session: currentSession, videoReady: videoReady, videoAccessError: videoAccessError, videoSessionVersion: videoSessionVersion, apiBase: apiBase, initializationState: initializationState, initializationError: initializationError };
     }
 
     function notify() {
@@ -67,10 +68,10 @@
           throw error;
         }
         return response.json().catch(function () { return null; }).then(function (data) {
-          currentTicket = token && data && data.ticket ? data.ticket : null;
           videoReady = !!token && !!currentSession && currentSession.access_token === token;
           videoReadyUserId = videoReady ? userId : null;
           videoAccessError = '';
+          if (videoReady) videoSessionVersion++;
           return videoReady;
         });
       }).catch(function (error) {
@@ -104,7 +105,11 @@
       var id = session && session.user && session.user.id || null;
       var token = session && session.access_token || null;
       var changed = id !== lastUserId || token !== lastToken;
-      if (!session) currentTicket = null;
+      if (changed) {
+        playbackTickets = Object.create(null);
+        playbackTicketRequests = Object.create(null);
+        playbackTicketErrors = Object.create(null);
+      }
       currentSession = session || null;
       lastUserId = id;
       if (!changed) { notify(); return; }
@@ -170,6 +175,7 @@
       }
       resumeHandler = null;
       authSubscription = null; client = null; currentSession = null; lastToken = null; lastUserId = null; configured = false; videoReady = false; videoReadyUserId = null; videoAccessError = '';
+      playbackTickets = Object.create(null); playbackTicketRequests = Object.create(null); playbackTicketErrors = Object.create(null);
     }
 
     function init(changeHandler) {
@@ -320,11 +326,48 @@
       initializationError = '';
     }
 
-    function playbackTicket() {
-      return currentTicket || (currentSession && currentSession.access_token) || '';
+    function playbackTicket(videoId) {
+      if (typeof videoId !== 'string') return '';
+      var entry = playbackTickets[videoId];
+      return entry && entry.expiresAt > Math.floor(Date.now() / 1000) + 60 ? entry.ticket : '';
     }
 
-    return { init: init, retry: retry, status: status, signUp: signUp, signIn: signIn, signOut: signOut, syncProgress: syncProgress, syncVideoSession: syncVideoSession, playbackTicket: playbackTicket, destroy: destroy, apiBase: apiBase };
+    function playbackTicketError(videoId) {
+      return typeof videoId === 'string' ? playbackTicketErrors[videoId] || '' : '';
+    }
+
+    function preparePlaybackTicket(videoId, force) {
+      if (typeof videoId !== 'string' || !/^[A-Za-z0-9._-]{1,120}$/.test(videoId) || !currentSession || !currentSession.access_token || !videoReady || !fetcher) return Promise.resolve(null);
+      var now = Math.floor(Date.now() / 1000), cached = playbackTickets[videoId];
+      if (!force && cached && cached.expiresAt > now + 60) return Promise.resolve(cached.ticket);
+      if (playbackTicketRequests[videoId]) return playbackTicketRequests[videoId];
+      var token = currentSession.access_token;
+      var request = fetcher(apiBase + '/api/auth/session', {
+        method: 'POST', credentials: 'include', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: token, videoId: videoId })
+      }).then(function (response) {
+        return response.json().catch(function () { return null; }).then(function (data) {
+          if (!response.ok || !data || typeof data.ticket !== 'string' || !data.ticket || !Number.isFinite(data.ticketExpiresAt)) {
+            throw new Error(data && typeof data.error === 'string' ? data.error : 'Secure video access could not be prepared.');
+          }
+          if (!currentSession || currentSession.access_token !== token) return null;
+          playbackTickets[videoId] = { ticket: data.ticket, expiresAt: data.ticketExpiresAt };
+          delete playbackTicketErrors[videoId];
+          return data.ticket;
+        });
+      }).catch(function (error) {
+        if (currentSession && currentSession.access_token === token) playbackTicketErrors[videoId] = authError(error);
+        return null;
+      }).then(function (ticket) {
+        if (playbackTicketRequests[videoId] === request) delete playbackTicketRequests[videoId];
+        return ticket;
+      });
+      playbackTicketRequests[videoId] = request;
+      return request;
+    }
+
+    return { init: init, retry: retry, status: status, signUp: signUp, signIn: signIn, signOut: signOut, syncProgress: syncProgress, syncVideoSession: syncVideoSession, playbackTicket: playbackTicket, playbackTicketError: playbackTicketError, preparePlaybackTicket: preparePlaybackTicket, destroy: destroy, apiBase: apiBase };
   }
 
   return { create: createAccount, DEFAULT_API_BASE: DEFAULT_API_BASE };

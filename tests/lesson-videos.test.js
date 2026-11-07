@@ -27,6 +27,7 @@ function loadHandlers(fetcher, mockCaches) {
 const environment = r2 => ({
   SUPABASE_URL: 'https://auth.example',
   SUPABASE_ANON_KEY: 'sb_publishable_test_key',
+  VIDEO_TICKET_SECRET: 'test-video-ticket-secret-at-least-32-bytes',
   VIDEO_AUTH_MODE: 'remote',
   LESSON_VIDEOS: r2
 });
@@ -497,18 +498,12 @@ test('lesson video study modal launches overlay without unmounting player, pause
 });
 
 
-test('authenticated video byte ranges are served from Cloudflare edge cache without reading R2', async () => {
-  const cachedEntries = new Map();
+test('authenticated video byte ranges stream from private R2 without using Cache API', async () => {
+  let cacheCalls = 0;
   const mockCaches = {
     default: {
-      match: async req => {
-        const url = req.url || (typeof req === 'string' ? req : '');
-        return cachedEntries.get(url) || null;
-      },
-      put: async (req, res) => {
-        const url = req.url || (typeof req === 'string' ? req : '');
-        cachedEntries.set(url, res);
-      }
+      match: async () => { cacheCalls++; return null; },
+      put: async () => { cacheCalls++; }
     }
   };
 
@@ -545,7 +540,7 @@ test('authenticated video byte ranges are served from Cloudflare edge cache with
     Origin: 'https://study.example'
   };
 
-  // First request: Cache miss -> Reads R2 and stores chunk in cache
+  // Each authorized range is served from the private R2 binding.
   const first = await handlers.onRequest({
     request: new Request(catalogUrl, { headers: authHeaders }),
     env: environment(bucket)
@@ -556,9 +551,9 @@ test('authenticated video byte ranges are served from Cloudflare edge cache with
   assert.equal(first.headers.get('access-control-allow-origin'), 'https://study.example');
   assert.equal(await first.text(), '01234567890123456789');
   assert.equal(r2Gets, 1);
-  assert.ok(cachedEntries.size >= 1, 'response must be placed in edge cache');
+  assert.equal(cacheCalls, 0, 'private media bytes and metadata must not be cached');
 
-  // Second request: Cache hit -> Served from edge cache, R2 is NOT contacted!
+  // A repeated range still reads R2; no unmeasured cache policy is assumed.
   const second = await handlers.onRequest({
     request: new Request(catalogUrl, { headers: authHeaders }),
     env: environment(bucket)
@@ -567,9 +562,9 @@ test('authenticated video byte ranges are served from Cloudflare edge cache with
   assert.equal(second.headers.get('content-range'), 'bytes 10-29/100');
   assert.equal(second.headers.get('cache-control'), 'private, no-store');
   assert.equal(await second.text(), '01234567890123456789');
-  assert.equal(r2Gets, 1, 'subsequent range request must NOT call R2 get');
+  assert.equal(r2Gets, 2, 'each authorized byte-range request reads the private object');
 
-  // HEAD request: First call caches metadata, second call uses cache
+  // HEAD requests read current object metadata from R2.
   const firstHead = await handlers.onRequest({
     request: new Request(catalogUrl, { method: 'HEAD', headers: authHeaders }),
     env: environment(bucket)
@@ -584,7 +579,7 @@ test('authenticated video byte ranges are served from Cloudflare edge cache with
   });
   assert.equal(secondHead.status, 200);
   assert.equal(secondHead.headers.get('content-length'), '100');
-  assert.equal(r2Heads, 1, 'subsequent HEAD request must NOT call R2 head');
+  assert.equal(r2Heads, 2, 'subsequent HEAD requests do not rely on stale cached metadata');
 
   // Unauthenticated request: Must fail with 401 and NOT return cached media
   try {
@@ -593,14 +588,15 @@ test('authenticated video byte ranges are served from Cloudflare edge cache with
       env: environment(bucket)
     });
     assert.equal(unauth.status, 401);
-    assert.equal(r2Gets, 1);
+    assert.equal(r2Gets, 2);
+    assert.equal(cacheCalls, 0);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
 
-test('video endpoint accepts scoped playback ticket via token or ticket query param', async () => {
+test('video endpoint accepts a catalog-scoped playback ticket and rejects access-token URLs', async () => {
   const auth = require('../functions/_lib/auth.cjs');
   const seen = [];
   const handlers = loadHandlers();
@@ -616,22 +612,11 @@ test('video endpoint accepts scoped playback ticket via token or ticket query pa
     ALLOWED_APP_ORIGINS: 'capacitor://localhost'
   };
   const validKey = catalogData.videos[0].objectKey;
-  const validTicket = await auth.createPlaybackTicket('123e4567-e89b-12d3-a456-426614174000', validKey, 3600, env);
-  const mismatchTicket = await auth.createPlaybackTicket('123e4567-e89b-12d3-a456-426614174000', 'other/video.mp4', 3600, env);
-  const expiredTicket = await auth.createPlaybackTicket('123e4567-e89b-12d3-a456-426614174000', validKey, -10, env);
+  const videoId = catalogData.videos[0].id;
+  const validTicket = await auth.createPlaybackTicket('123e4567-e89b-12d3-a456-426614174000', videoId, 3600, env);
+  const mismatchTicket = await auth.createPlaybackTicket('123e4567-e89b-12d3-a456-426614174000', 'other-video', 3600, env);
 
-  // 1. Success with ?token= and Range header, no cookies
-  const tokenResponse = await handlers.onRequest({
-    request: new Request('https://study.example/api/videos?key=' + encodeURIComponent(validKey) + '&token=' + encodeURIComponent(validTicket), {
-      headers: { Range: 'bytes=0-4', Origin: 'capacitor://localhost' }
-    }),
-    env
-  });
-  assert.equal(tokenResponse.status, 206);
-  assert.equal(await tokenResponse.text(), '01234');
-  assert.equal(tokenResponse.headers.get('access-control-allow-origin'), 'capacitor://localhost');
-
-  // 2. Success with ?ticket=
+  // 1. Success with a lesson-scoped ?ticket= and Range header, no cookies
   const ticketResponse = await handlers.onRequest({
     request: new Request('https://study.example/api/videos?key=' + encodeURIComponent(validKey) + '&ticket=' + encodeURIComponent(validTicket), {
       headers: { Range: 'bytes=0-4', Origin: 'capacitor://localhost' }
@@ -639,22 +624,24 @@ test('video endpoint accepts scoped playback ticket via token or ticket query pa
     env
   });
   assert.equal(ticketResponse.status, 206);
+  assert.equal(await ticketResponse.text(), '01234');
+  assert.equal(ticketResponse.headers.get('access-control-allow-origin'), 'capacitor://localhost');
 
-  // 3. Rejects mismatched object key in ticket
+  // A ticket for another catalog video is rejected.
   const mismatchResponse = await handlers.onRequest({
-    request: new Request('https://study.example/api/videos?key=' + encodeURIComponent(validKey) + '&token=' + encodeURIComponent(mismatchTicket), {
+    request: new Request('https://study.example/api/videos?key=' + encodeURIComponent(validKey) + '&ticket=' + encodeURIComponent(mismatchTicket), {
       headers: { Range: 'bytes=0-4', Origin: 'capacitor://localhost' }
     }),
     env
   });
   assert.equal(mismatchResponse.status, 401);
 
-  // 4. Rejects expired ticket
-  const expiredResponse = await handlers.onRequest({
-    request: new Request('https://study.example/api/videos?key=' + encodeURIComponent(validKey) + '&token=' + encodeURIComponent(expiredTicket), {
+  // Access tokens are never accepted from query strings.
+  const tokenQueryResponse = await handlers.onRequest({
+    request: new Request('https://study.example/api/videos?key=' + encodeURIComponent(validKey) + '&token=' + encodeURIComponent(validTicket), {
       headers: { Range: 'bytes=0-4', Origin: 'capacitor://localhost' }
     }),
     env
   });
-  assert.equal(expiredResponse.status, 401);
+  assert.equal(tokenQueryResponse.status, 401);
 });

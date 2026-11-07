@@ -321,15 +321,42 @@
   var WARN_SNAPSHOT_BYTES = 4194304;
 
   function payloadSize(snapshot) {
-    try {
-      var serialized = typeof snapshot === 'string' ? snapshot : JSON.stringify(snapshot);
-      if (typeof TextEncoder !== 'undefined') {
-        return new TextEncoder().encode(serialized).length;
-      }
-      return unescape(encodeURIComponent(serialized)).length;
-    } catch (e) {
-      return 0;
+    var serialized;
+    try { serialized = typeof snapshot === 'string' ? snapshot : JSON.stringify(snapshot); }
+    catch (e) {
+      var error = new Error('Progress snapshot could not be serialized for cloud sync.');
+      error.name = 'ProgressPayloadSerializationError';
+      throw error;
     }
+    if (typeof serialized !== 'string') {
+      var invalid = new Error('Progress snapshot could not be serialized for cloud sync.');
+      invalid.name = 'ProgressPayloadSerializationError';
+      throw invalid;
+    }
+
+    var bytes = typeof TextEncoder !== 'undefined'
+      ? new TextEncoder().encode(serialized).length
+      : unescape(encodeURIComponent(serialized)).length;
+
+    // PostgreSQL measures p_data::text after converting it to jsonb. Its
+    // canonical JSON output adds a space after each structural comma/colon;
+    // JSON.stringify omits those spaces. Count those separators outside
+    // strings so the client check uses a closer estimate of the server limit.
+    var separators = 0, inString = false, escaped = false;
+    for (var index = 0; index < serialized.length; index++) {
+      var character = serialized.charAt(index);
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (character === '\\') escaped = true;
+        else if (character === '"') inString = false;
+      } else if (character === '"') inString = true;
+      else if (character === ',' || character === ':') separators++;
+    }
+
+    // Keep a small additional margin for numeric normalization and RPC wrapper
+    // overhead. If serialization fails, fail closed instead of bypassing the
+    // payload guard with a zero-byte estimate.
+    return bytes + separators + 64;
   }
 
   function validateSnapshotSize(snapshot) {

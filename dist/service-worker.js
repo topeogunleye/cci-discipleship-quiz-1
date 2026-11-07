@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v52';
+const CACHE_NAME = CACHE_PREFIX + 'v53';
 const CORE_FILES = [
   './',
   'offline.html',
@@ -22,7 +22,6 @@ const CORE_FILES = [
   'js/transcripts.js',
   'js/app.js',
   'decks/manifest.json',
-  'decks/starter-decks.js',
   'content/devotionals.json',
   'content/lesson-videos.json',
   'content/lesson-transcripts.json'

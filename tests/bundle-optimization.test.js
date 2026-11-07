@@ -23,9 +23,10 @@ test('bundle optimization keeps dist/index.html under 800 KB and generates exter
   assert.match(starterDecksContent, /^window\.CCI_STARTER_DECKS = "DECK:/);
 });
 
-test('service worker precaches external starter decks for offline access', () => {
+test('service worker precaches canonical decks without downloading the duplicate starter bundle', () => {
   const sw = fs.readFileSync(path.join(root, 'service-worker.js'), 'utf8');
-  assert.match(sw, /'decks\/starter-decks\.js'/);
+  assert.doesNotMatch(sw, /'decks\/starter-decks\.js'/);
+  assert.match(sw, /'decks\/manifest\.json'/);
 });
 
 test('app dynamically loads starter-decks.js when in file: mode without embedded starter text', async () => {
