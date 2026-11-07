@@ -10486,13 +10486,13 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     var localStorage = Object.prototype.hasOwnProperty.call(options, 'localStorage') ? options.localStorage : (typeof window !== 'undefined' ? window.localStorage : null);
     var isNativeApp = typeof window !== 'undefined' && window.CciNative && window.CciNative.isNative;
     var apiBase = String(options.apiBase || (typeof window !== 'undefined' && window.CCI_API_BASE) || (typeof window !== 'undefined' && !isNativeApp && /^https?:$/.test(window.location.protocol) ? window.location.origin : DEFAULT_API_BASE)).replace(/\/$/, '');
-    var client = null, authSubscription = null, onChange = null, currentSession = null, configured = false, videoReady = false, videoReadyUserId = null, videoAccessError = '';
+    var client = null, authSubscription = null, onChange = null, currentSession = null, configured = false, videoReady = false, videoReadyUserId = null, videoAccessError = '', currentTicket = null;
     var cookieSync = Promise.resolve(), lastToken = null, lastUserId = null, cachedDeviceId = null, videoRetryTimer = null;
     var resumeHandler = null;
     var initializationState = 'idle', initializationError = '', initializationPromise = null, lifecycleId = 0;
 
     function status() {
-      return { configured: configured, user: currentSession && currentSession.user ? currentSession.user : null, session: currentSession, videoReady: videoReady, videoAccessError: videoAccessError, apiBase: apiBase, initializationState: initializationState, initializationError: initializationError };
+      return { configured: configured, user: currentSession && currentSession.user ? currentSession.user : null, session: currentSession, videoReady: videoReady, videoAccessError: videoAccessError, ticket: currentTicket, apiBase: apiBase, initializationState: initializationState, initializationError: initializationError };
     }
 
     function notify() {
@@ -10538,10 +10538,13 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
           if (Number.isFinite(retryAfter) && retryAfter > 0) error.retryAfter = Math.min(300, retryAfter);
           throw error;
         }
-        videoReady = !!token && !!currentSession && currentSession.access_token === token;
-        videoReadyUserId = videoReady ? userId : null;
-        videoAccessError = '';
-        return videoReady;
+        return response.json().catch(function () { return null; }).then(function (data) {
+          currentTicket = token && data && data.ticket ? data.ticket : null;
+          videoReady = !!token && !!currentSession && currentSession.access_token === token;
+          videoReadyUserId = videoReady ? userId : null;
+          videoAccessError = '';
+          return videoReady;
+        });
       }).catch(function (error) {
         if (token && currentSession && currentSession.access_token === token) {
           if (error && error.status === 401) {
@@ -10573,6 +10576,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       var id = session && session.user && session.user.id || null;
       var token = session && session.access_token || null;
       var changed = id !== lastUserId || token !== lastToken;
+      if (!session) currentTicket = null;
       currentSession = session || null;
       lastUserId = id;
       if (!changed) { notify(); return; }
@@ -10788,7 +10792,11 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       initializationError = '';
     }
 
-    return { init: init, retry: retry, status: status, signUp: signUp, signIn: signIn, signOut: signOut, syncProgress: syncProgress, syncVideoSession: syncVideoSession, destroy: destroy, apiBase: apiBase };
+    function playbackTicket() {
+      return currentTicket || (currentSession && currentSession.access_token) || '';
+    }
+
+    return { init: init, retry: retry, status: status, signUp: signUp, signIn: signIn, signOut: signOut, syncProgress: syncProgress, syncVideoSession: syncVideoSession, playbackTicket: playbackTicket, destroy: destroy, apiBase: apiBase };
   }
 
   return { create: createAccount, DEFAULT_API_BASE: DEFAULT_API_BASE };
@@ -13315,14 +13323,24 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       '</nav>'
       : '';
     var canWatchVideo = !!(accountStatus.user && accountStatus.videoReady);
+    var tokenParam = canWatchVideo && (account && typeof account.playbackTicket === 'function' ? account.playbackTicket() : (accountStatus.ticket || (accountStatus.session && accountStatus.session.access_token) || ''));
+    var isNative = typeof window !== 'undefined' && window.CciNative && window.CciNative.isNative;
+    var videoSourceUrl = video ? video.videoUrl : '';
+    var captionsSourceUrl = video ? video.captionsUrl : '';
+    var transcriptSourceUrl = video ? video.transcriptUrl : '';
+    if (tokenParam && isNative) {
+      if (videoSourceUrl) videoSourceUrl += (videoSourceUrl.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(tokenParam);
+      if (captionsSourceUrl) captionsSourceUrl += (captionsSourceUrl.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(tokenParam);
+      if (transcriptSourceUrl) transcriptSourceUrl += (transcriptSourceUrl.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(tokenParam);
+    }
     var player = video
       ? (canWatchVideo
-          ? '<video class="lesson-video-player" id="lesson-video-player" controls playsinline preload="metadata" crossorigin="use-credentials"' + (video.posterUrl ? ' poster="' + esc(video.posterUrl) + '"' : '') + ' aria-label="Video lesson: ' + esc(title) + '"><source src="' + esc(video.videoUrl) + '" type="video/mp4">' + (video.captionsUrl ? '<track kind="captions" src="' + esc(video.captionsUrl) + '" srclang="' + esc(video.captionsLanguage) + '" label="' + esc(video.captionsLabel) + '" default>' : '') + '<span>Your browser does not support video playback.</span></video>'
+          ? '<video class="lesson-video-player" id="lesson-video-player" controls playsinline preload="metadata" crossorigin="use-credentials"' + (video.posterUrl ? ' poster="' + esc(video.posterUrl) + '"' : '') + ' aria-label="Video lesson: ' + esc(title) + '"><source src="' + esc(videoSourceUrl) + '" type="video/mp4">' + (captionsSourceUrl ? '<track kind="captions" src="' + esc(captionsSourceUrl) + '" srclang="' + esc(video.captionsLanguage) + '" label="' + esc(video.captionsLabel) + '" default>' : '') + '<span>Your browser does not support video playback.</span></video>'
           : '<div class="lesson-video-unavailable lesson-video-auth-required" role="status"><strong>' + (accountStatus.user ? 'Preparing secure video access' : 'Sign in to watch this lesson') + '</strong><p>' + (accountStatus.user ? 'Your lesson files stay private. Video access is being prepared for your account.' : 'Create a free account or sign in to watch. You can continue studying locally without an account.') + '</p><button type="button" class="btn primary" data-act="nav-tab" data-tab="settings" data-return-video="' + esc(d.id) + '" data-return-video-index="' + index + '" data-return-video-asset-id="' + esc(video.id) + '">' + (accountStatus.user ? 'Account settings' : 'Sign in or create account') + '</button></div>')
       : '<div class="lesson-video-unavailable" role="status"><strong>Lesson video not available yet</strong><p>The ' + esc(parsed.topic) + ' video has not been added yet. Use Flashcards or Take quiz below.</p></div>';
-    var transcriptPanel = video && video.transcriptUrl
+    var transcriptPanel = video && transcriptSourceUrl
       ? (canWatchVideo
-          ? '<details class="lesson-transcript" data-video-id="' + esc(video.id) + '" data-transcript-url="' + esc(video.transcriptUrl) + '"><summary>Search transcript</summary><div class="lesson-transcript-body"><label for="lesson-transcript-search">Find a word or phrase</label><input id="lesson-transcript-search" type="search" autocomplete="off" aria-controls="lesson-transcript-cues"><p class="lesson-transcript-status" role="status" aria-live="polite">Open to load transcript segments.</p><ol class="lesson-transcript-cues" id="lesson-transcript-cues" hidden></ol></div></details>'
+          ? '<details class="lesson-transcript" data-video-id="' + esc(video.id) + '" data-transcript-url="' + esc(transcriptSourceUrl) + '"><summary>Search transcript</summary><div class="lesson-transcript-body"><label for="lesson-transcript-search">Find a word or phrase</label><input id="lesson-transcript-search" type="search" autocomplete="off" aria-controls="lesson-transcript-cues"><p class="lesson-transcript-status" role="status" aria-live="polite">Open to load transcript segments.</p><ol class="lesson-transcript-cues" id="lesson-transcript-cues" hidden></ol></div></details>'
           : '<p class="lesson-transcript-note">English captions and a searchable transcript are available after you sign in to watch.</p>')
       : (video && canWatchVideo ? '<p class="lesson-transcript-note">Captions and a searchable transcript are not available for this recording yet.</p>' : '');
     var videoNav = videos.length > 1

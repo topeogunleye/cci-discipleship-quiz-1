@@ -404,3 +404,30 @@ test('cloud progress sync aborts before calling writeProgress when snapshot exce
   );
   assert.equal(writeCalled, false, 'writeProgress RPC must NOT be called when payload exceeds 5 MB');
 });
+
+
+test('account service exposes playback ticket from session response and clears on sign out', async () => {
+  let change, session = null;
+  const token = 'header.payload.signature-test-token';
+  const Supabase = { createClient: () => ({ auth: {
+    onAuthStateChange(callback) { change = callback; return { data: { subscription: { unsubscribe() {} } } }; },
+    async getSession() { return { data: { session } }; },
+    async signInWithPassword() { session = { access_token: token, user: { id: 'user-ticket', email: 'learner@example.com' } }; change('SIGNED_IN', session); return { data: { session, user: session.user } }; },
+    async signOut() { session = null; change('SIGNED_OUT', null); return {}; }
+  } }) };
+  const fetch = async url => {
+    if (url.endsWith('/api/auth/config')) return new Response(JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }));
+    return new Response(JSON.stringify({ ok: true, ticket: 'signed-ticket-abc-123' }), { status: 200 });
+  };
+  const service = create({ apiBase: 'https://study.example', fetch, Supabase, localStorage: localStore() });
+  await service.init();
+  assert.equal(service.playbackTicket(), '');
+  const signedIn = await service.signIn('learner@example.com', 'long-password');
+  assert.equal(signedIn.user.id, 'user-ticket');
+  assert.equal(signedIn.videoReady, true);
+  assert.equal(service.status().ticket, 'signed-ticket-abc-123');
+  assert.equal(service.playbackTicket(), 'signed-ticket-abc-123');
+  await service.signOut();
+  assert.equal(service.status().ticket, null);
+  assert.equal(service.playbackTicket(), '');
+});

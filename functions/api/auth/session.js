@@ -40,5 +40,6 @@ export async function onRequestPost({ request, env }) {
   if (!Number.isFinite(expiresAt) || remainingLifetime <= 0) return auth.jsonResponse({ error: 'Sign in again to enable lesson video access.' }, 401, headers);
   const maxAge = Math.min(3600, remainingLifetime);
   headers.append('Set-Cookie', auth.videoCookie(token, maxAge));
-  return auth.jsonResponse({ ok: true, user: { id: user.id } }, 200, headers);
+  const ticket = await auth.createPlaybackTicket(user.id, body && body.key ? body.key : '*', maxAge, env);
+  return auth.jsonResponse({ ok: true, user: { id: user.id }, ticket: ticket }, 200, headers);
 }

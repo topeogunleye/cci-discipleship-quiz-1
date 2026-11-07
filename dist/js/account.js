@@ -14,13 +14,13 @@
     var localStorage = Object.prototype.hasOwnProperty.call(options, 'localStorage') ? options.localStorage : (typeof window !== 'undefined' ? window.localStorage : null);
     var isNativeApp = typeof window !== 'undefined' && window.CciNative && window.CciNative.isNative;
     var apiBase = String(options.apiBase || (typeof window !== 'undefined' && window.CCI_API_BASE) || (typeof window !== 'undefined' && !isNativeApp && /^https?:$/.test(window.location.protocol) ? window.location.origin : DEFAULT_API_BASE)).replace(/\/$/, '');
-    var client = null, authSubscription = null, onChange = null, currentSession = null, configured = false, videoReady = false, videoReadyUserId = null, videoAccessError = '';
+    var client = null, authSubscription = null, onChange = null, currentSession = null, configured = false, videoReady = false, videoReadyUserId = null, videoAccessError = '', currentTicket = null;
     var cookieSync = Promise.resolve(), lastToken = null, lastUserId = null, cachedDeviceId = null, videoRetryTimer = null;
     var resumeHandler = null;
     var initializationState = 'idle', initializationError = '', initializationPromise = null, lifecycleId = 0;
 
     function status() {
-      return { configured: configured, user: currentSession && currentSession.user ? currentSession.user : null, session: currentSession, videoReady: videoReady, videoAccessError: videoAccessError, apiBase: apiBase, initializationState: initializationState, initializationError: initializationError };
+      return { configured: configured, user: currentSession && currentSession.user ? currentSession.user : null, session: currentSession, videoReady: videoReady, videoAccessError: videoAccessError, ticket: currentTicket, apiBase: apiBase, initializationState: initializationState, initializationError: initializationError };
     }
 
     function notify() {
@@ -66,10 +66,13 @@
           if (Number.isFinite(retryAfter) && retryAfter > 0) error.retryAfter = Math.min(300, retryAfter);
           throw error;
         }
-        videoReady = !!token && !!currentSession && currentSession.access_token === token;
-        videoReadyUserId = videoReady ? userId : null;
-        videoAccessError = '';
-        return videoReady;
+        return response.json().catch(function () { return null; }).then(function (data) {
+          currentTicket = token && data && data.ticket ? data.ticket : null;
+          videoReady = !!token && !!currentSession && currentSession.access_token === token;
+          videoReadyUserId = videoReady ? userId : null;
+          videoAccessError = '';
+          return videoReady;
+        });
       }).catch(function (error) {
         if (token && currentSession && currentSession.access_token === token) {
           if (error && error.status === 401) {
@@ -101,6 +104,7 @@
       var id = session && session.user && session.user.id || null;
       var token = session && session.access_token || null;
       var changed = id !== lastUserId || token !== lastToken;
+      if (!session) currentTicket = null;
       currentSession = session || null;
       lastUserId = id;
       if (!changed) { notify(); return; }
@@ -316,7 +320,11 @@
       initializationError = '';
     }
 
-    return { init: init, retry: retry, status: status, signUp: signUp, signIn: signIn, signOut: signOut, syncProgress: syncProgress, syncVideoSession: syncVideoSession, destroy: destroy, apiBase: apiBase };
+    function playbackTicket() {
+      return currentTicket || (currentSession && currentSession.access_token) || '';
+    }
+
+    return { init: init, retry: retry, status: status, signUp: signUp, signIn: signIn, signOut: signOut, syncProgress: syncProgress, syncVideoSession: syncVideoSession, playbackTicket: playbackTicket, destroy: destroy, apiBase: apiBase };
   }
 
   return { create: createAccount, DEFAULT_API_BASE: DEFAULT_API_BASE };

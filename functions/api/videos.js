@@ -54,18 +54,21 @@ export async function onRequest(context) {
   const { request, env, waitUntil } = context || {};
   if (!['GET', 'HEAD'].includes(request.method)) return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD, OPTIONS', 'Cache-Control': 'no-store' } });
   if (!auth.originAllowed(request, env)) return auth.jsonResponse({ error: 'This app origin is not allowed.' }, 403, cors(request, env));
+  const key = new URL(request.url).searchParams.get('key') || '';
   let user;
   try {
     const token = auth.videoToken(request);
-    user = env && env.VIDEO_AUTH_MODE === 'remote'
-      ? await auth.getAuthenticatedUser(token, env)
-      : await auth.verifySupabaseAccessToken(token, env);
+    if (auth.isPlaybackTicket(token)) {
+      user = await auth.verifyPlaybackTicket(token, key, env);
+    } else {
+      user = env && env.VIDEO_AUTH_MODE === 'remote'
+        ? await auth.getAuthenticatedUser(token, env)
+        : await auth.verifySupabaseAccessToken(token, env);
+    }
   }
   catch (error) { return auth.authServiceUnavailableResponse(request, env, error); }
   if (!user) return unauthorized(request, env);
   if (!env || !env.LESSON_VIDEOS) return auth.jsonResponse({ error: 'Lesson video storage is not configured.' }, 503, cors(request, env));
-
-  const key = new URL(request.url).searchParams.get('key') || '';
   if (!safeObjectKey(key) || !videoCatalog.isCatalogVideoKey(key)) return auth.jsonResponse({ error: 'Lesson video not found.' }, 404, cors(request, env));
   const headers = cors(request, env);
   headers.set('Cache-Control', 'private, no-store');

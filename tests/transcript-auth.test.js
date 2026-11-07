@@ -102,3 +102,54 @@ test('transcript route distinguishes invalid credentials from retryable Auth fai
     }
   } finally { globalThis.fetch = originalFetch; }
 });
+
+
+test('transcript endpoint allows playback tickets in query parameter without cookies', async () => {
+  const env = {
+    SUPABASE_URL: 'https://auth.example',
+    SUPABASE_ANON_KEY: 'sb_publishable_test_key',
+    ALLOWED_APP_ORIGINS: 'capacitor://localhost'
+  };
+  const auth = require('../functions/_lib/auth.cjs');
+  const validTicket = await auth.createPlaybackTicket('123e4567-e89b-12d3-a456-426614174000', 'lesson.vtt', 3600, env);
+  const mismatchTicket = await auth.createPlaybackTicket('123e4567-e89b-12d3-a456-426614174000', 'other.vtt', 3600, env);
+  const wildcardTicket = await auth.createPlaybackTicket('123e4567-e89b-12d3-a456-426614174000', '*', 3600, env);
+  const expiredTicket = await auth.createPlaybackTicket('123e4567-e89b-12d3-a456-426614174000', 'lesson.vtt', -10, env);
+
+  // Valid ticket in ?token= query parameter without cookies
+  const allowed = await onRequest({
+    request: new Request('https://study.example/transcript/lesson.vtt?token=' + encodeURIComponent(validTicket), {
+      headers: { Origin: 'capacitor://localhost' }
+    }),
+    env
+  });
+  assert.equal(allowed.status, 200);
+  assert.equal(await allowed.text(), passage);
+
+  // Wildcard ticket in ?ticket= query parameter
+  const wildcardAllowed = await onRequest({
+    request: new Request('https://study.example/transcript/lesson.vtt?ticket=' + encodeURIComponent(wildcardTicket), {
+      headers: { Origin: 'capacitor://localhost' }
+    }),
+    env
+  });
+  assert.equal(wildcardAllowed.status, 200);
+
+  // Mismatched ticket key is rejected
+  const mismatched = await onRequest({
+    request: new Request('https://study.example/transcript/lesson.vtt?token=' + encodeURIComponent(mismatchTicket), {
+      headers: { Origin: 'capacitor://localhost' }
+    }),
+    env
+  });
+  assert.equal(mismatched.status, 401);
+
+  // Expired ticket is rejected
+  const expired = await onRequest({
+    request: new Request('https://study.example/transcript/lesson.vtt?token=' + encodeURIComponent(expiredTicket), {
+      headers: { Origin: 'capacitor://localhost' }
+    }),
+    env
+  });
+  assert.equal(expired.status, 401);
+});
