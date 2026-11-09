@@ -41,7 +41,7 @@ jobs:
 
   deploy:
     needs: web-ci
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
