@@ -100,6 +100,7 @@
         var currentDeck = object(mergedProgress[deckId]), incomingDeck = object(incomingProgress[deckId]);
         var currentCards = object(currentDeck.cards), incomingCards = object(incomingDeck.cards), mergedCards = Object.assign({}, currentCards);
         Object.keys(incomingCards).forEach(function (cardId) {
+          if (cardId === '__proto__' || cardId === 'constructor' || cardId === 'prototype') return;
           var current = counterRecord(currentCards[cardId]), incoming = counterRecord(incomingCards[cardId]);
           mergedCards[cardId] = { attempts: Math.max(current.attempts, incoming.attempts), misses: Math.max(current.misses, incoming.misses) };
         });
@@ -122,6 +123,7 @@
     decks.forEach(function (deckId) {
       var leftCards = object(object(left.progress)[deckId]).cards, rightCards = object(object(right.progress)[deckId]).cards, cards = {};
       new Set(Object.keys(object(leftCards)).concat(Object.keys(object(rightCards)))).forEach(function (cardId) {
+        if (cardId === '__proto__' || cardId === 'constructor' || cardId === 'prototype') return;
         var a = counterRecord(object(leftCards)[cardId]), b = counterRecord(object(rightCards)[cardId]);
         cards[cardId] = { attempts: Math.max(a.attempts, b.attempts), misses: Math.max(a.misses, b.misses) };
       });
