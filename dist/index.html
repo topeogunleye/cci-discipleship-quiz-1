@@ -1000,12 +1000,32 @@ a:hover { color: var(--link-hover); }
 
 .bible-reference-wrap.is-open > .bible-reference-preview {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: var(--space-sm);
 }
 
 .bible-reference-preview.is-open {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
   gap: var(--space-sm);
+}
+
+.bible-preview-content {
+  display: grid;
+  gap: var(--space-sm);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.bible-preview-parts {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.bible-preview-parts[hidden] {
+  display: none;
 }
 
 .bible-preview-heading {
@@ -1015,6 +1035,8 @@ a:hover { color: var(--link-hover); }
 }
 
 .bible-preview-heading strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--ink);
   font-size: var(--text-base);
 }
@@ -1029,6 +1051,7 @@ a:hover { color: var(--link-hover); }
 }
 
 .bible-preview-close {
+  flex-shrink: 0;
   display: inline-grid;
   place-items: center;
   width: 30px;
@@ -11621,7 +11644,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
   function defaultStudyState() { return { decks: [], progress: {}, settings: { theme: 'auto', bibleVersion: 'ASV', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, cloudSyncDeviceId: null, seeded: false, dataVersion: 0, pausedSession: null }; }
   var S = defaultStudyState();
   var STARTER_DECKS = [], DEVOTIONALS = [], LESSON_VIDEOS = [];
-  var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, suppressBiblePreviewFocus = null;
+  var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, suppressBiblePreviewFocus = null, suppressBiblePreviewHover = null;
   var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), activeStorageOwnerId = null, requestedStorageOwnerId = null, guestProgressForImport = null, account = Account ? Account.create() : null, accountStatus = { configured: false, user: null, videoReady: false, videoSessionVersion: 0 }, accountBootReady = false, accountMessage = '', accountEmailDraft = '', accountBusy = false, accountSwitchQueue = Promise.resolve(), cloudSyncQueue = Promise.resolve(), cloudSyncTimer = null, lessonTranscriptCache = Object.create(null), lessonTranscriptRequests = Object.create(null), lastVideoSessionVersion = 0, V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
   var quizFeedbackDrag = null, quizFeedbackIgnoreClick = false;
   var browserLocalStorage = null, browserIndexedDB = null, animateRouteChange = false;
@@ -11645,13 +11668,14 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
         '<a class="bible-reference-link" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" data-bible-reference-link="true" aria-haspopup="dialog" aria-controls="' + previewId + '" aria-describedby="' + messageId + '" aria-expanded="false">' + esc(reference) + '</a>' +
         '<span class="bible-reference-preview" id="' + previewId + '" role="dialog" aria-labelledby="' + titleId + '">' +
           '<span class="bible-preview-heading"><strong id="' + titleId + '">' + esc(reference) + '</strong><span class="bible-preview-version">Bible</span><button class="bible-preview-close" type="button" data-bible-preview-close aria-label="Close Bible passage preview">×</button></span>' +
-          bibleVersionPicker(false) +
+          '<span class="bible-preview-content">' + bibleVersionPicker(false) +
           '<span class="bible-preview-notice" role="status"></span>' +
           '<span class="bible-preview-text" hidden></span>' +
           '<span class="bible-preview-copyright meta"></span>' +
           '<a class="bible-preview-esv-link meta" href="https://www.esv.org/" target="_blank" rel="noopener noreferrer" hidden>ESV.org</a>' +
-          '<span class="bible-preview-fallback" id="' + messageId + '">Verse text is unavailable. Connect to the internet and try again, or open YouVersion.</span>' +
+          '<span class="bible-preview-fallback" id="' + messageId + '" role="status"></span>' +
           '<a class="btn sm primary bible-preview-open" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">Open passage on YouVersion</a>' +
+          '<span class="bible-preview-parts" hidden></span></span>' +
         '</span>' +
       '</span>';
     }
@@ -11671,43 +11695,52 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     var viewportWidth = visual ? visual.width : document.documentElement.clientWidth;
     var viewportHeight = visual ? visual.height : window.innerHeight;
     var rightEdge = leftEdge + viewportWidth, bottomEdge = topEdge + viewportHeight;
-    var maxWidth = Math.max(200, viewportWidth - margin * 2);
+    var maxWidth = Math.max(1, viewportWidth - margin * 2);
     preview.style.width = Math.min(340, maxWidth) + 'px';
-    preview.style.maxHeight = Math.max(120, viewportHeight - margin * 2) + 'px';
-    preview.style.overflowY = 'auto';
+    preview.style.maxHeight = Math.max(1, viewportHeight - margin * 2) + 'px';
     preview.style.left = (leftEdge + margin) + 'px';
     preview.style.top = (topEdge + margin) + 'px';
     var panel = preview.getBoundingClientRect();
-    var minLeft = leftEdge + margin, maxLeft = Math.max(minLeft, rightEdge - panel.width - margin);
-    var minTop = topEdge + margin, maxTop = Math.max(minTop, bottomEdge - panel.height - margin);
-    var leftOfAnchor = Math.max(minLeft, Math.min(anchor.left, maxLeft));
-    var centeredTop = Math.max(minTop, Math.min(anchor.top + (anchor.height - panel.height) / 2, maxTop));
-    var candidates = [
-      { left: leftOfAnchor, top: anchor.bottom + gap },
-      { left: leftOfAnchor, top: anchor.top - panel.height - gap },
-      { left: anchor.right + gap, top: centeredTop },
-      { left: anchor.left - panel.width - gap, top: centeredTop }
-    ];
-    var controls = Array.prototype.slice.call(document.querySelectorAll('.btn-continue, .study-navigation, .flash-rating')).filter(function (control) {
+    var controls = Array.prototype.slice.call(document.querySelectorAll('.btn-continue, .study-navigation, .flash-rating, .study-close-btn')).filter(function (control) {
       if (preview.contains(control) || control.disabled) return false;
       var rect = control.getBoundingClientRect(), style = window.getComputedStyle(control);
       return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
     });
-    var best = null, bestOverlap = Infinity;
-    candidates.forEach(function (candidate) {
-      var left = Math.max(minLeft, Math.min(candidate.left, maxLeft));
-      var top = Math.max(minTop, Math.min(candidate.top, maxTop));
-      var overlap = 0;
-      controls.forEach(function (control) {
-        var rect = control.getBoundingClientRect();
-        var width = Math.max(0, Math.min(left + panel.width, rect.right) - Math.max(left, rect.left));
-        var height = Math.max(0, Math.min(top + panel.height, rect.bottom) - Math.max(top, rect.top));
-        overlap += width * height;
+    // Subtract the study controls from the usable viewport. Shrink the scrollable
+    // passage into a free region instead of accepting a least-bad overlap.
+    var regions = [{ left: leftEdge + margin, top: topEdge + margin, right: rightEdge - margin, bottom: bottomEdge - margin }];
+    controls.forEach(function (control) {
+      var rect = control.getBoundingClientRect();
+      var block = { left: rect.left - gap, top: rect.top - gap, right: rect.right + gap, bottom: rect.bottom + gap };
+      var free = [];
+      regions.forEach(function (r) {
+        var l = Math.max(r.left, block.left), t = Math.max(r.top, block.top);
+        var right = Math.min(r.right, block.right), bottom = Math.min(r.bottom, block.bottom);
+        if (l >= right || t >= bottom) { free.push(r); return; }
+        if (r.top < t) free.push({ left: r.left, top: r.top, right: r.right, bottom: t });
+        if (bottom < r.bottom) free.push({ left: r.left, top: bottom, right: r.right, bottom: r.bottom });
+        if (r.left < l) free.push({ left: r.left, top: t, right: l, bottom: bottom });
+        if (right < r.right) free.push({ left: right, top: t, right: r.right, bottom: bottom });
       });
-      if (overlap < bestOverlap) { best = { left: left, top: top }; bestOverlap = overlap; }
+      regions = free;
     });
-    preview.style.left = (best ? best.left : leftOfAnchor) + 'px';
-    preview.style.top = (best ? best.top : centeredTop) + 'px';
+    var best = null;
+    regions.forEach(function (r) {
+      var width = Math.min(340, r.right - r.left), height = Math.min(panel.height, r.bottom - r.top);
+      if (width <= 0 || height <= 0) return;
+      var left = Math.max(r.left, Math.min(anchor.left, r.right - width));
+      var top = Math.max(r.top, Math.min(anchor.bottom + gap, r.bottom - height));
+      var above = Math.max(r.top, Math.min(anchor.top - height - gap, r.bottom - height));
+      if (Math.abs(above + height - anchor.top) < Math.abs(top - anchor.bottom)) top = above;
+      var score = Math.min(width, Math.min(200, maxWidth)) * 10000 + width * height;
+      var distance = Math.abs(top - anchor.bottom) + Math.abs(left - anchor.left);
+      if (!best || score > best.score || (score === best.score && distance < best.distance)) best = { left: left, top: top, width: width, height: height, score: score, distance: distance };
+    });
+    if (!best) { closeBiblePreview(true, true); return; }
+    preview.style.width = best.width + 'px';
+    preview.style.maxHeight = best.height + 'px';
+    preview.style.left = best.left + 'px';
+    preview.style.top = best.top + 'px';
   }
   function updateBiblePreviewText(preview, text, fallbackMessage) {
     if (!preview) return;
@@ -11716,10 +11749,11 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       passage.textContent = text;
       passage.hidden = false;
       fallback.hidden = true;
+      fallback.textContent = '';
     } else {
       passage.textContent = '';
       passage.hidden = true;
-      fallback.textContent = fallbackMessage || 'Verse text is unavailable. Connect to the internet and try again, or open YouVersion.';
+      fallback.textContent = fallbackMessage || 'Passage text is unavailable. Change translation or open the passage to continue.';
       fallback.hidden = false;
     }
   }
@@ -11756,10 +11790,10 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     var init = { cache: 'no-store', headers: { Accept: 'application/json' }, signal: signal };
     function fromYouVersion(requested, markFallback) {
       return fetch(bibleApiUrl() + '?q=' + encodeURIComponent(reference) + '&version=' + encodeURIComponent(requested), init).then(function (response) {
-        if (!response.ok) throw new Error('Passage service unavailable');
+        if (!response.ok) throw biblePassageError(response);
         return response.json();
       }).then(function (result) {
-        if (!result.text || !result.version) throw new Error('Passage text unavailable');
+        if (typeof result.text !== 'string' || !result.text.trim() || !result.version) throw biblePassageError({ status: 404 });
         if (markFallback) result.fallback = true;
         return result;
       });
@@ -11767,11 +11801,11 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     if (version !== 'ESV') return fromYouVersion(version, false);
     var cached = esvCacheGet(reference);
     var text = cached ? Promise.resolve(cached) : fetch(esvApiUrl() + '?q=' + encodeURIComponent(reference), init).then(function (response) {
-      if (!response.ok) throw new Error('ESV passage unavailable');
+      if (!response.ok) throw biblePassageError(response);
       return response.json();
     }).then(function (result) {
       var passage = result && typeof result.text === 'string' ? result.text.trim() : '';
-      if (!passage) throw new Error('ESV passage text unavailable');
+      if (!passage) throw biblePassageError({ status: 404 });
       esvCachePut(reference, passage);
       return passage;
     });
@@ -11781,6 +11815,21 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       if (signal && signal.aborted) throw error;
       return fromYouVersion('ASV', true);
     });
+  }
+  function biblePassageError(response) {
+    var error = new Error('Bible passage request failed');
+    error.status = response.status;
+    var retry = response.headers && response.headers.get('Retry-After');
+    if (/^\d+$/.test(retry || '')) error.retryAfter = Math.min(3600, Math.max(1, Number(retry)));
+    return error;
+  }
+  function biblePassageErrorMessage(error) {
+    if (error && error.status === 400) return 'This Bible reference cannot be previewed. Open the passage to read it.';
+    if (error && error.status === 404) return 'No passage text was found for this reference and translation. Choose another translation or open the passage.';
+    if (error && error.status === 429) return 'The Bible service request limit was reached. ' + (error.retryAfter ? 'Try again in ' + error.retryAfter + ' seconds' : 'Wait a moment and try again') + ', or open the passage.';
+    if (error && error.status === 403) return 'This translation cannot be previewed right now. Choose another translation or open the passage.';
+    if (error && error.status >= 500) return 'The Bible service is temporarily unavailable. Try again later or open the passage.';
+    return 'Could not connect to the Bible service. Check your connection and try again, or open the passage.';
   }
   function bibleVersionOptions(selected, query) {
     var options = [{ id: 'ASV', abbreviation: 'ASV', title: 'Preferred default (when available)' }, { id: 'ESV', abbreviation: 'ESV', title: 'English Standard Version (Crossway)' }].concat(bibleVersions);
@@ -11797,8 +11846,9 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       return '<option value="' + esc(selected) + '" disabled selected>No translations match "' + esc(query) + '"</option>';
     }
     var hasSelectedInFiltered = filtered.some(function (v) { return v.id === selected; });
-    var activeSelection = hasSelectedInFiltered ? selected : (q ? filtered[0].id : selected);
-    return filtered.map(function (v) {
+    var activeSelection = hasSelectedInFiltered ? selected : '';
+    // A search result is not the active translation until explicitly accepted.
+    return (hasSelectedInFiltered ? '' : '<option value="" disabled selected>Choose a translation…</option>') + filtered.map(function (v) {
       return '<option value="' + esc(v.id) + '"' + (v.id === activeSelection ? ' selected' : '') + '>' + esc(v.abbreviation + ' — ' + v.title) + '</option>';
     }).join('');
   }
@@ -11875,6 +11925,8 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     preview.querySelector('.bible-preview-notice').textContent = '';
     preview.querySelector('.bible-preview-copyright').textContent = '';
     var openLink = preview.querySelector('.bible-preview-open'), esvLink = preview.querySelector('.bible-preview-esv-link');
+    var parts = preview.querySelector('.bible-preview-parts');
+    if (parts) { parts.innerHTML = ''; parts.hidden = true; }
     if (esvLink) esvLink.hidden = true;
     openLink.href = version === 'ESV' ? esvPassageLink(reference) : 'https://www.bible.com/search/bible?q=' + encodeURIComponent(reference);
     openLink.textContent = version === 'ESV' ? 'Open passage on ESV.org' : 'Open passage on YouVersion';
@@ -11896,22 +11948,30 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
         openLink.href = 'https://www.bible.com/search/bible?q=' + encodeURIComponent(reference);
         openLink.textContent = 'Open passage on YouVersion';
         if (/^https:\/\/www\.bible\.com\/bible\/[0-9]+\//.test(result.url || '')) openLink.href = result.url;
+        var links = (result.links || []).filter(function (part) { return /^https:\/\/www\.bible\.com\/bible\/[0-9]+\//.test(part.url || '') && part.label; });
+        if (links.length > 1 && parts) {
+          openLink.href = links[0].url;
+          openLink.textContent = 'Open ' + links[0].label + ' on YouVersion';
+          parts.innerHTML = links.slice(1).map(function (part) { return '<a class="btn sm primary" href="' + esc(part.url) + '" target="_blank" rel="noopener noreferrer">Open ' + esc(part.label) + ' on YouVersion</a>'; }).join('');
+          parts.hidden = false;
+        }
       }
       positionBiblePreview(link, preview);
-    }).catch(function () {
+    }).catch(function (error) {
       if ((controller.signal.aborted && !request.timedOut) || biblePreviewRequest !== request) return;
       preview.querySelector('.bible-preview-version').textContent = 'Unavailable';
-      updateBiblePreviewText(preview, '', request.timedOut ? 'The Bible service took too long. Change translation or reopen this preview to retry.' : 'Verse text is unavailable. Connect to the internet and try again, or open YouVersion.');
+      updateBiblePreviewText(preview, '', request.timedOut ? 'The Bible service took too long. Change translation or reopen this preview to retry.' : biblePassageErrorMessage(error));
       positionBiblePreview(link, preview);
     }).finally(function () {
       window.clearTimeout(timeout);
       if (biblePreviewRequest === request) biblePreviewRequest = null;
     });
   }
-  function closeBiblePreview(restoreFocus) {
+  function closeBiblePreview(restoreFocus, suppressHover) {
     if (biblePreviewCloseTimer) { window.clearTimeout(biblePreviewCloseTimer); biblePreviewCloseTimer = null; }
     if (!activeBiblePreview) return false;
     var current = activeBiblePreview;
+    if (suppressHover) suppressBiblePreviewHover = current.link;
     if (biblePreviewRequest && biblePreviewRequest.preview === current.preview) {
       biblePreviewRequest.controller.abort();
       biblePreviewRequest = null;
@@ -11947,6 +12007,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     var wrapper = link && link.closest('.bible-reference-wrap'), previewId = link && link.getAttribute('aria-controls');
     var preview = previewId && document.getElementById(previewId);
     if (!wrapper || !preview) return;
+    if (pinned) suppressBiblePreviewHover = null;
     if (biblePreviewCloseTimer) { window.clearTimeout(biblePreviewCloseTimer); biblePreviewCloseTimer = null; }
     if (activeBiblePreview && activeBiblePreview.link !== link) closeBiblePreview(false);
     if (activeBiblePreview && activeBiblePreview.link === link) {
@@ -15678,14 +15739,18 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       window.clearTimeout(biblePreviewCloseTimer); biblePreviewCloseTimer = null;
     }
     var link = target.closest('.bible-reference-link');
-    if (link) openBiblePreview(link, false);
+    if (link && link !== suppressBiblePreviewHover) openBiblePreview(link, false);
   });
   document.addEventListener('pointerout', function (e) {
     var target = e.target && e.target.closest ? e.target : null;
+    if (suppressBiblePreviewHover && target && target.closest('.bible-reference-link') === suppressBiblePreviewHover && !suppressBiblePreviewHover.contains(e.relatedTarget)) suppressBiblePreviewHover = null;
     if (!target || !activeBiblePreview) return;
     var wrapper = target.closest('.bible-reference-wrap');
     if ((wrapper !== activeBiblePreview.wrapper && !activeBiblePreview.preview.contains(target)) || isWithinActiveBiblePreview(e.relatedTarget)) return;
     scheduleBiblePreviewClose();
+  });
+  document.addEventListener('pointermove', function (e) {
+    if (suppressBiblePreviewHover && !suppressBiblePreviewHover.contains(e.target)) suppressBiblePreviewHover = null;
   });
   document.addEventListener('focusin', function (e) {
     var target = e.target && e.target.closest ? e.target : null;
@@ -15696,7 +15761,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       window.clearTimeout(biblePreviewCloseTimer); biblePreviewCloseTimer = null;
     }
     var link = target.closest('.bible-reference-link');
-    if (link) openBiblePreview(link, false);
+    if (link) { suppressBiblePreviewHover = null; openBiblePreview(link, false); }
   });
   document.addEventListener('focusout', function (e) {
     var target = e.target && e.target.closest ? e.target : null;
@@ -15706,7 +15771,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     scheduleBiblePreviewClose();
   });
   document.addEventListener('pointerdown', function (e) {
-    if (activeBiblePreview && !isWithinActiveBiblePreview(e.target)) closeBiblePreview(false);
+    if (activeBiblePreview && !isWithinActiveBiblePreview(e.target)) closeBiblePreview(false, true);
   });
   function setQuizFeedbackExpanded(control, expanded) {
     if (!control) return;
@@ -15750,12 +15815,12 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     var target = e.target && e.target.closest ? e.target : null;
     if (!target) return;
     if (target.closest('[data-bible-preview-close]')) {
-      e.preventDefault(); closeBiblePreview(true); return;
+      e.preventDefault(); closeBiblePreview(true, true); return;
     }
     var link = target.closest('.bible-reference-link');
     if (!link) return;
     e.preventDefault();
-    if (activeBiblePreview && activeBiblePreview.link === link && activeBiblePreview.pinned) closeBiblePreview(false);
+    if (activeBiblePreview && activeBiblePreview.link === link && activeBiblePreview.pinned) closeBiblePreview(false, true);
     else openBiblePreview(link, true);
   });
   if (typeof window.addEventListener === 'function') {
@@ -16415,13 +16480,17 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       e.preventDefault();
       var picker = e.target.closest('.bible-version-picker');
       var select = picker ? picker.querySelector('[data-bible-version]') : null;
+      if (select && !select.value) {
+        var firstMatch = Array.prototype.find.call(select.options, function (option) { return !option.disabled; });
+        if (firstMatch) select.value = firstMatch.value;
+      }
       if (select && select.value && select.selectedIndex >= 0 && !select.options[select.selectedIndex].disabled) {
         select.dispatchEvent(new Event('change', { bubbles: true }));
       }
       return;
     }
     if (e.key === 'Escape' && activeBiblePreview) {
-      e.preventDefault(); closeBiblePreview(isWithinActiveBiblePreview(document.activeElement)); return;
+      e.preventDefault(); closeBiblePreview(isWithinActiveBiblePreview(document.activeElement), true); return;
     }
     var feedbackResizeControl = e.target && e.target.closest ? e.target.closest('.quiz-feedback-resize-control') : null;
     if (feedbackResizeControl && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {

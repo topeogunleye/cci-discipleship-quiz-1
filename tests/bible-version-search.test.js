@@ -65,10 +65,11 @@ test('bibleVersionOptions returns all translations when query is empty', () => {
   assert.match(html, /value="111">NIV11 — New International Version 2011/);
 });
 
-test('bibleVersionOptions filters out non-matching selected default when searching for AMP', () => {
+test('search results do not silently become the active translation', () => {
   const { testApi } = setupTestEnvironment();
   const html = testApi.bibleVersionOptions('ASV', 'amp');
-  assert.match(html, /value="1588"[^>]*selected[^>]*>AMP — Amplified Bible/);
+  assert.match(html, /value="" disabled selected>Choose a translation/);
+  assert.match(html, /value="1588">AMP — Amplified Bible/);
   assert.doesNotMatch(html, /value="ASV"/, 'ASV should be filtered out when query is "amp"');
   assert.doesNotMatch(html, /value="ESV"/);
   assert.doesNotMatch(html, /value="111"/);
@@ -77,8 +78,23 @@ test('bibleVersionOptions filters out non-matching selected default when searchi
 test('bibleVersionOptions matches partial titles case-insensitively', () => {
   const { testApi } = setupTestEnvironment();
   const html = testApi.bibleVersionOptions('ASV', 'crossway');
-  assert.match(html, /value="ESV"[^>]*selected/);
+  assert.match(html, /value="ESV">ESV/);
+  assert.match(html, /value="" disabled selected/);
   assert.doesNotMatch(html, /value="1588"/);
+});
+
+test('Enter explicitly accepts the first search result but not the disabled no-match placeholder', () => {
+  const { listeners, testApi } = setupTestEnvironment();
+  let changes = 0;
+  const select = { value: '', get selectedIndex() { return this.options.findIndex(option => option.value === this.value); }, options: [{ disabled: true, value: '' }, { disabled: false, value: '1588' }], dispatchEvent: () => { changes++; } };
+  const target = { hasAttribute: name => name === 'data-bible-version-search', closest: () => ({ querySelector: () => select }) };
+  listeners.keydown.forEach(fn => fn({ key: 'Enter', target, preventDefault() {} }));
+  assert.equal(select.value, '1588');
+  assert.equal(changes, 1);
+  assert.equal(testApi.state.settings.bibleVersion, 'ASV');
+  select.value = 'ASV'; select.options = [{ disabled: true, value: 'ASV' }];
+  listeners.keydown.forEach(fn => fn({ key: 'Enter', target, preventDefault() {} }));
+  assert.equal(changes, 1);
 });
 
 test('bibleVersionOptions returns disabled empty placeholder when no translations match', () => {

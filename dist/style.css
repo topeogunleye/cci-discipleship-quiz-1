@@ -987,12 +987,32 @@ a:hover { color: var(--link-hover); }
 
 .bible-reference-wrap.is-open > .bible-reference-preview {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: var(--space-sm);
 }
 
 .bible-reference-preview.is-open {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
   gap: var(--space-sm);
+}
+
+.bible-preview-content {
+  display: grid;
+  gap: var(--space-sm);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.bible-preview-parts {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.bible-preview-parts[hidden] {
+  display: none;
 }
 
 .bible-preview-heading {
@@ -1002,6 +1022,8 @@ a:hover { color: var(--link-hover); }
 }
 
 .bible-preview-heading strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--ink);
   font-size: var(--text-base);
 }
@@ -1016,6 +1038,7 @@ a:hover { color: var(--link-hover); }
 }
 
 .bible-preview-close {
+  flex-shrink: 0;
   display: inline-grid;
   place-items: center;
   width: 30px;
