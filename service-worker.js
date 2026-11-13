@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v54';
+const CACHE_NAME = CACHE_PREFIX + 'v55';
 const CORE_FILES = [
   './',
   'offline.html',
@@ -94,7 +94,7 @@ self.addEventListener('fetch', event => {
   }
   if (url.pathname.startsWith(apiBasePath) || url.pathname.startsWith(transcriptPath)) {
     event.respondWith(fetch(request, { cache: 'no-store' }).catch(() => new Response(
-      JSON.stringify({ error: 'The account, lesson video, or transcript service is unavailable offline.' }),
+      JSON.stringify({ error: 'This online service is unavailable offline.' }),
       { status: 503, headers: { 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8' } }
     )));
     return;

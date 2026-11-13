@@ -9407,6 +9407,12 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 @media (min-width:701px) and (max-height:920px){.lesson-video-page{padding-top:12px}.lesson-video-topbar{margin-bottom:12px}.lesson-video-frame{width:min(100%,900px)}.lesson-video-summary{margin-top:12px}}
 @media (min-width:701px) and (max-height:820px){.lesson-video-frame{width:min(100%,740px)}}
 
+/* Bible translation controls stay usable inside narrow verse previews. */
+.bible-version-picker { display: grid; gap: 8px; width: 100%; min-width: 0; }
+.bible-version-picker label { display: grid; gap: 4px; font-size: 13px; }
+.bible-version-picker input, .bible-version-picker select { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.bible-preview-notice, .bible-preview-copyright { display: block; margin-top: 8px; font-size: 12px; }
+.bible-preview-notice:empty, .bible-preview-copyright:empty { display: none; }
 /* Short, purposeful transitions help route and dialog changes feel connected. */
 @keyframes appScreenEnter{from{opacity:.72;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
 @keyframes appModalScrimEnter{from{opacity:0}to{opacity:1}}

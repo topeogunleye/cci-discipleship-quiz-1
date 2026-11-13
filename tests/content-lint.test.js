@@ -781,7 +781,7 @@ test('home shows the backup reminder and dismissing it resets stored thresholds'
   await window.testAppReady;
   assert.match(elements.app.innerHTML, /Back up now\?/);
   assert.match(elements.app.innerHTML, /Last backup was 15 days ago\./);
-  listeners.click({ target: { closest: () => ({ dataset: { act: 'backup-dismiss' } }) } });
+  listeners.click({ target: { closest: selector => selector === '[data-act]' ? { dataset: { act: 'backup-dismiss' } } : null } });
   await window.reminderTestApi.flush();
   assert.doesNotMatch(elements.app.innerHTML, /Back up now\?/);
   const reminder = JSON.parse(stored).backupReminder;
@@ -837,7 +837,7 @@ test('a waiting service worker shows an update prompt and receives SKIP_WAITING'
   await new Promise(resolve => setImmediate(resolve));
   assert.match(elements.app.innerHTML, /CCI Study update ready/);
   assert.match(elements.app.innerHTML, /Remind me later/);
-  listeners.click({ target: { closest: () => ({ dataset: { act: 'update-app' } }) } });
+  listeners.click({ target: { closest: selector => selector === '[data-act]' ? { dataset: { act: 'update-app' } } : null } });
   await new Promise(resolve => setImmediate(resolve));
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(JSON.parse(JSON.stringify(messages)), [{ type: 'SKIP_WAITING' }]);

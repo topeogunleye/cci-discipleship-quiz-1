@@ -1,0 +1,74 @@
+// Only server-side Functions import this module. Never return the App Key.
+const API = 'https://api.youversion.com/v1';
+const books = 'Genesis:GEN|Exodus:EXO|Leviticus:LEV|Numbers:NUM|Deuteronomy:DEU|Joshua:JOS|Judges:JDG|Ruth:RUT|1 Samuel:1SA|2 Samuel:2SA|1 Kings:1KI|2 Kings:2KI|1 Chronicles:1CH|2 Chronicles:2CH|Ezra:EZR|Nehemiah:NEH|Esther:EST|Job:JOB|Psalms:PSA|Proverbs:PRO|Ecclesiastes:ECC|Song of Solomon:SNG|Isaiah:ISA|Jeremiah:JER|Lamentations:LAM|Ezekiel:EZK|Daniel:DAN|Hosea:HOS|Joel:JOL|Amos:AMO|Obadiah:OBA|Jonah:JON|Micah:MIC|Nahum:NAM|Habakkuk:HAB|Zephaniah:ZEP|Haggai:HAG|Zechariah:ZEC|Malachi:MAL|Matthew:MAT|Mark:MRK|Luke:LUK|John:JHN|Acts:ACT|Romans:ROM|1 Corinthians:1CO|2 Corinthians:2CO|Galatians:GAL|Ephesians:EPH|Philippians:PHP|Colossians:COL|1 Thessalonians:1TH|2 Thessalonians:2TH|1 Timothy:1TI|2 Timothy:2TI|Titus:TIT|Philemon:PHM|Hebrews:HEB|James:JAS|1 Peter:1PE|2 Peter:2PE|1 John:1JN|2 John:2JN|3 John:3JN|Jude:JUD|Revelation:REV';
+const bookMap = Object.fromEntries(books.split('|').map(pair => { const [name, id] = pair.split(':'); return [name.toLowerCase(), id]; }));
+Object.assign(bookMap, { psalm: 'PSA', 'song of songs': 'SNG' });
+function passageIds(reference) {
+  if (typeof reference !== 'string' || reference.length > 180) return null;
+  const match = /^([1-3]?\s*[A-Za-z ]+?)\s+(\d[\d\s,:–—-]*)$/.exec(reference.trim());
+  if (!match) return null;
+  const book = bookMap[match[1].trim().toLowerCase().replace(/\s+/g, ' ')];
+  if (!book) return null;
+  let spec = match[2].replace(/[–—]/g, '-').replace(/\s/g, '');
+  if (['OBA', 'PHM', '2JN', '3JN', 'JUD'].includes(book) && !spec.includes(':')) spec = '1:' + spec;
+  const pieces = spec.split(':');
+  if (pieces.length > 2) return null;
+  const positive = n => /^\d+$/.test(n) && +n > 0 && +n <= 176;
+  const ids = [];
+  const chapter = pieces[0];
+  if (pieces.length === 2 && (!positive(chapter) || +chapter > 150)) return null;
+  for (const part of (pieces[1] || chapter).split(',')) {
+    const range = part.split('-');
+    if (range.length > 2 || !range.every(positive) || (range[1] && +range[1] < +range[0])) return null;
+    if (pieces.length === 2) ids.push(book + '.' + (+chapter) + '.' + range.map(Number).join('-'));
+    else for (let n = +range[0]; n <= +(range[1] || range[0]); n++) ids.push(book + '.' + n);
+  }
+  return ids.length && ids.length <= 8 ? [...new Set(ids)] : null;
+}
+async function upstream(path, key, fetcher) {
+  const response = await fetcher(API + path, { headers: { 'X-YVP-App-Key': key, Accept: 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(8000) });
+  if (!response.ok) { const error = new Error('Bible service unavailable'); error.status = response.status; throw error; }
+  return response.json();
+}
+async function versions(key, fetcher = fetch) {
+  const result = [], tokens = new Set();
+  let token = '';
+  do {
+    const query = new URLSearchParams({ 'language_ranges[]': 'en', page_size: '99' });
+    if (token) query.set('page_token', token);
+    const page = await upstream('/bibles?' + query, key, fetcher);
+    if (!Array.isArray(page.data)) throw new Error('Invalid Bible catalog');
+    for (const bible of page.data) {
+      if (!Number.isSafeInteger(bible.id) || !/^en(?:-|$)/i.test(bible.language_tag || '')) continue;
+      result.push({ id: String(bible.id), abbreviation: String(bible.abbreviation || ''), title: String(bible.title || bible.localized_title || ''), copyright: String(bible.copyright || ''), publisher: String(bible.publisher_name || '') });
+    }
+    token = page.next_page_token || '';
+    if (token && tokens.has(token)) throw new Error('Repeated catalog page');
+    tokens.add(token);
+    if (tokens.size > 50) throw new Error('Catalog pagination limit');
+  } while (token);
+  return [...new Map(result.map(b => [b.id, b])).values()].sort((a, b) => a.abbreviation.localeCompare(b.abbreviation) || a.id.localeCompare(b.id));
+}
+async function passage(reference, preferred, catalog, key, fetcher = fetch) {
+  const ids = passageIds(reference);
+  if (!ids) return { status: 400, error: 'This reference cannot be previewed. Open it on YouVersion.' };
+  const requested = catalog.find(b => b.id === preferred || b.abbreviation.toUpperCase() === preferred.toUpperCase());
+  const ranked = ['NKJV', 'KJV', 'BSB', 'WEBUS'];
+  const alternatives = catalog.filter(b => b !== requested).sort((a, b) => {
+    const rank = b => { const i = ranked.indexOf(b.abbreviation.toUpperCase()); return i < 0 ? 100 : i; };
+    return rank(a) - rank(b);
+  });
+  // Bounded retries avoid amplifying outages. Never combine different translations.
+  for (const bible of [requested, ...alternatives].filter(Boolean).slice(0, 3)) {
+    try {
+      const parts = await Promise.all(ids.map(id => upstream('/bibles/' + bible.id + '/passages/' + encodeURIComponent(id) + '?format=text', key, fetcher)));
+      if (parts.some(p => typeof p.content !== 'string' || !p.content.trim())) continue;
+      return { text: parts.map(p => p.content.trim()).join('\n\n'), version: bible, fallback: bible !== requested,
+        url: 'https://www.bible.com/bible/' + bible.id + '/' + ids[0], reference };
+    } catch (error) {
+      if (![403, 404].includes(error.status)) throw error;
+    }
+  }
+  return { status: 503, error: 'No available translation could load this passage. Try again later or open YouVersion.' };
+}
+module.exports = { passageIds, versions, passage };

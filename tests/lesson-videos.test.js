@@ -464,6 +464,7 @@ test('lesson video study modal launches overlay without unmounting player, pause
     getBoundingClientRect: () => ({ left: 350, right: 380, top: 100, bottom: 120, width: 30, height: 20 })
   };
   const previewParts = { '.bible-preview-text': { textContent: '', hidden: true }, '.bible-preview-fallback': { textContent: '', hidden: false } };
+  for (const selector of ['[data-bible-version]', '[data-bible-version-search]', '.bible-preview-version', '.bible-preview-notice', '.bible-preview-copyright', '.bible-preview-open']) previewParts[selector] = { value: 'NKJV', innerHTML: '', textContent: '' };
   const preview = {
     parentNode: wrapper,
     nextSibling: null,

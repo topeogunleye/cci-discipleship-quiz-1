@@ -123,6 +123,9 @@
           try { legacy = readLegacy(owner); }
           catch (error) { return { raw: stored, backend: 'indexedDB', ok: true, migrated: false, notice: 'Could not access the legacy localStorage copy; IndexedDB is active.' }; }
           if (legacy === null) return { raw: stored, backend: 'indexedDB', ok: true, migrated: false, notice: '' };
+          if (stored !== null && stored !== legacy) {
+            return { raw: stored, backend: 'indexedDB', ok: true, migrated: false, notice: 'Existing IndexedDB progress preserved over legacy storage.' };
+          }
           if (stored === legacy) {
             var cleared = clearLegacyAfterConfirmation(stored, owner);
             return { raw: stored, backend: 'indexedDB', ok: true, migrated: true, notice: cleared ? '' : 'IndexedDB is confirmed, but the legacy localStorage copy could not be removed.' };
