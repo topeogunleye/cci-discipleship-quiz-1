@@ -18,6 +18,10 @@ const MAX_VERSES_PER_REQUEST = 176;
 // the app keeps a small in-memory copy per browser session.
 const UPSTREAM_TIMEOUT_MS = 5000;
 
+function normalizeSingleChapterReference(reference) {
+  return reference.replace(/^(Obadiah|Philemon|2\s+John|3\s+John|Jude)\s+(\d[\d\s,–—-]*)$/i, '$1 1:$2');
+}
+
 function isBoundedPassageReference(reference) {
   const match = /^([1-3]\s+)?[A-Za-z]+(?:\s+[A-Za-z]+)*\s+(\d{1,3})(?::\s*(\d{1,3}(?:\s*[-\u2013\u2014]\s*\d{1,3})?(?:\s*,\s*\d{1,3}(?:\s*[-\u2013\u2014]\s*\d{1,3})?)*))?$/.exec(reference);
   if (!match) return false;
@@ -101,7 +105,7 @@ export async function onRequestGet(context) {
   const { request, env } = context || {};
   const url = new URL(request.url);
   const references = url.searchParams.getAll('q');
-  const reference = references.length === 1 ? references[0].trim().replace(/\s+/g, ' ') : '';
+  const reference = references.length === 1 ? normalizeSingleChapterReference(references[0].trim().replace(/\s+/g, ' ')) : '';
   if (!reference || reference.length > MAX_REFERENCE_LENGTH || !isBoundedPassageReference(reference)) {
     return jsonResponse({ error: 'Enter a valid Bible passage reference.' }, 400);
   }

@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const bible = require('../functions/_lib/youversion.cjs');
+const loadFunction = require('./helpers/load-function.cjs');
 const response = data => new Response(JSON.stringify(data));
 const catalog = [{ id: '1', abbreviation: 'KJV', title: 'King James', copyright: 'fixture copyright' }, { id: '2', abbreviation: 'NKJV', title: 'New King James', copyright: 'fixture copyright' }];
 
@@ -67,12 +68,33 @@ test('outages and rate limits do not fan out through the translation catalog', a
   assert.equal(requests, 1);
 });
 
+test('every authored multipart citation retains a translated link for every resolved segment', async () => {
+  let checked = 0;
+  for (const file of fs.readdirSync('decks').filter(f => f.endsWith('.txt'))) {
+    for (const match of fs.readFileSync('decks/' + file, 'utf8').matchAll(/https:\/\/www\.esv\.org\/verses\/([^/>]+)\//g)) {
+      const reference = decodeURIComponent(match[1].replace(/\+/g, ' ')), ids = bible.passageIds(reference);
+      if (ids.length < 2) continue;
+      const result = await bible.passage(reference, 'NKJV', catalog, 'fixture', async () => response({ content: 'fixture' }));
+      assert.deepEqual(result.links.map(link => link.url), ids.map(id => 'https://www.bible.com/bible/2/' + id), reference);
+      assert.equal(new Set(result.links.map(link => link.label)).size, ids.length, reference);
+      checked++;
+    }
+  }
+  assert.equal(checked, 23);
+});
+
+test('missing or unlicensed text has a distinct not-found status after bounded fallbacks', async () => {
+  const empty = await bible.passage('John 3:16', 'NKJV', catalog, 'fixture', async () => response({ content: ' ' }));
+  assert.equal(empty.status, 404);
+  const missing = await bible.passage('John 3:16', 'NKJV', catalog, 'fixture', async () => new Response(null, { status: 404 }));
+  assert.equal(missing.status, 404);
+});
+
 test('Function rejects invalid references/origins, hides upstream errors and never exposes the key', async () => {
-  const vm = require('node:vm');
-  const auth = require('../functions/_lib/auth.cjs');
-  const source = fs.readFileSync('functions/api/bible.js', 'utf8').replace(/^import .*;\n/gm, '').replace('export async function', 'async function');
   let calls = 0;
-  const handler = vm.runInNewContext(source + '\nonRequestGet', { URL, Response, auth, bible: { ...bible, versions: async () => { calls++; throw new Error('private-key'); } } });
+  const handler = loadFunction('functions/api/bible.js', {
+    modules: { '../_lib/youversion.cjs': { ...bible, versions: async () => { calls++; throw new Error('private-key'); } } }
+  }).onRequestGet;
   const request = q => new Request('https://study.example/api/bible' + q);
   assert.equal((await handler({ request: request('?q=invalid'), env: {} })).status, 400);
   assert.equal((await handler({ request: request(''), env: {} })).status, 503);
@@ -105,17 +127,13 @@ test('catalog caches in-memory and deduplicates concurrent fetches', async () =>
 });
 
 test('Function returns cacheable headers on successful catalog and passage queries', async () => {
-  const vm = require('node:vm');
-  const auth = require('../functions/_lib/auth.cjs');
-  const source = fs.readFileSync('functions/api/bible.js', 'utf8').replace(/^import .*;\n/gm, '').replace('export async function', 'async function');
-  const handler = vm.runInNewContext(source + '\nonRequestGet', {
-    URL, Response, auth,
-    bible: {
+  const handler = loadFunction('functions/api/bible.js', {
+    modules: { '../_lib/youversion.cjs': {
       ...bible,
       versions: async () => [{ id: '12', abbreviation: 'ASV', title: 'ASV' }],
       passage: async () => ({ text: 'In the beginning...', version: { id: '12', abbreviation: 'ASV' }, status: 200 })
-    }
-  });
+    } }
+  }).onRequestGet;
   const env = {
     YOUVERSION_APP_KEY: 'test-key',
     ESV_RATE_LIMITER: { fetch: async () => new Response(null, { status: 200 }) }
@@ -150,7 +168,7 @@ function previewUi(fetcher) {
       activate: function(link, preview) { activeBiblePreview = {link:link,preview:preview}; } };
   `);
   vm.runInNewContext(source, { window, document, URL, AbortController, fetch: fetcher });
-  const nodes = Object.fromEntries(['[data-bible-version]', '.bible-preview-version', '.bible-preview-notice', '.bible-preview-copyright', '.bible-preview-open', '.bible-preview-text', '.bible-preview-fallback'].map(key => [key, { value: 'ASV', textContent: '', hidden: false }]));
+  const nodes = Object.fromEntries(['[data-bible-version]', '.bible-preview-version', '.bible-preview-notice', '.bible-preview-copyright', '.bible-preview-open', '.bible-preview-text', '.bible-preview-fallback', '.bible-preview-parts'].map(key => [key, { value: 'ASV', textContent: '', innerHTML: '', hidden: false }]));
   const preview = { querySelector: key => nodes[key] }, link = { textContent: 'John 3:16' };
   window.ui.activate(link, preview);
   return { ui: window.ui, nodes, preview, link, timers, change: target => listeners.change.forEach(fn => fn({ target })) };
@@ -194,4 +212,35 @@ test('preview timeout replaces the loading state with a retry message', async ()
   h.timers.get(20000)();
   await flush();
   assert.match(h.nodes['.bible-preview-fallback'].textContent, /took too long/);
+});
+
+test('successful text clears the hidden loading description and renders all external links', async () => {
+  const h = previewUi(async () => response({ text: 'fixture', version: catalog[0], links: [
+    { label: 'Hebrews 1:3', url: 'https://www.bible.com/bible/1/HEB.1.3' },
+    { label: 'Hebrews 1:5–6', url: 'https://www.bible.com/bible/1/HEB.1.5-6' },
+    { label: 'Hebrews 1:13–14', url: 'https://www.bible.com/bible/1/HEB.1.13-14' }
+  ] }));
+  h.ui.load(h.link, h.preview);
+  await flush();
+  assert.equal(h.nodes['.bible-preview-fallback'].textContent, '');
+  assert.equal(h.nodes['.bible-preview-fallback'].hidden, true);
+  assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open Hebrews 1:3 on YouVersion');
+  assert.match(h.nodes['.bible-preview-parts'].innerHTML, /HEB\.1\.5-6/);
+  assert.match(h.nodes['.bible-preview-parts'].innerHTML, /HEB\.1\.13-14/);
+  assert.equal(h.nodes['.bible-preview-parts'].hidden, false);
+});
+
+test('passage failures distinguish invalid, missing, limited, upstream and network causes', async () => {
+  for (const [status, expected] of [[400, /reference cannot be previewed/], [404, /No passage text was found/], [429, /Try again in 120 seconds/], [503, /temporarily unavailable/]]) {
+    const h = previewUi(async () => new Response('{}', { status, headers: { 'Retry-After': '120' } }));
+    h.ui.load(h.link, h.preview);
+    await flush();
+    assert.match(h.nodes['.bible-preview-fallback'].textContent, expected);
+  }
+  const empty = previewUi(async () => response({ text: '', version: catalog[0] }));
+  empty.ui.load(empty.link, empty.preview); await flush();
+  assert.match(empty.nodes['.bible-preview-fallback'].textContent, /No passage text was found/);
+  const network = previewUi(async () => { throw new TypeError('Failed to fetch'); });
+  network.ui.load(network.link, network.preview); await flush();
+  assert.match(network.nodes['.bible-preview-fallback'].textContent, /Check your connection/);
 });

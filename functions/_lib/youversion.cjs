@@ -95,12 +95,18 @@ async function passage(reference, preferred, catalog, key, fetcher = fetch) {
     try {
       const parts = await Promise.all(ids.map(id => upstream('/bibles/' + bible.id + '/passages/' + encodeURIComponent(id) + '?format=text', key, fetcher)));
       if (parts.some(p => typeof p.content !== 'string' || !p.content.trim())) continue;
+      const book = reference.trim().match(/^([1-3]?\s*[A-Za-z ]+?)\s+\d/)[1];
+      const links = ids.map(id => {
+        const [, chapter, verses] = id.split('.');
+        return { label: book + ' ' + chapter + (verses ? ':' + verses.replace(/-/g, '–') : ''),
+          url: 'https://www.bible.com/bible/' + bible.id + '/' + id };
+      });
       return { text: parts.map(p => p.content.trim()).join('\n\n'), version: bible, fallback: bible !== requested,
-        url: 'https://www.bible.com/bible/' + bible.id + '/' + ids[0], reference };
+        url: links[0].url, links, reference };
     } catch (error) {
       if (![403, 404].includes(error.status)) throw error;
     }
   }
-  return { status: 503, error: 'No available translation could load this passage. Try again later or open YouVersion.' };
+  return { status: 404, error: 'Passage text is not available in the supported translations. Open the passage on YouVersion.' };
 }
 module.exports = { passageIds, versions, passage, __test: { clearCatalogCache } };

@@ -3,6 +3,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const loadFunction = require('./helpers/load-function.cjs');
+
+test('single-chapter shorthand is normalized before ESV validation and retrieval', async () => {
+  const seen = [];
+  const handler = loadFunction('functions/api/esv-passage.js', { fetch: async url => {
+    seen.push(new URL(url).searchParams.get('q'));
+    return Response.json({ passages: ['fixture'] });
+  } }).onRequestGet;
+  const env = { ESV_API_KEY: 'fixture-key', ESV_RATE_LIMITER: { fetch: async () => new Response(null, { status: 204 }) } };
+  for (const [input, expected] of [['Jude 24–25', 'Jude 1:24–25'], ['Philemon 4–6', 'Philemon 1:4–6'], ['2 John 5–6', '2 John 1:5–6'], ['3 John 2', '3 John 1:2'], ['Obadiah 3–4', 'Obadiah 1:3–4'], ['Jude 1:24–25', 'Jude 1:24–25']]) {
+    const result = await handler({ request: new Request('https://study.example/api/esv-passage?q=' + encodeURIComponent(input), { headers: { 'CF-Connecting-IP': '192.0.2.1' } }), env });
+    assert.equal(result.status, 200, input);
+    assert.equal(seen.at(-1), expected);
+  }
+});
 
 const root = path.join(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'functions/api/esv-passage.js'), 'utf8')

@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const loadFunction = require('./helpers/load-function.cjs');
 
 const root = path.join(__dirname, '..');
 const response = (data, status) => new Response(JSON.stringify(data), { status: status || 200 });
@@ -58,17 +59,14 @@ test('ESV requests reserve quota from the ESV scope of the private limiter', asy
 
 test('YouVersion requests reserve quota from their own scope', async () => {
   const seen = [];
-  const auth = require('../functions/_lib/auth.cjs');
-  const bibleSource = fs.readFileSync(path.join(root, 'functions/api/bible.js'), 'utf8').replace(/^import .*;\n/gm, '').replace('export async function', 'async function');
-  const handler = vm.runInNewContext(bibleSource + '\nonRequestGet', {
-    URL, Request, Response, AbortSignal, auth,
+  const handler = loadFunction('functions/api/bible.js', {
     fetch: async () => response({}),
-    bible: {
+    modules: { '../_lib/youversion.cjs': {
       passageIds: () => ['JHN.3.16'],
       versions: async (key, fetcher) => { await fetcher('https://upstream.test/bibles', {}); return [{ id: '12', abbreviation: 'ASV', title: 'ASV' }]; },
       passage: async () => ({ text: 'x', version: { abbreviation: 'ASV' } })
-    }
-  });
+    } }
+  }).onRequestGet;
   const env = { YOUVERSION_APP_KEY: 'k', ESV_RATE_LIMITER: { fetch: async request => { seen.push(request.url); return new Response(null, { status: 204 }); } } };
   await handler({ request: new Request('https://study.example/api/bible', { headers: { 'CF-Connecting-IP': '198.51.100.7' } }), env });
   assert.deepEqual(seen, ['https://esv-rate-limiter.internal/check/youversion']);
