@@ -99,7 +99,7 @@ function previewUi(fetcher) {
       activate: function(link, preview) { activeBiblePreview = {link:link,preview:preview}; } };
   `);
   vm.runInNewContext(source, { window, document, URL, AbortController, fetch: fetcher });
-  const nodes = Object.fromEntries(['[data-bible-version]', '.bible-preview-version', '.bible-preview-notice', '.bible-preview-copyright', '.bible-preview-open', '.bible-preview-text', '.bible-preview-fallback'].map(key => [key, { value: 'NKJV', textContent: '', hidden: false }]));
+  const nodes = Object.fromEntries(['[data-bible-version]', '.bible-preview-version', '.bible-preview-notice', '.bible-preview-copyright', '.bible-preview-open', '.bible-preview-text', '.bible-preview-fallback'].map(key => [key, { value: 'ASV', textContent: '', hidden: false }]));
   const preview = { querySelector: key => nodes[key] }, link = { textContent: 'John 3:16' };
   window.ui.activate(link, preview);
   return { ui: window.ui, nodes, preview, link, timers, change: target => listeners.change.forEach(fn => fn({ target })) };
@@ -113,7 +113,7 @@ test('preview switching does not save preference; Settings does, and fallback te
   });
   harness.change({ dataset: { bibleVersion: 'preview' }, value: '1' });
   await flush();
-  assert.equal(harness.ui.state.settings.bibleVersion, 'NKJV');
+  assert.equal(harness.ui.state.settings.bibleVersion, 'ASV');
   assert.equal(harness.nodes['.bible-preview-version'].textContent, 'KJV');
   assert.match(harness.nodes['.bible-preview-copyright'].textContent, /fixture copyright/);
   harness.change({ dataset: { bibleVersion: 'default' }, value: '1' });
@@ -121,14 +121,14 @@ test('preview switching does not save preference; Settings does, and fallback te
   const fallback = previewUi(async () => response({ text: 'Fixture', version: catalog[0], fallback: true }));
   fallback.ui.load(fallback.link, fallback.preview);
   await flush();
-  assert.match(fallback.nodes['.bible-preview-notice'].textContent, /NKJV unavailable — showing KJV/);
-  assert.equal(fallback.ui.state.settings.bibleVersion, 'NKJV');
+  assert.match(fallback.nodes['.bible-preview-notice'].textContent, /ASV unavailable — showing KJV/);
+  assert.equal(fallback.ui.state.settings.bibleVersion, 'ASV');
 });
 
 test('a slower earlier translation response cannot replace the latest selection', async () => {
   const requests = [];
   const h = previewUi(() => new Promise(resolve => requests.push(resolve)));
-  h.ui.load(h.link, h.preview, 'NKJV');
+  h.ui.load(h.link, h.preview, 'ASV');
   h.ui.load(h.link, h.preview, '1');
   requests[1](response({ text: 'Latest fixture', version: catalog[0], fallback: false }));
   await flush();

@@ -7,8 +7,8 @@ export async function onRequestGet({ request, env }) {
   if (!auth.originAllowed(request, env)) return reply({ error: 'Origin not allowed.' }, 403);
   const params = new URL(request.url).searchParams;
   if (params.getAll('q').length > 1 || params.getAll('version').length > 1) return reply({ error: 'Duplicate query parameters are not supported.' }, 400);
-  const reference = params.get('q'), version = params.get('version') || 'NKJV';
-  if ((reference !== null && !bible.passageIds(reference)) || !/^(?:[1-9]\d{0,9}|NKJV)$/.test(version)) return reply({ error: 'Enter a supported Bible reference and translation.' }, 400);
+  const reference = params.get('q'), version = params.get('version') || 'ASV';
+  if ((reference !== null && !bible.passageIds(reference)) || !/^(?:[1-9]\d{0,9}|NKJV|ASV)$/.test(version)) return reply({ error: 'Enter a supported Bible reference and translation.' }, 400);
   if (!env.YOUVERSION_APP_KEY) return reply({ error: 'Bible previews are not configured yet.' }, 503);
   try {
     // Reuse the deployed private limiter. Each upstream call reserves quota,

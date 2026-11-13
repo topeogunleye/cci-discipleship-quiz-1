@@ -53,7 +53,7 @@ async function passage(reference, preferred, catalog, key, fetcher = fetch) {
   const ids = passageIds(reference);
   if (!ids) return { status: 400, error: 'This reference cannot be previewed. Open it on YouVersion.' };
   const requested = catalog.find(b => b.id === preferred || b.abbreviation.toUpperCase() === preferred.toUpperCase());
-  const ranked = ['NKJV', 'KJV', 'BSB', 'WEBUS'];
+  const ranked = ['ASV', 'NKJV', 'KJV', 'BSB', 'WEBUS'];
   const alternatives = catalog.filter(b => b !== requested).sort((a, b) => {
     const rank = b => { const i = ranked.indexOf(b.abbreviation.toUpperCase()); return i < 0 ? 100 : i; };
     return rank(a) - rank(b);

@@ -2,7 +2,7 @@
   'use strict';
   var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, ProgressSync = window.CCIProgressSync, Account = window.CCIAccount, TranscriptTools = window.CCITranscripts, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 14;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
-  function defaultStudyState() { return { decks: [], progress: {}, settings: { theme: 'auto', bibleVersion: 'NKJV', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, cloudSyncDeviceId: null, seeded: false, dataVersion: 0, pausedSession: null }; }
+  function defaultStudyState() { return { decks: [], progress: {}, settings: { theme: 'auto', bibleVersion: 'ASV', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, cloudSyncDeviceId: null, seeded: false, dataVersion: 0, pausedSession: null }; }
   var S = defaultStudyState();
   var STARTER_DECKS = [], DEVOTIONALS = [], LESSON_VIDEOS = [];
   var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, suppressBiblePreviewFocus = null;
@@ -107,10 +107,10 @@
     }
   }
   var bibleVersions = [], bibleVersionsRequest = null;
-  function validBibleVersion(value) { return /^(?:[1-9]\d{0,9}|NKJV)$/.test(String(value || '')) ? String(value) : 'NKJV'; }
+  function validBibleVersion(value) { return /^(?:[1-9]\d{0,9}|NKJV|ASV)$/.test(String(value || '')) ? String(value) : 'ASV'; }
   function bibleApiUrl() { return (account ? account.apiBase : (window.CCI_API_BASE || (Account && Account.DEFAULT_API_BASE) || '')) + '/api/bible'; }
   function bibleVersionOptions(selected, query) {
-    var options = [{ id: 'NKJV', abbreviation: 'NKJV', title: 'Preferred default (when available)' }].concat(bibleVersions);
+    var options = [{ id: 'ASV', abbreviation: 'ASV', title: 'Preferred default (when available)' }].concat(bibleVersions);
     if (!options.some(function (v) { return v.id === selected; })) options.unshift({ id: selected, abbreviation: 'Saved translation', title: selected });
     return options.filter(function (v) { return v.id === selected || !query || (v.abbreviation + ' ' + v.title).toLowerCase().indexOf(query.toLowerCase()) >= 0; }).map(function (v) {
       return '<option value="' + esc(v.id) + '"' + (v.id === selected ? ' selected' : '') + '>' + esc(v.abbreviation + ' — ' + v.title) + '</option>';
@@ -169,7 +169,7 @@
       updateBiblePreviewText(preview, result.text);
       preview.querySelector('.bible-preview-version').textContent = result.version.abbreviation;
       var selectedLabel = bibleVersions.find(function (v) { return v.id === version; });
-      preview.querySelector('.bible-preview-notice').textContent = result.fallback ? (selectedLabel ? selectedLabel.abbreviation : version === 'NKJV' ? 'NKJV' : 'Selected translation') + ' unavailable — showing ' + result.version.abbreviation + '. Your saved default is unchanged.' : '';
+      preview.querySelector('.bible-preview-notice').textContent = result.fallback ? (selectedLabel ? selectedLabel.abbreviation : (version === 'ASV' || version === 'NKJV') ? version : 'Selected translation') + ' unavailable — showing ' + result.version.abbreviation + '. Your saved default is unchanged.' : '';
       preview.querySelector('.bible-preview-copyright').textContent = result.version.title + '. ' + result.version.copyright + (result.version.publisher ? ' ' + result.version.publisher : '') + ' Provided by YouVersion.';
       if (/^https:\/\/www\.bible\.com\/bible\/[0-9]+\//.test(result.url || '')) openLink.href = result.url;
       positionBiblePreview(link, preview);
