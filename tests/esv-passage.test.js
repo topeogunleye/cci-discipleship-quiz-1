@@ -6,38 +6,50 @@ const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'functions/api/esv-passage.js'), 'utf8')
-  .replace(/^export async function onRequestGet/m, 'async function onRequestGet');
+  .replace(/export function /g, 'function ')
+  .replace(/export async function /g, 'async function ');
 
-function loadHandler(fetchImpl) {
-  return vm.runInNewContext(source + '\nonRequestGet', {
+function loadHandler(fetchImpl, mockCaches) {
+  return vm.runInNewContext(source + '\n({ onRequestGet, onRequestOptions })', {
     URL,
+    Request,
     Response,
+    Headers,
+    caches: mockCaches || undefined,
     fetch: fetchImpl
   });
 }
 
+function allowedRateLimiter() {
+  return {
+    fetch: async () => new Response(null, { status: 204 })
+  };
+}
+
 test('ESV passage function requires a configured secret and validates passage references', async () => {
   let requests = 0;
-  const handler = loadHandler(async () => { requests++; throw new Error('unexpected upstream request'); });
-  const missingKey = await handler({
+  const handlers = loadHandler(async () => { requests++; throw new Error('unexpected upstream request'); });
+  const missingKey = await handlers.onRequestGet({
     request: new Request('https://study.example/api/esv-passage?q=John+3%3A16'),
     env: {}
   });
   assert.equal(missingKey.status, 503);
+  assert.equal(missingKey.headers.get('Cache-Control'), 'no-store');
   assert.match((await missingKey.json()).error, /not configured/i);
 
-  const invalidReference = await handler({
+  const invalidReference = await handlers.onRequestGet({
     request: new Request('https://study.example/api/esv-passage?q=https%3A%2F%2Fevil.example'),
     env: { ESV_API_KEY: 'secret' }
   });
   assert.equal(invalidReference.status, 400);
+  assert.equal(invalidReference.headers.get('Cache-Control'), 'no-store');
   assert.equal(requests, 0);
 });
 
-test('ESV passage function calls the official API with its secret header and returns uncached text', async () => {
+test('ESV passage function calls the official API with its secret header and returns no-store text with CORS', async () => {
   let upstreamUrl;
   let upstreamHeaders;
-  const handler = loadHandler(async (url, options) => {
+  const handlers = loadHandler(async (url, options) => {
     upstreamUrl = new URL(url);
     upstreamHeaders = options.headers;
     return new Response(JSON.stringify({ passages: ['For God so loved the world. (ESV)'] }), {
@@ -46,17 +58,67 @@ test('ESV passage function calls the official API with its secret header and ret
     });
   });
 
-  const response = await handler({
-    request: new Request('https://study.example/api/esv-passage?q=John+3%3A16'),
-    env: { ESV_API_KEY: 'test-esv-key' }
+  const response = await handlers.onRequestGet({
+    request: new Request('https://study.example/api/esv-passage?q=John+3%3A16', {
+      headers: { 'CF-Connecting-IP': '198.51.100.7' }
+    }),
+    env: { ESV_API_KEY: 'test-esv-key', ESV_RATE_LIMITER: allowedRateLimiter() }
   });
 
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'), '*');
   assert.deepEqual(await response.json(), { text: 'For God so loved the world. (ESV)' });
   assert.equal(upstreamUrl.origin + upstreamUrl.pathname, 'https://api.esv.org/v3/passage/text/');
   assert.equal(upstreamUrl.searchParams.get('q'), 'John 3:16');
   assert.equal(upstreamUrl.searchParams.get('include-short-copyright'), 'true');
   assert.equal(upstreamHeaders.Authorization, 'Token test-esv-key');
   assert.equal(upstreamHeaders.Accept, 'application/json');
+
+  const optionsResponse = handlers.onRequestOptions();
+  assert.equal(optionsResponse.status, 204);
+  assert.equal(optionsResponse.headers.get('Access-Control-Allow-Origin'), '*');
+});
+
+test('ESV passage text is not persisted through the Cloudflare Cache API', async () => {
+  let upstreamRequests = 0, cacheCalls = 0;
+  const mockCaches = {
+    default: {
+      match: async () => { cacheCalls++; return null; },
+      put: async () => { cacheCalls++; }
+    }
+  };
+
+  const handlers = loadHandler(async () => {
+    upstreamRequests++;
+    return new Response(JSON.stringify({ passages: ['In the beginning was the Word. (ESV)'] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }, mockCaches);
+
+  // Each request goes to ESV and returns a no-store response.
+  const first = await handlers.onRequestGet({
+    request: new Request('https://study.example/api/esv-passage?q=John+1%3A1', {
+      headers: { 'CF-Connecting-IP': '198.51.100.7' }
+    }),
+    env: { ESV_API_KEY: 'test-esv-key', ESV_RATE_LIMITER: allowedRateLimiter() }
+  });
+  assert.equal(first.status, 200);
+  assert.equal(upstreamRequests, 1);
+  assert.equal(first.headers.get('Cache-Control'), 'no-store');
+  assert.deepEqual(await first.json(), { text: 'In the beginning was the Word. (ESV)' });
+
+  // A repeated request is not served from a persistent application cache.
+  const second = await handlers.onRequestGet({
+    request: new Request('https://study.example/api/esv-passage?q=John+1%3A1', {
+      headers: { 'CF-Connecting-IP': '198.51.100.7' }
+    }),
+    env: { ESV_API_KEY: 'test-esv-key', ESV_RATE_LIMITER: allowedRateLimiter() }
+  });
+  assert.equal(second.status, 200);
+  assert.equal(second.headers.get('Cache-Control'), 'no-store');
+  assert.equal(upstreamRequests, 2, 'ESV text remains uncached at the edge');
+  assert.equal(cacheCalls, 0);
+  assert.deepEqual(await second.json(), { text: 'In the beginning was the Word. (ESV)' });
 });

@@ -21,8 +21,17 @@ function replaceOnce(source, search, replacement) {
 }
 
 function normalizeTextFile(file) {
-  const content = fs.readFileSync(file, 'utf8').replace(/[ \t]+$/gm, '');
-  fs.writeFileSync(file, content);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const content = fs.readFileSync(file, 'utf8').replace(/[ \t]+$/gm, '');
+      fs.writeFileSync(file, content);
+      break;
+    } catch (e) {
+      if (attempt === 4) throw e;
+      const start = Date.now();
+      while (Date.now() - start < 150) {}
+    }
+  }
 }
 
 function normalizeTextFiles(directory) {
@@ -36,7 +45,9 @@ function normalizeTextFiles(directory) {
 normalizeTextFile(path.join(root, 'js/supabase.bundle.js'));
 
 html = replaceOnce(html, '<link rel="stylesheet" href="style.css">', `<style>\n${read('style.css')}\n</style>`);
-html = replaceOnce(html, '<script type="application/json" id="starter-fallback">""</script>', `<script type="application/json" id="starter-fallback">${inlineJson}</script>`);
+// Keep starter-fallback lightweight in dist/index.html to save 1.09 MB of payload bloat
+// Decks are loaded dynamically via decks/manifest.json and decks/starter-decks.js
+// html = replaceOnce(html, '<script type="application/json" id="starter-fallback">""</script>', `<script type="application/json" id="starter-fallback">${inlineJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="devotionals-fallback">[]</script>', `<script type="application/json" id="devotionals-fallback">${devotionalsJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="lesson-videos-fallback">{"schemaVersion":1,"videos":[]}</script>', `<script type="application/json" id="lesson-videos-fallback">${lessonVideosJson}</script>`);
 html = replaceOnce(html, '<script type="application/json" id="lesson-transcripts-fallback">{"schemaVersion":1,"transcripts":[]}</script>', `<script type="application/json" id="lesson-transcripts-fallback">${lessonTranscriptsJson}</script>`);
@@ -54,6 +65,10 @@ html = replaceOnce(html, '<script src="js/app.js"></script>', `<script>\n${read(
 for (const retired of ['content/sermons', 'content/sermons.json', 'js/sermons.js', 'js/sermons-ui.js', 'js/sermon-audio.js']) {
   fs.rmSync(path.join(outputDir, retired), { recursive: true, force: true });
 }
+// Raw lesson transcripts are source material. Only the authenticated VTT
+// function may serve mapped captions; never leave legacy Markdown/SRT files in
+// an output directory reused by a later build.
+fs.rmSync(path.join(outputDir, 'transcripts'), { recursive: true, force: true });
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(path.join(outputDir, 'index.html'), html);
 for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html', 'favicon.ico', 'style.css']) {
@@ -62,6 +77,9 @@ for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html',
 for (const directory of ['decks', 'icons', 'content', 'js']) {
   fs.cpSync(path.join(root, directory), path.join(outputDir, directory), { recursive: true });
 }
+const starterDecksJs = `window.CCI_STARTER_DECKS = ${inlineJson};\n`;
+fs.writeFileSync(path.join(root, 'decks', 'starter-decks.js'), starterDecksJs);
+fs.writeFileSync(path.join(outputDir, 'decks', 'starter-decks.js'), starterDecksJs);
 require('./lesson-transcripts.js').writeLessonTranscripts(root);
 normalizeTextFile(path.join(outputDir, 'style.css'));
 normalizeTextFiles(path.join(outputDir, 'js'));

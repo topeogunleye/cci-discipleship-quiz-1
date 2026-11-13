@@ -45,7 +45,7 @@ Usage guide: https://developers.youversion.com/api-usage
 
 ## Checks performed
 
-- `npm run build` passes; generated `dist` includes the new controls and shell v51.
+- `npm run build` passes; generated `dist` includes the new controls and shell v55.
 - `npm test` passes all 19 test files (existing content-quality TODOs remain).
 - New tests cover the authored reference corpus, catalog pagination/language
   filtering, NKJV preference, scoped fallback, copyright/link metadata, secret
@@ -57,3 +57,13 @@ Usage guide: https://developers.youversion.com/api-usage
   `/tmp/youversion-preview.png`. Live licensed passages remain unverified because
   the secret is stored only in Cloudflare, not in the local preview.
 - No commits, pushes, deployments or production-data changes were performed.
+
+## Integration with current main
+
+The integration preserves the current video study modal and its portaled Bible
+preview, hash routing, cloud sync and security changes. It reuses the existing
+private `ESV_RATE_LIMITER` service binding for every outgoing YouVersion request.
+Both providers conservatively share its IP/daily budget during rollout; missing
+or failed rate-limit protection fails closed. Preview deployments therefore need
+both the YouVersion secret and the service binding. No new secret is introduced
+for the limiter, and no existing security control is disabled.

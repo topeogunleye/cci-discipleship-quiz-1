@@ -2,7 +2,17 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { toWebVtt } = require('../js/transcripts.js');
+
+function withoutExportMetadata(source) {
+  const text = source.replace(/\r\n?/g, '\n');
+  const firstTiming = text.search(/^\d{2,}:\d{2}:\d{2}[,.]\d{3}\s+-->/m);
+  if (firstTiming < 0) throw new Error('Transcript has no valid timing line.');
+  // Ignore the known exporter header only before the first cue's timing.
+  // Never discard matching words inside spoken cue text.
+  return text.slice(0, firstTiming).replace(/^Meeting created at: [^\n]*(?:\n|$)/gm, '') + text.slice(firstTiming);
+}
 
 function compileLessonTranscripts(root) {
   const readJson = file => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
@@ -19,7 +29,35 @@ function compileLessonTranscripts(root) {
     }
     const source = path.join(root, 'transcript', item.file);
     if (!fs.existsSync(source)) throw new Error(`Mapped transcript is missing: ${item.file}`);
-    passages[item.file.replace(/\.srt$/i, '.vtt')] = toWebVtt(fs.readFileSync(source, 'utf8'));
+    const sourceBytes = fs.readFileSync(source);
+    if (item.selection) {
+      if (!['user-confirmed', 'metadata-only-duplicates'].includes(item.selection.basis) || !/^[a-f0-9]{64}$/.test(item.selection.sourceSha256 || '')) {
+        throw new Error(`Invalid transcript selection evidence: ${item.videoId}`);
+      }
+      // Git may convert line endings on checkout; wording and timing must still
+      // match the selected source, regardless of LF/CRLF platform conventions.
+      const fingerprint = crypto.createHash('sha256').update(sourceBytes.toString('utf8').replace(/\r\n?/g, '\n')).digest('hex');
+      if (fingerprint !== item.selection.sourceSha256) {
+        throw new Error(`Confirmed transcript source changed; review the selection again: ${item.videoId}`);
+      }
+      if (item.selection.basis === 'metadata-only-duplicates') {
+        const alternatives = item.selection.equivalentFiles;
+        if (!Array.isArray(alternatives) || !alternatives.length || new Set(alternatives).size !== alternatives.length) {
+          throw new Error(`Invalid equivalent transcript inventory: ${item.videoId}`);
+        }
+        const selectedText = withoutExportMetadata(sourceBytes.toString('utf8'));
+        for (const file of alternatives) {
+          if (typeof file !== 'string' || path.basename(file) !== file || !/^[A-Za-z0-9._-]+\.srt$/i.test(file) || file === item.file) {
+            throw new Error(`Invalid equivalent transcript filename: ${item.videoId}`);
+          }
+          const text = fs.readFileSync(path.join(root, 'transcript', file), 'utf8');
+          if (withoutExportMetadata(text) !== selectedText) {
+            throw new Error(`Transcript variants differ beyond export metadata; review again: ${item.videoId}`);
+          }
+        }
+      }
+    }
+    passages[item.file.replace(/\.srt$/i, '.vtt')] = toWebVtt(sourceBytes.toString('utf8'));
     mappedVideos.add(item.videoId);
     mappedFiles.add(item.file);
   }

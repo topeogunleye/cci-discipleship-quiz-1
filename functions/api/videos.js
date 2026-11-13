@@ -1,4 +1,5 @@
 import auth from '../_lib/auth.cjs';
+import videoCatalog from '../_lib/video-catalog.cjs';
 
 function cors(request, env) {
   return auth.withCors({ 'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS', 'Access-Control-Allow-Headers': 'Range, If-Range, If-None-Match', 'Access-Control-Expose-Headers': 'Accept-Ranges, Content-Length, Content-Range, ETag' }, request, env);
@@ -38,15 +39,26 @@ export function onRequestOptions({ request, env }) {
   return new Response(null, { status: 204, headers: cors(request, env) });
 }
 
-export async function onRequest({ request, env }) {
+export async function onRequest(context) {
+  const { request, env } = context || {};
   if (!['GET', 'HEAD'].includes(request.method)) return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD, OPTIONS', 'Cache-Control': 'no-store' } });
   if (!auth.originAllowed(request, env)) return auth.jsonResponse({ error: 'This app origin is not allowed.' }, 403, cors(request, env));
-  const user = await auth.getAuthenticatedUser(auth.videoToken(request), env);
+  const key = new URL(request.url).searchParams.get('key') || '';
+  let user;
+  try {
+    const token = auth.videoToken(request);
+    if (auth.isPlaybackTicket(token)) {
+      user = await auth.verifyPlaybackTicket(token, videoCatalog.videoIdForObjectKey(key), env);
+    } else {
+      user = env && env.VIDEO_AUTH_MODE === 'remote'
+        ? await auth.getAuthenticatedUser(token, env)
+        : await auth.verifySupabaseAccessToken(token, env);
+    }
+  }
+  catch (error) { return auth.authServiceUnavailableResponse(request, env, error); }
   if (!user) return unauthorized(request, env);
   if (!env || !env.LESSON_VIDEOS) return auth.jsonResponse({ error: 'Lesson video storage is not configured.' }, 503, cors(request, env));
-
-  const key = new URL(request.url).searchParams.get('key') || '';
-  if (!safeObjectKey(key)) return auth.jsonResponse({ error: 'Lesson video not found.' }, 404, cors(request, env));
+  if (!safeObjectKey(key) || !videoCatalog.isCatalogVideoKey(key)) return auth.jsonResponse({ error: 'Lesson video not found.' }, 404, cors(request, env));
   const headers = cors(request, env);
   headers.set('Cache-Control', 'private, no-store');
   headers.set('X-Content-Type-Options', 'nosniff');
@@ -77,10 +89,12 @@ export async function onRequest({ request, env }) {
       const length = Number(object.range.length);
       headers.set('Content-Length', String(length));
       headers.set('Content-Range', 'bytes ' + start + '-' + (start + length - 1) + '/' + object.size);
+
       return new Response(object.body, { status: 206, headers });
     }
     if (range) return auth.jsonResponse({ error: 'The requested video range could not be served.' }, 502, headers);
     headers.set('Content-Length', String(object.size));
+
     return new Response(object.body, { status: 200, headers });
   } catch (error) {
     if (request.headers.has('Range')) {

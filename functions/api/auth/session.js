@@ -1,4 +1,5 @@
 import auth from '../../_lib/auth.cjs';
+import videoCatalog from '../../_lib/video-catalog.cjs';
 
 function cors(request, env) {
   return auth.withCors({ 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }, request, env);
@@ -27,14 +28,30 @@ export async function onRequestPost({ request, env }) {
     return auth.jsonResponse({ ok: true }, 200, headers);
   }
 
-  const user = await auth.getAuthenticatedUser(body && body.accessToken, env);
+  let user;
+  try { user = await auth.getAuthenticatedUser(body && body.accessToken, env); }
+  catch (error) { return auth.authServiceUnavailableResponse(request, env, error); }
   if (!user) return auth.jsonResponse({ error: 'Sign in again to enable lesson video access.' }, 401, headers);
   const token = body.accessToken;
-  let maxAge = 3600;
-  try {
-    const claims = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-    if (Number.isFinite(claims.exp)) maxAge = Math.max(1, claims.exp - Math.floor(Date.now() / 1000));
-  } catch (error) {}
+  // Bind the cookie to the same account whose signed token was remotely validated.
+  // The subject is only trusted after getAuthenticatedUser accepts the token.
+  if (auth.accessTokenSubject(token) !== user.id) return auth.jsonResponse({ error: 'Sign in again to enable lesson video access.' }, 401, headers);
+  const expiresAt = auth.accessTokenExpiration(token);
+  const remainingLifetime = expiresAt - Math.floor(Date.now() / 1000);
+  if (!Number.isFinite(expiresAt) || remainingLifetime <= 0) return auth.jsonResponse({ error: 'Sign in again to enable lesson video access.' }, 401, headers);
+  const maxAge = Math.min(3600, remainingLifetime);
+  const videoId = body && body.videoId;
+  if (videoId !== undefined && !videoCatalog.isCatalogVideoId(videoId)) return auth.jsonResponse({ error: 'Lesson video not found.' }, 404, cors(request, env));
+  let ticket = null;
+  if (videoId !== undefined) {
+    const ticketNow = Math.floor(Date.now() / 1000);
+    const ticketLifetime = Math.min(3600, expiresAt - ticketNow - 1);
+    if (ticketLifetime <= 0) return auth.jsonResponse({ error: 'Refresh your sign-in to watch this lesson.' }, 401, cors(request, env));
+    ticket = await auth.createPlaybackTicket(user.id, videoId, ticketLifetime, env);
+    if (!ticket) return auth.jsonResponse({ error: 'Secure native video access is not configured.' }, 503, cors(request, env));
+    headers.append('Set-Cookie', auth.videoCookie(token, maxAge));
+    return auth.jsonResponse({ ok: true, user: { id: user.id }, ticket: ticket, ticketExpiresAt: ticketNow + ticketLifetime }, 200, headers);
+  }
   headers.append('Set-Cookie', auth.videoCookie(token, maxAge));
-  return auth.jsonResponse({ ok: true, user: { id: user.id } }, 200, headers);
+  return auth.jsonResponse({ ok: true, user: { id: user.id }, ticket: null, ticketExpiresAt: null }, 200, headers);
 }

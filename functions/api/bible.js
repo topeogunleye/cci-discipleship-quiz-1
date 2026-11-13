@@ -6,15 +6,32 @@ export async function onRequestGet({ request, env }) {
   const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
   if (!auth.originAllowed(request, env)) return reply({ error: 'Origin not allowed.' }, 403);
   const params = new URL(request.url).searchParams;
+  if (params.getAll('q').length > 1 || params.getAll('version').length > 1) return reply({ error: 'Duplicate query parameters are not supported.' }, 400);
   const reference = params.get('q'), version = params.get('version') || 'NKJV';
   if ((reference !== null && !bible.passageIds(reference)) || !/^(?:[1-9]\d{0,9}|NKJV)$/.test(version)) return reply({ error: 'Enter a supported Bible reference and translation.' }, 400);
   if (!env.YOUVERSION_APP_KEY) return reply({ error: 'Bible previews are not configured yet.' }, 503);
   try {
-    const catalog = await bible.versions(env.YOUVERSION_APP_KEY);
+    // Reuse the deployed private limiter. Each upstream call reserves quota,
+    // including catalog pages and fallback attempts; missing protection fails closed.
+    const limitedFetch = async (url, options) => {
+      const limiter = env.ESV_RATE_LIMITER, ip = request.headers.get('CF-Connecting-IP');
+      if (!limiter || typeof limiter.fetch !== 'function' || !ip) throw new Error('Limiter unavailable');
+      const reservation = await limiter.fetch(new Request('https://esv-rate-limiter.internal/check', {
+        method: 'POST', headers: { 'X-ESV-Client-IP': ip }, signal: AbortSignal.timeout(5000)
+      }));
+      if (!reservation.ok) {
+        const error = new Error('Bible request limit');
+        error.status = reservation.status;
+        throw error;
+      }
+      return fetch(url, options);
+    };
+    const catalog = await bible.versions(env.YOUVERSION_APP_KEY, limitedFetch);
     if (reference === null) return reply({ versions: catalog });
-    const result = await bible.passage(reference, version, catalog, env.YOUVERSION_APP_KEY);
+    const result = await bible.passage(reference, version, catalog, env.YOUVERSION_APP_KEY, limitedFetch);
     return reply(result, result.status || 200);
   } catch (error) {
+    if (error.status === 429) { headers.set('Retry-After', '60'); return reply({ error: 'Too many Bible requests. Please try again shortly.' }, 429); }
     return reply({ error: 'Bible service unavailable. Please try again later.' }, 503);
   }
 }

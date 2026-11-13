@@ -208,6 +208,91 @@ test('account service prepares a private video session cookie without exposing t
   assert.equal(service.status().videoReady, false);
 });
 
+test('video sessions do not remotely revalidate every four minutes; transient failures still retry', async () => {
+  const fs = require('node:fs');
+  const vm = require('node:vm');
+  const timers = new Map();
+  let nextTimer = 1, change, session = null, mode = 'ready';
+  const browser = {
+    location: { protocol: 'https:', origin: 'https://study.example' },
+    addEventListener() {}, removeEventListener() {}
+  };
+  const Supabase = { createClient: () => ({ auth: {
+    onAuthStateChange(callback) { change = callback; return { data: { subscription: { unsubscribe() {} } } }; },
+    async getSession() { return { data: { session } }; },
+    async signInWithPassword() {
+      session = { access_token: 'same-access-token', user: { id: 'user-renewal', email: 'learner@example.com' } };
+      change('SIGNED_IN', session);
+      return { data: { session, user: session.user } };
+    },
+    async signOut() { session = null; change('SIGNED_OUT', null); return {}; }
+  } }) };
+  const context = {
+    self: browser, window: browser, Supabase,
+    setTimeout(callback, delay) { const id = nextTimer++; timers.set(id, { callback, delay }); return id; },
+    clearTimeout(id) { timers.delete(id); }
+  };
+  vm.runInNewContext(fs.readFileSync(require.resolve('../js/account.js'), 'utf8'), context);
+  const fetch = async url => {
+    if (url.endsWith('/api/auth/config')) return new Response(JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }));
+    if (mode === 'unavailable') return new Response('{}', { status: 503 });
+    return new Response('{"ok":true}', { status: 200 });
+  };
+  const service = browser.CCIAccount.create({ apiBase: 'https://study.example', fetch, Supabase, localStorage: localStore() });
+  await service.init();
+  const signedIn = await service.signIn('learner@example.com', 'long-password');
+  assert.equal(signedIn.videoReady, true);
+  assert.equal(timers.size, 0, 'a successful cookie setup should not schedule a forced remote validation');
+
+  mode = 'unavailable';
+  await service.syncVideoSession(signedIn.session, true);
+  assert.deepEqual(Array.from(timers.values()).map(timer => timer.delay), [30000], 'transient failures keep a bounded retry');
+  await service.signOut();
+  assert.equal(timers.size, 0, 'sign-out cancels pending video-session retries');
+  service.destroy();
+});
+
+test('transient video-session failures preserve the signed-in user and ready player state', async () => {
+  let change, session = null, mode = 'ready';
+  const token = 'header.payload.signature-private-token';
+  const Supabase = { createClient: () => ({ auth: {
+    onAuthStateChange(callback) { change = callback; return { data: { subscription: { unsubscribe() {} } } }; },
+    async getSession() { return { data: { session } }; },
+    async signInWithPassword() { session = { access_token: token, user: { id: 'user-video', email: 'learner@example.com' } }; change('SIGNED_IN', session); return { data: { session, user: session.user } }; }
+  } }) };
+  const fetch = async url => {
+    if (url.endsWith('/api/auth/config')) return new Response(JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }));
+    if (mode === 'invalid') return new Response('{}', { status: 401 });
+    if (mode === 'unavailable') return new Response('{}', { status: 503, headers: { 'Retry-After': '7' } });
+    return new Response('{"ok":true}', { status: 200 });
+  };
+  const service = create({ apiBase: 'https://study.example', fetch, Supabase, localStorage: localStore() });
+  await service.init();
+  const signedIn = await service.signIn('learner@example.com', 'long-password');
+  assert.equal(signedIn.videoReady, true);
+
+  mode = 'unavailable';
+  assert.equal(await service.syncVideoSession(signedIn.session, true), false);
+  assert.equal(service.status().user.id, 'user-video');
+  assert.equal(service.status().videoReady, true, 'a transient renewal failure must not remove the playing video');
+  assert.match(service.status().videoAccessError, /temporarily unavailable/i);
+
+  const otherSession = { access_token: 'header.other.signature', user: { id: 'user-other', email: 'other@example.com' } };
+  session = otherSession;
+  change('SIGNED_IN', otherSession);
+  mode = 'unavailable';
+  await service.syncVideoSession(otherSession, true);
+  assert.equal(service.status().user.id, 'user-other');
+  assert.equal(service.status().videoReady, false, 'video readiness must not carry across users when renewal fails');
+
+  mode = 'invalid';
+  assert.equal(await service.syncVideoSession(otherSession, true), false);
+  assert.equal(service.status().user.id, 'user-other', 'invalid video credentials do not silently sign the app out');
+  assert.equal(service.status().videoReady, false);
+  assert.match(service.status().videoAccessError, /no longer valid/i);
+  service.destroy();
+});
+
 test('cloud progress sync retries a compare-and-set conflict and merges both sides', async () => {
   let call = 0, session = { access_token: 'header.payload.signature', user: { id: 'user-2' } };
   const remoteData = { schemaVersion: 1, progress: { d1: { cards: { q1: { attempts: 2, misses: 1, lastSeen: 20 } }, best: null } }, completedToday: {}, streak: { lastStreakDate: null } };
@@ -260,4 +345,92 @@ test('repeating an explicit guest import does not add the same attempts twice', 
   assert.equal(second.snapshot.completedToday['2026-11-03'], 3);
   assert.equal(second.deviceId, first.deviceId);
   assert.equal(second.snapshot.deviceCounters[second.deviceId].guestImport.progress.d1.cards.q1.attempts, 3);
+});
+
+
+test('cloud progress sync applies backoff delays when resolving compare-and-set conflicts', async () => {
+  let call = 0;
+  const sleepDelays = [];
+  const session = { access_token: 'header.payload.signature', user: { id: 'user-backoff' } };
+  const remoteData = { schemaVersion: 2, progress: { d1: { cards: { q1: { attempts: 1, misses: 0, lastSeen: 10 } }, best: null } }, completedToday: {}, streak: { lastStreakDate: null }, deviceCounters: {} };
+  const Supabase = { createClient: () => ({ auth: {
+    onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; },
+    async getSession() { return { data: { session } }; }
+  }, async rpc(name, args) {
+    if (name === 'get_user_progress') return { data: { version: call, data: remoteData } };
+    call++;
+    if (call < 3) return { data: { ok: false, version: call, data: remoteData } };
+    return { data: { ok: true, version: call + 1, data: args.p_data } };
+  } }) };
+  const fetch = async () => new Response(JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }));
+  const sleep = async ms => { sleepDelays.push(ms); };
+  const service = create({ apiBase: 'https://study.example', fetch, Supabase, localStorage: null, sleep });
+  await service.init();
+
+  const local = Sync.empty();
+  const result = await service.syncProgress(local, Sync);
+  assert.equal(result.version, 4);
+  assert.equal(call, 3);
+  assert.equal(sleepDelays.length, 2);
+  assert.ok(sleepDelays[0] >= 30, 'first backoff delay should be at least base delay');
+  assert.ok(sleepDelays[1] >= sleepDelays[0], 'second backoff delay should be >= first');
+});
+
+test('cloud progress sync aborts before calling writeProgress when snapshot exceeds 5 MB limit', async () => {
+  let writeCalled = false;
+  const session = { access_token: 'header.payload.signature', user: { id: 'user-limit' } };
+  const Supabase = { createClient: () => ({ auth: {
+    onAuthStateChange() { return { data: { subscription: { unsubscribe() {} } } }; },
+    async getSession() { return { data: { session } }; }
+  }, async rpc(name, args) {
+    if (name === 'get_user_progress') return { data: { version: 0, data: null } };
+    if (name === 'sync_user_progress') { writeCalled = true; return { data: { ok: true, version: 1, data: args.p_data } }; }
+    return { data: null };
+  } }) };
+  const fetch = async () => new Response(JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }));
+  const service = create({ apiBase: 'https://study.example', fetch, Supabase, localStorage: null });
+  await service.init();
+
+  const oversized = {
+    schemaVersion: 2,
+    progress: { d1: { cards: { q1: { attempts: 1, misses: 0, overflow: 'z'.repeat(Sync.MAX_SNAPSHOT_BYTES + 50) } }, best: null } },
+    completedToday: {},
+    streak: { lastStreakDate: null }
+  };
+
+  await assert.rejects(
+    async () => { await service.syncProgress(oversized, Sync); },
+    /Progress snapshot exceeds maximum allowed size of 5 MB/
+  );
+  assert.equal(writeCalled, false, 'writeProgress RPC must NOT be called when payload exceeds 5 MB');
+});
+
+
+test('account service issues in-memory playback tickets per lesson and clears them on sign out', async () => {
+  let change, session = null;
+  const token = 'header.payload.signature-test-token';
+  const Supabase = { createClient: () => ({ auth: {
+    onAuthStateChange(callback) { change = callback; return { data: { subscription: { unsubscribe() {} } } }; },
+    async getSession() { return { data: { session } }; },
+    async signInWithPassword() { session = { access_token: token, user: { id: 'user-ticket', email: 'learner@example.com' } }; change('SIGNED_IN', session); return { data: { session, user: session.user } }; },
+    async signOut() { session = null; change('SIGNED_OUT', null); return {}; }
+  } }) };
+  const fetch = async (url, options) => {
+    if (url.endsWith('/api/auth/config')) return new Response(JSON.stringify({ configured: true, url: 'https://supabase.example', publishableKey: 'public-key' }));
+    const body = JSON.parse(options.body);
+    if (body.videoId) return new Response(JSON.stringify({ ok: true, ticket: 'signed-ticket-abc-123', ticketExpiresAt: Math.floor(Date.now() / 1000) + 1200 }), { status: 200 });
+    return new Response(JSON.stringify({ ok: true, ticket: null }), { status: 200 });
+  };
+  const service = create({ apiBase: 'https://study.example', fetch, Supabase, localStorage: localStore() });
+  await service.init();
+  assert.equal(service.playbackTicket('section-01-born-again'), '');
+  const signedIn = await service.signIn('learner@example.com', 'long-password');
+  assert.equal(signedIn.user.id, 'user-ticket');
+  assert.equal(signedIn.videoReady, true);
+  assert.equal(service.playbackTicket(), '', 'a session access token must never be exposed as a playback URL credential');
+  assert.equal(await service.preparePlaybackTicket('section-01-born-again'), 'signed-ticket-abc-123');
+  assert.equal(service.playbackTicket('section-01-born-again'), 'signed-ticket-abc-123');
+  assert.equal(service.playbackTicket('section-02-assurance'), '', 'tickets are scoped to one video');
+  await service.signOut();
+  assert.equal(service.playbackTicket('section-01-born-again'), '');
 });

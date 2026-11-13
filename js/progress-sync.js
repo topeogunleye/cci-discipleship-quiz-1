@@ -100,6 +100,7 @@
         var currentDeck = object(mergedProgress[deckId]), incomingDeck = object(incomingProgress[deckId]);
         var currentCards = object(currentDeck.cards), incomingCards = object(incomingDeck.cards), mergedCards = Object.assign({}, currentCards);
         Object.keys(incomingCards).forEach(function (cardId) {
+          if (cardId === '__proto__' || cardId === 'constructor' || cardId === 'prototype') return;
           var current = counterRecord(currentCards[cardId]), incoming = counterRecord(incomingCards[cardId]);
           mergedCards[cardId] = { attempts: Math.max(current.attempts, incoming.attempts), misses: Math.max(current.misses, incoming.misses) };
         });
@@ -122,6 +123,7 @@
     decks.forEach(function (deckId) {
       var leftCards = object(object(left.progress)[deckId]).cards, rightCards = object(object(right.progress)[deckId]).cards, cards = {};
       new Set(Object.keys(object(leftCards)).concat(Object.keys(object(rightCards)))).forEach(function (cardId) {
+        if (cardId === '__proto__' || cardId === 'constructor' || cardId === 'prototype') return;
         var a = counterRecord(object(leftCards)[cardId]), b = counterRecord(object(rightCards)[cardId]);
         cards[cardId] = { attempts: Math.max(a.attempts, b.attempts), misses: Math.max(a.misses, b.misses) };
       });
@@ -316,5 +318,59 @@
     return result;
   }
 
-  return { empty: emptySnapshot, extract: extract, merge: merge, mergeForDevice: mergeForDevice, importCheckpoint: importCheckpoint, delta: delta, apply: apply, hasProgress: hasProgress };
+
+  var MAX_SNAPSHOT_BYTES = 5242880;
+  var WARN_SNAPSHOT_BYTES = 4194304;
+
+  function payloadSize(snapshot) {
+    var serialized;
+    try { serialized = typeof snapshot === 'string' ? snapshot : JSON.stringify(snapshot); }
+    catch (e) {
+      var error = new Error('Progress snapshot could not be serialized for cloud sync.');
+      error.name = 'ProgressPayloadSerializationError';
+      throw error;
+    }
+    if (typeof serialized !== 'string') {
+      var invalid = new Error('Progress snapshot could not be serialized for cloud sync.');
+      invalid.name = 'ProgressPayloadSerializationError';
+      throw invalid;
+    }
+
+    var bytes = typeof TextEncoder !== 'undefined'
+      ? new TextEncoder().encode(serialized).length
+      : unescape(encodeURIComponent(serialized)).length;
+
+    // PostgreSQL measures p_data::text after converting it to jsonb. Its
+    // canonical JSON output adds a space after each structural comma/colon;
+    // JSON.stringify omits those spaces. Count those separators outside
+    // strings so the client check uses a closer estimate of the server limit.
+    var separators = 0, inString = false, escaped = false;
+    for (var index = 0; index < serialized.length; index++) {
+      var character = serialized.charAt(index);
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (character === '\\') escaped = true;
+        else if (character === '"') inString = false;
+      } else if (character === '"') inString = true;
+      else if (character === ',' || character === ':') separators++;
+    }
+
+    // Keep a small additional margin for numeric normalization and RPC wrapper
+    // overhead. If serialization fails, fail closed instead of bypassing the
+    // payload guard with a zero-byte estimate.
+    return bytes + separators + 64;
+  }
+
+  function validateSnapshotSize(snapshot) {
+    var size = payloadSize(snapshot);
+    if (size > MAX_SNAPSHOT_BYTES) {
+      var error = new Error('Progress snapshot exceeds maximum allowed size of 5 MB (' + (size / (1024 * 1024)).toFixed(2) + ' MB).');
+      error.name = 'ProgressPayloadTooLargeError';
+      error.size = size;
+      throw error;
+    }
+    return { valid: true, size: size, nearLimit: size >= WARN_SNAPSHOT_BYTES };
+  }
+
+  return { empty: emptySnapshot, extract: extract, merge: merge, mergeForDevice: mergeForDevice, importCheckpoint: importCheckpoint, delta: delta, apply: apply, hasProgress: hasProgress, validateSnapshotSize: validateSnapshotSize, payloadSize: payloadSize, MAX_SNAPSHOT_BYTES: MAX_SNAPSHOT_BYTES, WARN_SNAPSHOT_BYTES: WARN_SNAPSHOT_BYTES };
 });

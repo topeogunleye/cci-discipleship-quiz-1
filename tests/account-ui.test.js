@@ -18,7 +18,7 @@ function accountUi(service, initialStatus) {
   const source = fs.readFileSync(require.resolve('../js/app.js'), 'utf8').replace('  boot();', `
     render = function () {};
     accountStatus = window.initialStatus;
-    window.accountUi = { act: accountAction, settings: accountSettingsSection, videos: normalizeLessonVideos, transcript: loadLessonTranscript, clearTranscript: clearLessonTranscriptCache };
+    window.accountUi = { act: accountAction, settings: accountSettingsSection, videos: normalizeLessonVideos, transcript: loadLessonTranscript, renderTranscript: updateLessonTranscript, clearTranscript: clearLessonTranscriptCache };
   `);
   window.initialStatus = initialStatus || { configured: true };
   vm.runInNewContext(source, { window, document, URL });
@@ -59,6 +59,22 @@ test('temporary account connection failures provide an explicit working retry', 
   assert.match(ui.settings(), /data-account-form/);
 });
 
+test('account retry shows a clean loading state without stale unconfigured copy or retry controls', async () => {
+  let finishRetry;
+  const { ui } = accountUi({ retry: () => new Promise(resolve => { finishRetry = resolve; }) }, {
+    configured: false, initializationState: 'unconfigured', initializationError: 'Account services are not configured yet.'
+  });
+  assert.match(ui.settings(), /Retry account connection/);
+  ui.act('account-retry');
+  const loading = ui.settings();
+  assert.match(loading, /Connecting to account services/);
+  assert.doesNotMatch(loading, /Retry account connection|Account sign-in is not configured for this app deployment/);
+  finishRetry({ configured: false, initializationState: 'unconfigured', initializationError: 'Account services are not configured yet.' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(ui.settings(), /Retry account connection/);
+  assert.match(ui.settings(), /Account services are not configured yet/);
+});
+
 test('native lesson captions and transcript use the same authenticated host as the video', () => {
   const { ui } = accountUi({ apiBase: 'https://study.example' });
   const videos = ui.videos({ schemaVersion: 1, videos: [{ id: 'lesson-1', deckId: 'd-lesson', title: 'Lesson', objectKey: 'Lesson/video.mp4' }] }, {
@@ -84,4 +100,21 @@ test('an account change clears transcript memory and rejects the previous accoun
   assert.equal((await newRequest)[0].text, 'Current account request.');
   assert.equal((await ui.transcript('https://study.example/transcript/Lesson.vtt'))[0].text, 'Current account request.');
   assert.equal(pending.length, 2);
+});
+
+test('transcript search, accessible labels and seek timestamps use the cleaned cue text', async () => {
+  const { ui, window } = accountUi({});
+  window.fetch = async () => ({ ok: true, text: async () => 'WEBVTT\n\n00:00:16.960 --> 00:00:20.720\nSpeaker 2: Grace and truth.\n' });
+  const cues = await ui.transcript('https://study.example/transcript/Lesson.vtt');
+  assert.equal(cues[0].text, 'Grace and truth.');
+  const list = { innerHTML: '', hidden: true }, status = { textContent: '' };
+  const details = { querySelector: selector => selector === '.lesson-transcript-cues' ? list : selector === '.lesson-transcript-status' ? status : null };
+  ui.renderTranscript(details, cues, 'truth');
+  assert.equal(list.hidden, false);
+  assert.match(list.innerHTML, /data-time="16\.96"/);
+  assert.match(list.innerHTML, /aria-label="Jump to 00:00:16: Grace and truth\."/);
+  assert.doesNotMatch(list.innerHTML, /Speaker 2/);
+  ui.renderTranscript(details, cues, 'speaker 2');
+  assert.equal(list.hidden, true);
+  assert.equal(status.textContent, 'No transcript segments match that search.');
 });

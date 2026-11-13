@@ -30,6 +30,9 @@ prevent the old fields returning. Old backups on disk are not rewritten.
 Both browser caches and the native directory are cleaned on launch; service
 worker activation also removes both named caches and refreshes the shell cache.
 Cleanup failures are logged and retried without blocking study.
+Profile, browser-cache, and native-download cleanup run independently: a failure
+in one backend does not prevent the remaining cleanup attempts. Warnings contain
+only fixed messages, without raw errors or learner data.
 
 ## Shared data and features retained
 
@@ -76,14 +79,15 @@ Runtime changes: `js/app.js`, `js/storage.js`, `js/native-bridge.mjs` and its
 bundle, `index.html`, `style.css`, and `service-worker.js`. Build changes:
 `scripts/build.js`, `package.json`, and regenerated `dist/`. Shared regression
 updates: `tests/storage.test.js`, `tests/content-lint.test.js`,
-`tests/account-ui.test.js`, and `tests/pwa.test.js`. Documentation changes:
+`tests/account-ui.test.js`, `tests/pwa.test.js`, and focused cleanup-failure
+regressions in `tests/retired-cleanup.test.js`. Documentation changes:
 `README.md`, `design-qa.md`, and this audit. Retired modules, catalog/sample
 assets, validator, dedicated tests, prompts, and Sermons-only handover templates
 were deleted. Concurrent account changes and their tests, lockfile edits, and
 an unrelated QA handoff were left intact.
 
-Validation: `npm run build`, `npm test` (all 18 test files), and
-`git diff --check` pass. Storage regression cases cover inactive account and
+Validation: `npm run build`, `npm test` (133 passing, zero failures, two existing
+content-quality TODO checks), and `git diff --check` pass. Storage regression cases cover inactive account and
 guest records, malformed JSON, unknown/custom records, idempotence, failed
 writes, and preventing legacy fields from returning. PWA tests cover retired
 cache removal and preservation of private lesson API/transcript handling.

@@ -86,3 +86,26 @@ test('stores guest-import receipts with cloud progress so concurrent retries are
   assert.equal(retried.completedToday['2026-11-03'], 2);
   assert.deepEqual(retried.deviceCounters.deviceA.guestImport.progress.d1.cards.q1, { attempts: 2, misses: 1 });
 });
+
+
+test('validates snapshot payload sizes against the 5 MB cloud database ceiling', () => {
+  const normal = Sync.empty();
+  const result = Sync.validateSnapshotSize(normal);
+  assert.equal(result.valid, true);
+  assert.equal(result.nearLimit, false);
+  assert.ok(result.size > 0 && result.size < 1000);
+
+  const oversized = {
+    schemaVersion: 2,
+    progress: {},
+    completedToday: {},
+    streak: { lastStreakDate: null },
+    deviceCounters: {
+      overflow: 'x'.repeat(Sync.MAX_SNAPSHOT_BYTES + 10)
+    }
+  };
+
+  assert.throws(() => {
+    Sync.validateSnapshotSize(oversized);
+  }, /Progress snapshot exceeds maximum allowed size of 5 MB/);
+});

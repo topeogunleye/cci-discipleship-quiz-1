@@ -2,3 +2,9 @@
 # Use the publishable key only. Do not include an "Authorization: Bearer" prefix.
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_replace_with_your_key
+# Local video authorization uses the Supabase JWKS endpoint by default.
+# Only for a legacy HS256 project, add SUPABASE_JWT_SECRET to the ignored .dev.vars file.
+# Native WebView playback tickets require a dedicated random secret of at least 32 bytes.
+# Generate locally with: openssl rand -base64 32
+# VIDEO_TICKET_SECRET=
+# VIDEO_AUTH_MODE=remote is an explicit compatibility fallback and performs remote auth checks per video request.

@@ -1,5 +1,6 @@
 import auth from '../_lib/auth.cjs';
 import transcripts from '../_generated/lesson-transcripts.cjs';
+import videoCatalog from '../_lib/video-catalog.cjs';
 
 function headersFor(request, env) {
   return auth.withCors({ 'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS' }, request, env);
@@ -16,12 +17,23 @@ export async function onRequest(context) {
   const pathname = new URL(request.url).pathname;
   const match = /^\/transcript\/([A-Za-z0-9._-]+\.vtt)$/i.exec(pathname);
   if (!match) return auth.jsonResponse({ error: 'Transcript not found.' }, 404, headersFor(request, env));
-
-  const user = await auth.getAuthenticatedUser(auth.videoToken(request), env);
-  if (!user) return auth.jsonResponse({ error: 'Sign in to view this lesson transcript.' }, 401, headersFor(request, env));
-
   const filename = match[1];
-  if (!Object.hasOwn(transcripts, filename)) return auth.jsonResponse({ error: 'Transcript not found.' }, 404, headersFor(request, env));
+  const videoId = videoCatalog.videoIdForTranscriptFilename(filename);
+  if (!videoId || !Object.hasOwn(transcripts, filename)) return auth.jsonResponse({ error: 'Transcript not found.' }, 404, headersFor(request, env));
+
+  let user;
+  try {
+    const token = auth.videoToken(request);
+    if (auth.isPlaybackTicket(token)) {
+      user = await auth.verifyPlaybackTicket(token, videoId, env);
+    } else {
+      user = env && env.VIDEO_AUTH_MODE === 'remote'
+        ? await auth.getAuthenticatedUser(token, env)
+        : await auth.verifySupabaseAccessToken(token, env);
+    }
+  }
+  catch (error) { return auth.authServiceUnavailableResponse(request, env, error); }
+  if (!user) return auth.jsonResponse({ error: 'Sign in to view this lesson transcript.' }, 401, headersFor(request, env));
   const text = transcripts[filename];
   const headers = headersFor(request, env);
   headers.set('Content-Type', 'text/vtt; charset=utf-8');

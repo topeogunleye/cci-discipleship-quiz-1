@@ -6,8 +6,9 @@
   var S = defaultStudyState();
   var STARTER_DECKS = [], DEVOTIONALS = [], LESSON_VIDEOS = [];
   var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, suppressBiblePreviewFocus = null;
-  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), activeStorageOwnerId = null, requestedStorageOwnerId = null, guestProgressForImport = null, account = Account ? Account.create() : null, accountStatus = { configured: false, user: null, videoReady: false }, accountBootReady = false, accountMessage = '', accountEmailDraft = '', accountBusy = false, accountSwitchQueue = Promise.resolve(), cloudSyncQueue = Promise.resolve(), cloudSyncTimer = null, lessonTranscriptCache = Object.create(null), lessonTranscriptRequests = Object.create(null), V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
-  var browserLocalStorage = null, browserIndexedDB = null;
+  var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), activeStorageOwnerId = null, requestedStorageOwnerId = null, guestProgressForImport = null, account = Account ? Account.create() : null, accountStatus = { configured: false, user: null, videoReady: false, videoSessionVersion: 0 }, accountBootReady = false, accountMessage = '', accountEmailDraft = '', accountBusy = false, accountSwitchQueue = Promise.resolve(), cloudSyncQueue = Promise.resolve(), cloudSyncTimer = null, lessonTranscriptCache = Object.create(null), lessonTranscriptRequests = Object.create(null), lastVideoSessionVersion = 0, V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
+  var quizFeedbackDrag = null, quizFeedbackIgnoreClick = false;
+  var browserLocalStorage = null, browserIndexedDB = null, animateRouteChange = false;
   var lessonTranscriptGeneration = 0;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
   if (!browserLocalStorage) { try { if (typeof localStorage !== 'undefined') browserLocalStorage = localStorage; } catch (e) {} }
@@ -107,7 +108,7 @@
   }
   var bibleVersions = [], bibleVersionsRequest = null;
   function validBibleVersion(value) { return /^(?:[1-9]\d{0,9}|NKJV)$/.test(String(value || '')) ? String(value) : 'NKJV'; }
-  function bibleApiUrl() { return (account ? account.apiBase : '') + '/api/bible'; }
+  function bibleApiUrl() { return (account ? account.apiBase : (window.CCI_API_BASE || (Account && Account.DEFAULT_API_BASE) || '')) + '/api/bible'; }
   function bibleVersionOptions(selected, query) {
     var options = [{ id: 'NKJV', abbreviation: 'NKJV', title: 'Preferred default (when available)' }].concat(bibleVersions);
     if (!options.some(function (v) { return v.id === selected; })) options.unshift({ id: selected, abbreviation: 'Saved translation', title: selected });
@@ -191,7 +192,14 @@
       biblePreviewRequest = null;
     }
     current.wrapper.classList.remove('is-open', 'is-pinned');
+    current.preview.classList.remove('is-open');
     current.link.setAttribute('aria-expanded', 'false');
+    if (current.originalParent && current.link.isConnected && current.wrapper.contains(current.link)) {
+      if (current.originalNextSibling && current.originalNextSibling.parentNode === current.originalParent) current.originalParent.insertBefore(current.preview, current.originalNextSibling);
+      else current.originalParent.appendChild(current.preview);
+    } else if (current.preview.parentNode) {
+      current.preview.parentNode.removeChild(current.preview);
+    }
     activeBiblePreview = null;
     if (restoreFocus && current.link.isConnected) {
       suppressBiblePreviewFocus = current.link;
@@ -199,6 +207,9 @@
       window.setTimeout(function () { if (suppressBiblePreviewFocus === current.link) suppressBiblePreviewFocus = null; }, 0);
     }
     return true;
+  }
+  function isWithinActiveBiblePreview(target) {
+    return !!(activeBiblePreview && target && (activeBiblePreview.wrapper.contains(target) || activeBiblePreview.preview.contains(target)));
   }
   function repositionActiveBiblePreview() {
     if (!activeBiblePreview) return;
@@ -216,11 +227,20 @@
     if (activeBiblePreview && activeBiblePreview.link === link) {
       if (pinned) { activeBiblePreview.pinned = true; wrapper.classList.add('is-pinned'); }
     } else {
-      activeBiblePreview = { link: link, wrapper: wrapper, preview: preview, pinned: !!pinned };
+      activeBiblePreview = {
+        link: link,
+        wrapper: wrapper,
+        preview: preview,
+        originalParent: preview.parentNode,
+        originalNextSibling: preview.nextSibling,
+        pinned: !!pinned
+      };
+      document.body.appendChild(preview);
       preview.querySelector('[data-bible-version]').innerHTML = bibleVersionOptions(validBibleVersion(S.settings.bibleVersion), '');
       preview.querySelector('[data-bible-version-search]').value = '';
     }
     wrapper.classList.add('is-open');
+    preview.classList.add('is-open');
     if (pinned) wrapper.classList.add('is-pinned');
     link.setAttribute('aria-expanded', 'true');
     positionBiblePreview(link, preview);
@@ -232,7 +252,7 @@
     biblePreviewCloseTimer = window.setTimeout(function () {
       biblePreviewCloseTimer = null;
       if (!activeBiblePreview || activeBiblePreview.pinned) return;
-      if (activeBiblePreview.wrapper.contains(document.activeElement)) return;
+      if (isWithinActiveBiblePreview(document.activeElement)) return;
       closeBiblePreview(false);
     }, 180);
   }
@@ -282,9 +302,21 @@
       return typeof text === 'string' ? text : '';
     } catch (e) { return ''; }
   }
+  function loadStarterFallbackScript() {
+    return new Promise(function (resolve) {
+      if (typeof window !== 'undefined' && window.CCI_STARTER_DECKS) return resolve(window.CCI_STARTER_DECKS);
+      if (typeof document === 'undefined' || !document.createElement || !document.head) return resolve('');
+      var s = document.createElement('script');
+      s.src = 'decks/starter-decks.js';
+      s.onload = function () { resolve((typeof window !== 'undefined' && window.CCI_STARTER_DECKS) || ''); };
+      s.onerror = function () { resolve(''); };
+      document.head.appendChild(s);
+    });
+  }
   function loadStarterText() {
-    var fallback = inlineStarterText();
-    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(fallback);
+    var fallback = inlineStarterText() || (typeof window !== 'undefined' && window.CCI_STARTER_DECKS) || '';
+    if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return fallback ? Promise.resolve(fallback) : loadStarterFallbackScript();
+
     return window.fetch('decks/manifest.json').then(function (response) {
       if (!response.ok) throw new Error('Could not load deck manifest');
       return response.json();
@@ -297,7 +329,7 @@
           return response.text();
         });
       }));
-    }).then(function (texts) { return texts.join('\n\n'); }).catch(function () { return fallback; });
+    }).then(function (texts) { return texts.join('\n\n'); }).catch(function () { return fallback ? fallback : loadStarterFallbackScript(); });
   }
 
   function inlineDevotionalsData() {
@@ -313,6 +345,7 @@
     if (!el) return Promise.resolve([]);
     var fallback = inlineDevotionalsData();
     if (!window.location || window.location.protocol === 'file:' || typeof window.fetch !== 'function') return Promise.resolve(fallback);
+
     return window.fetch('content/devotionals.json').then(function (response) {
       if (!response.ok) throw new Error('Could not load devotionals');
       return response.json();
@@ -387,7 +420,156 @@
     }).catch(function () { return normalizeLessonVideos(fallback, transcriptFallback); });
   }
   function lessonVideosForDeck(deckId) {
-    return LESSON_VIDEOS.filter(function (item) { return item.deckId === deckId; });
+    return LESSON_VIDEOS.filter(function (item) {
+      return item.deckId === deckId || (deckId && item.deckId && (item.deckId.indexOf(deckId) === 0 || deckId.indexOf(item.deckId) === 0));
+    });
+  }
+  function cardMatchesVideo(card, video) {
+    if (!card || !video || !card.ref) return false;
+    var normTitle = String(video.title).toLowerCase().replace(/[^a-z0-9]/g, '');
+    var normId = String(video.id).replace(/^section-\d+-/, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    var refPrefix = card.ref.split(/[—–\[\(\-]/)[0].trim();
+    var normRefPrefix = refPrefix.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    if (normRefPrefix && (normRefPrefix === normTitle || normRefPrefix === normId)) return true;
+
+    var titleParts = video.title.trim().split(/\s+/);
+    var lastWord = titleParts[titleParts.length - 1].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (/^[IVXLCDM]+$/.test(lastWord)) {
+      var baseTitle = titleParts.slice(0, -1).join(' ').replace(/[^a-zA-Z0-9]/g, '');
+      var romanRegex = new RegExp('\\b' + baseTitle.split('').join('[^a-zA-Z0-9]*') + '[^a-zA-Z0-9]+' + lastWord + '\\b', 'i');
+      if (romanRegex.test(card.ref)) return true;
+    }
+
+    if (/^\d+$/.test(lastWord)) {
+      var baseTitleNum = titleParts.slice(0, -1).join(' ').replace(/[^a-zA-Z0-9]/g, '');
+      var numRegex = new RegExp('\\b' + baseTitleNum.split('').join('[^a-zA-Z0-9]*') + '[^a-zA-Z0-9]+' + lastWord + '\\b', 'i');
+      if (numRegex.test(card.ref)) return true;
+    }
+
+    var cleanTitle = video.title.replace(/[^a-zA-Z0-9]/g, '');
+    var boundaryRegex = new RegExp('\\b' + cleanTitle.split('').join('[^a-zA-Z0-9]*') + '\\b', 'i');
+    return boundaryRegex.test(card.ref);
+  }
+  function cardsForVideo(deckItem, video) {
+    if (!deckItem || !video || !Array.isArray(deckItem.cards)) return [];
+    return deckItem.cards.filter(function (card) { return cardMatchesVideo(card, video); });
+  }
+  function parseTimeToSeconds(timeStr) {
+    if (!timeStr) return 0;
+    var parts = timeStr.trim().split(':').map(Number);
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return 0;
+  }
+  function resolveVideoForRef(refSegment, currentDeckId) {
+    if (!refSegment) return null;
+    var candidateVideos = currentDeckId ? lessonVideosForDeck(currentDeckId) : LESSON_VIDEOS;
+    for (var i = 0; i < candidateVideos.length; i++) {
+      if (cardMatchesVideo({ ref: refSegment }, candidateVideos[i])) return candidateVideos[i];
+    }
+    if (candidateVideos !== LESSON_VIDEOS) {
+      for (var j = 0; j < LESSON_VIDEOS.length; j++) {
+        if (cardMatchesVideo({ ref: refSegment }, LESSON_VIDEOS[j])) return LESSON_VIDEOS[j];
+      }
+    }
+    return null;
+  }
+  function parseReferenceLinks(refText, currentDeckId) {
+    if (!refText || typeof refText !== 'string') return [];
+    var parts = refText.split(';');
+    var results = [];
+    var lastResolvedVideo = null;
+    parts.forEach(function (part) {
+      var trimmed = part.trim();
+      if (!trimmed) return;
+      var timeMatch = trimmed.match(/(?:\[|\()?\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);
+      var timeStr = timeMatch ? timeMatch[1] : null;
+      var timeSec = timeStr ? parseTimeToSeconds(timeStr) : 0;
+      var video = resolveVideoForRef(trimmed, currentDeckId);
+      if (!video && lastResolvedVideo) video = lastResolvedVideo;
+      if (video) lastResolvedVideo = video;
+      results.push({
+        raw: trimmed,
+        video: video,
+        timeStr: timeStr,
+        timeSec: timeSec
+      });
+    });
+    return results;
+  }
+  function renderReferenceNote(card, currentDeckId) {
+    if (!card || !card.ref) return '';
+    var links = parseReferenceLinks(card.ref, currentDeckId);
+    var hasClickable = links.some(function (l) { return l.video && l.timeStr; });
+    if (!hasClickable) {
+      return '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(card.ref) + '</p>';
+    }
+    var partsHtml = links.map(function (link) {
+      if (!link.video || !link.timeStr) {
+        return esc(link.raw);
+      }
+      var preRollSec = Math.max(0, link.timeSec - 3);
+      var label = (link.video.title ? link.video.title + ' ' : '') + '· ' + link.timeStr;
+      return '<button type="button" class="ref-timestamp-btn" data-act="seek-video-reference" data-deck-id="' + esc(link.video.deckId) + '" data-video-id="' + esc(link.video.id) + '" data-time="' + preRollSec + '" aria-label="Watch video from ' + esc(link.timeStr) + '" title="Watch video from ' + esc(link.timeStr) + ' (with 3s lead-in)">' +
+        '<span class="ref-play-icon" aria-hidden="true">▶</span> ' + esc(label) +
+      '</button>';
+    }).join(' <span class="ref-separator">·</span> ');
+
+    return '<p class="card-note card-ref"><strong>Reference:</strong> ' + partsHtml + '</p>';
+  }
+  function nativeTicketUrl(value, ticket) {
+    if (!value || !ticket || !account || !account.apiBase) return '';
+    try {
+      var url = new URL(value, account.apiBase + '/');
+      var api = new URL(account.apiBase);
+      if (url.origin !== api.origin || (url.pathname !== '/api/videos' && !/^\/transcript\/[A-Za-z0-9._-]+\.vtt$/i.test(url.pathname))) return '';
+      url.searchParams.set('ticket', ticket);
+      return url.toString();
+    } catch (e) { return ''; }
+  }
+  function refreshNativeVideoTicket(force) {
+    if (!account || !window.CciNative || !window.CciNative.isNative || V.name !== 'lesson-video' || !accountStatus.user || !accountStatus.videoReady || typeof account.preparePlaybackTicket !== 'function') return;
+    var video = lessonVideosForDeck(V.id)[Number.isInteger(V.videoIndex) ? V.videoIndex : 0];
+    if (!video) return;
+    account.preparePlaybackTicket(video.id, !!force).then(function (ticket) {
+      if (!ticket || V.name !== 'lesson-video' || V.id !== video.deckId || lessonVideosForDeck(V.id)[V.videoIndex] !== video) return;
+      var player = document.getElementById('lesson-video-player');
+      if (!player) { render(true); return; }
+      var videoUrl = nativeTicketUrl(video.videoUrl, ticket);
+      var captionsUrl = nativeTicketUrl(video.captionsUrl, ticket);
+      if (!videoUrl) return;
+      var source = player.querySelector('source');
+      if (!source || source.src === videoUrl) return;
+      var currentTime = Number.isFinite(player.currentTime) ? player.currentTime : 0;
+      var wasPlaying = !player.paused && !player.ended;
+      var restored = false;
+      var restorePlayback = function () {
+        if (restored) return;
+        restored = true;
+        try { player.currentTime = Math.min(currentTime, Number.isFinite(player.duration) ? player.duration : currentTime); } catch (e) {}
+        if (wasPlaying) {
+          var playbackAttempt = player.play();
+          if (playbackAttempt && playbackAttempt.catch) playbackAttempt.catch(function () {});
+        }
+      };
+      source.src = videoUrl;
+      var track = player.querySelector('track');
+      if (track && captionsUrl) track.src = captionsUrl;
+      var transcript = app.querySelector('.lesson-transcript');
+      if (transcript && captionsUrl) {
+        transcript.dataset.transcriptUrl = captionsUrl;
+        transcript.dataset.loaded = 'false';
+        var cues = transcript.querySelector('.lesson-transcript-cues');
+        if (cues) { cues.replaceChildren(); cues.hidden = true; }
+        var status = transcript.querySelector('.lesson-transcript-status');
+        if (status) status.textContent = 'Open to load transcript segments.';
+      }
+      player.addEventListener('loadedmetadata', restorePlayback, { once: true });
+      player.load();
+      if (player.readyState >= 1) restorePlayback();
+    }).catch(function () {});
   }
   function loadLessonTranscript(url) {
     if (lessonTranscriptCache[url]) return Promise.resolve(lessonTranscriptCache[url]);
@@ -427,6 +609,16 @@
     status.textContent = visible.length
       ? (normalizedQuery ? 'Showing ' + visible.length + ' matching transcript ' + (visible.length === 1 ? 'segment.' : 'segments.') : 'Showing all ' + visible.length + ' transcript segments.')
       : 'No transcript segments match that search.';
+  }
+
+  function returnToLessonVideo() {
+    var frame = document.querySelector('.lesson-video-frame');
+    var title = document.getElementById('lesson-video-title');
+    var target = frame || title;
+    if (!target) return;
+    var nextTop = Math.max(0, window.scrollY + target.getBoundingClientRect().top - 12);
+    window.scrollTo(window.scrollX, nextTop);
+    if (title) title.focus({ preventScroll: true });
   }
 
   /* ---------- storage ---------- */
@@ -517,16 +709,33 @@
     var starterIds = STARTER_DECKS.map(function (item) { return 'd-' + slug(item.title); }).filter(function (id) { return currentDeckIds.has(id); });
     return ProgressSync ? ProgressSync.extract(state, starterIds) : null;
   }
-  function scheduleCloudProgressSync() {
+  var lastCloudSyncTime = 0;
+  var MIN_STUDY_SYNC_INTERVAL_MS = 15000;
+  var IDLE_SYNC_DELAY_MS = 1500;
+  function isInteractiveStudyActive() {
+    return V && (V.name === 'quiz' || V.name === 'flash' || (V.name === 'lesson-video' && !!V.videoStudy));
+  }
+  function scheduleCloudProgressSync(immediate) {
     if (!account || !accountStatus.user || !navigator.onLine || preserveStorage) return;
+    if (immediate) {
+      if (cloudSyncTimer) { window.clearTimeout(cloudSyncTimer); cloudSyncTimer = null; }
+      syncCloudProgress();
+      return;
+    }
     if (cloudSyncTimer) window.clearTimeout(cloudSyncTimer);
-    cloudSyncTimer = window.setTimeout(function () { cloudSyncTimer = null; syncCloudProgress(); }, 1400);
+    var delay = IDLE_SYNC_DELAY_MS;
+    if (isInteractiveStudyActive()) {
+      var elapsed = Date.now() - lastCloudSyncTime;
+      delay = Math.max(IDLE_SYNC_DELAY_MS, MIN_STUDY_SYNC_INTERVAL_MS - elapsed);
+    }
+    cloudSyncTimer = window.setTimeout(function () { cloudSyncTimer = null; syncCloudProgress(); }, delay);
   }
   function syncCloudProgress(importSnapshot) {
     if (!account || !accountStatus.user || !ProgressSync) return Promise.resolve(false);
     if (!navigator.onLine) { accountMessage = 'You are offline. Progress is saved on this device and will sync when you reconnect.'; if (V.name === 'settings') render(true); return Promise.resolve(false); }
     if (cloudSyncTimer) { window.clearTimeout(cloudSyncTimer); cloudSyncTimer = null; }
     var owner = accountStatus.user.id, current = null;
+    lastCloudSyncTime = Date.now();
     accountMessage = 'Syncing study progress…';
     if (V.name === 'settings') render(true);
     cloudSyncQueue = cloudSyncQueue.catch(function () {}).then(function () {
@@ -546,7 +755,8 @@
         : 'Progress synced. Your study data is also saved on this device.';
       if (importSnapshot) guestProgressForImport = null;
       save(true);
-      render(true);
+      // Background sync must not replace the playing video or its caption/transcript state.
+      if (V.name !== 'lesson-video' || !accountStatus.videoReady || !document.getElementById('lesson-video-player')) render(true);
       if (changedDuringSync) scheduleCloudProgressSync();
       return true;
     }).catch(function (error) {
@@ -605,13 +815,52 @@
   function initializeAccount() {
     if (!account) return Promise.resolve(accountStatus);
     return account.init(function (status) {
+      var hadVideoAccess = !!(accountStatus.user && accountStatus.videoReady);
+      var priorUserId = accountStatus.user && accountStatus.user.id;
+      var sessionRefreshed = Number(status.videoSessionVersion) > lastVideoSessionVersion;
+      lastVideoSessionVersion = Number(status.videoSessionVersion) || 0;
       accountStatus = status;
       if (!accountBootReady) return;
+      // Remove protected media on account changes, but keep an existing player mounted for same-user renewal outcomes.
+      var preserveActivePlayer = V.name === 'lesson-video' && priorUserId && status.user && priorUserId === status.user.id && !!document.getElementById('lesson-video-player');
+      if (V.name === 'lesson-video' && hadVideoAccess !== !!(status.user && status.videoReady) && !preserveActivePlayer) render(true);
       var nextOwner = status.user && status.user.id || null;
       if (nextOwner !== requestedStorageOwnerId) switchStorageOwner(nextOwner);
       else if (nextOwner && nextOwner === activeStorageOwnerId && status.videoReady && !cloudSyncTimer) scheduleCloudProgressSync();
       else if (V.name === 'settings') render(true);
+      if (sessionRefreshed) refreshNativeVideoTicket(true);
     }).catch(function () {});
+  }
+  var pendingVideoReturnKey = 'cci-pending-video-return';
+  function readPendingVideoReturn() {
+    try {
+      var saved = JSON.parse(window.sessionStorage.getItem(pendingVideoReturnKey) || 'null');
+      if (saved && typeof saved.deckId === 'string' && saved.deckId) return {
+        deckId: saved.deckId,
+        videoIndex: Number.isInteger(saved.videoIndex) && saved.videoIndex >= 0 ? saved.videoIndex : 0,
+        videoId: typeof saved.videoId === 'string' ? saved.videoId : ''
+      };
+    } catch (e) {}
+    return null;
+  }
+  function savePendingVideoReturn(deckId, videoIndex, videoId) {
+    try {
+      if (deckId) window.sessionStorage.setItem(pendingVideoReturnKey, JSON.stringify({
+        deckId: String(deckId),
+        videoIndex: Number.isInteger(videoIndex) && videoIndex >= 0 ? videoIndex : 0,
+        videoId: typeof videoId === 'string' ? videoId : ''
+      }));
+      else window.sessionStorage.removeItem(pendingVideoReturnKey);
+    } catch (e) {}
+  }
+  function returnToPendingVideo(pending) {
+    if (!pending || typeof pending.deckId !== 'string' || !pending.deckId) return false;
+    var videos = lessonVideosForDeck(pending.deckId);
+    var videoIndex = pending.videoId ? videos.findIndex(function (item) { return item.id === pending.videoId; }) : -1;
+    if (videoIndex < 0) videoIndex = Number.isInteger(pending.videoIndex) && pending.videoIndex >= 0 ? pending.videoIndex : 0;
+    savePendingVideoReturn(null);
+    go({ name: 'lesson-video', id: pending.deckId, videoIndex: videoIndex });
+    return true;
   }
   function accountAction(action, form) {
     if (!account) { accountMessage = 'Account support is not available in this app build.'; render(true); return; }
@@ -663,12 +912,13 @@
       function finishAccountRequest(message, failed, result) {
         accountBusy = false;
         accountMessage = message;
-        if (!failed && result && !result.confirmationRequired && V.name === 'settings' && V.returnToVideoId) {
-          var returnId = V.returnToVideoId, returnIndex = Number.isInteger(V.returnVideoIndex) ? V.returnVideoIndex : 0;
+        var pendingReturn = V.name === 'settings' && V.returnToVideoId
+          ? { deckId: V.returnToVideoId, videoIndex: Number.isInteger(V.returnVideoIndex) ? V.returnVideoIndex : 0, videoId: V.returnVideoAssetId || '' }
+          : readPendingVideoReturn();
+        if (!failed && result && !result.confirmationRequired && pendingReturn) {
           accountEmailDraft = '';
           accountMessage = '';
-          go({ name: 'lesson-video', id: returnId, videoIndex: returnIndex });
-          return;
+          if (returnToPendingVideo(pendingReturn)) return;
         }
         render(true);
         if (failed) {
@@ -679,7 +929,7 @@
       (action === 'account-signup' ? account.signUp(email, password) : account.signIn(email, password)).then(function (result) {
         if (result.error) finishAccountRequest(result.error, true, result);
         else if (result.confirmationRequired) finishAccountRequest('Check your email for a confirmation link, then return here to sign in.', false, result);
-        else finishAccountRequest(result.videoReady ? 'Signed in. Your lesson videos are ready.' : 'Signed in. Video access is being prepared; local study and progress sync are available.', false, result);
+        else finishAccountRequest(result.videoReady ? 'Signed in. Your lesson videos are ready.' : (result.videoAccessError || 'Signed in. Video access is being prepared; local study and progress sync are available.'), false, result);
       }).catch(function () { finishAccountRequest('The account request failed. Check your connection and try again.', true); });
       return;
     }
@@ -697,7 +947,9 @@
     if (action === 'account-video-session') {
       accountBusy = true; render(true);
       account.syncVideoSession(accountStatus.session, true).then(function (ready) {
-        accountBusy = false; accountStatus = account.status(); accountMessage = ready ? 'Video access is ready.' : 'Video access could not be prepared. Try again.'; render(true);
+        accountBusy = false; accountStatus = account.status();
+        if (ready && V.name === 'settings' && returnToPendingVideo(readPendingVideoReturn())) return;
+        accountMessage = ready ? 'Video access is ready.' : (accountStatus.videoAccessError || 'Video access could not be prepared. Try again.'); render(true);
       });
       return;
     }
@@ -714,11 +966,11 @@
     var connectionMessage = connectionState === 'loading' || accountBusy ? 'Connecting to account services…' : (accountStatus && accountStatus.initializationError || 'Account services are not configured yet. Guest study remains available on this device.');
     var message = accountMessage || (configured ? (user ? 'CCI lesson progress syncs when you are online. Custom decks remain local.' : 'Create an account or sign in to sync CCI lesson progress and watch lesson videos.') : connectionMessage);
     var controls;
-    if (!configured) controls = (connectionState === 'unconfigured' ? '<p class="meta">Account sign-in is not configured for this app deployment. You can keep studying as a guest.</p>' : '') +
-      (account && connectionState !== 'loading' ? '<button type="button" class="btn sm" data-act="account-retry"' + (accountBusy ? ' disabled' : '') + '>Retry account connection</button>' : '');
+    if (!configured) controls = (!accountBusy && connectionState === 'unconfigured' ? '<p class="meta">Account sign-in is not configured for this app deployment. You can keep studying as a guest.</p>' : '') +
+      (account && !accountBusy && connectionState !== 'loading' ? '<button type="button" class="btn sm" data-act="account-retry">Retry account connection</button>' : '');
     else if (user) {
       controls = '<p><strong>Signed in as</strong> ' + esc(user.email || 'CCI Study learner') + '</p>' +
-        (!accountStatus.videoReady ? '<p class="meta">Lesson-video access is not ready on this device yet.</p><button type="button" class="btn sm" data-act="account-video-session"' + (accountBusy ? ' disabled' : '') + '>Prepare video access</button>' : '<p class="meta">Private lesson videos are available to your account.</p>') +
+        (!accountStatus.videoReady ? '<p class="meta">' + esc(accountStatus.videoAccessError || 'Lesson-video access is not ready on this device yet.') + '</p><button type="button" class="btn sm" data-act="account-video-session"' + (accountBusy ? ' disabled' : '') + '>Prepare video access</button>' : '<p class="meta">Private lesson videos are available to your account.</p>') +
         (guestProgressForImport ? '<div class="note"><strong>CCI lesson progress from this device is available.</strong><p>Import explicitly to merge it with your account. Your guest copy will remain on this device.</p><button type="button" class="btn sm primary" data-act="account-import"' + (accountBusy ? ' disabled' : '') + '>Import this device’s progress</button></div>' : '') +
         '<div class="row"><button type="button" class="btn sm" data-act="account-sync"' + (accountBusy ? ' disabled' : '') + '>Sync now</button><button type="button" class="btn sm ghost" data-act="account-signout"' + (accountBusy ? ' disabled' : '') + '>Sign out</button></div>';
     } else {
@@ -735,6 +987,10 @@
   }
   function isStudySession(name) { return name === 'flash' || name === 'quiz' || name === 'exam'; }
   function saveActiveSession() {
+    if (V.videoStudy) {
+      S.pausedSession = MobileStudy.snapshot(V.videoStudy);
+      return save();
+    }
     if (!isStudySession(V.name)) return Promise.resolve();
     S.pausedSession = MobileStudy.snapshot(V);
     return save();
@@ -1000,15 +1256,18 @@
   /* ---------- helpers ---------- */
   function applyTheme() { var t = S.settings.theme; if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t); }
   var toastT; function toast(m) { toastEl.textContent = m; toastEl.className = 'show'; clearTimeout(toastT); toastT = setTimeout(function () { toastEl.className = ''; }, 3200); }
-  function openModal(html) {
-    returnFocus = document.activeElement;
+  function openModal(html, options) {
+    options = options || {};
+    closeBiblePreview(false);
+    if (!options.preserveReturnFocus) returnFocus = document.activeElement;
     modal.innerHTML = html;
     var rocketEl = document.querySelector('.rocket-container');
     if (rocketEl) rocketEl.style.display = 'none';
-    var first = modal.querySelector('button, input, select, textarea');
+    var first = options.focusSelector ? modal.querySelector(options.focusSelector) : null;
+    if (!first || first.disabled) first = modal.querySelector('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])');
     if (first) first.focus();
   }
-  function openLessonDetailSheet(lessonId) {
+  function openLessonDetailSheet(lessonId, focusAction) {
     var detailDeck = deck(lessonId);
     if (!detailDeck) return;
     var detailProgress = prog(detailDeck.id);
@@ -1021,6 +1280,22 @@
     var sectionNumber = parsedDetail.sectionNum || 1;
     var progressPct = detailDeck.cards.length ? Math.round(100 * detailMastered / detailDeck.cards.length) : 0;
     var gradient = 'deck-grad-' + (((sectionNumber - 1) % 12) + 1);
+    var lessonDecks = STARTER_DECKS.map(function (source) { return deck('d-' + slug(source.title)); }).filter(Boolean);
+    var lessonIndex = lessonDecks.findIndex(function (lessonDeck) { return lessonDeck.id === detailDeck.id; });
+    var lessonNavigation = '';
+    if (lessonIndex >= 0 && lessonDecks.length > 1) {
+      var previousLesson = lessonIndex > 0 ? lessonDecks[lessonIndex - 1] : null;
+      var nextLesson = lessonIndex < lessonDecks.length - 1 ? lessonDecks[lessonIndex + 1] : null;
+      lessonNavigation = '<div class="lesson-detail-navigation" role="group" aria-label="Navigate lessons">' +
+        (previousLesson
+          ? '<button type="button" class="btn lesson-detail-previous" data-act="lesson-detail-prev" data-id="' + previousLesson.id + '" aria-label="Previous lesson: ' + esc(MobileStudy.parseChapterTitle(previousLesson.title).topic) + '">← Previous</button>'
+          : '<button type="button" class="btn lesson-detail-previous" disabled aria-label="No previous lesson">← Previous</button>') +
+        '<span class="lesson-detail-position">Lesson ' + (lessonIndex + 1) + ' of ' + lessonDecks.length + '</span>' +
+        (nextLesson
+          ? '<button type="button" class="btn lesson-detail-next" data-act="lesson-detail-next" data-id="' + nextLesson.id + '" aria-label="Next lesson: ' + esc(MobileStudy.parseChapterTitle(nextLesson.title).topic) + '">Next →</button>'
+          : '<button type="button" class="btn lesson-detail-next" disabled aria-label="No next lesson">Next →</button>') +
+        '</div>';
+    }
     openModal('<div class="scrim" data-act="close"></div><section class="sheet lesson-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="lesson-detail-title">' +
       '<span class="lesson-detail-handle" aria-hidden="true"></span>' +
       '<div class="lesson-detail-hero ' + gradient + '">' +
@@ -1033,14 +1308,16 @@
         '<div><b>' + detailMastered + '</b><span>Mastered</span></div>' +
         '<div><b>' + detailWeak + '</b><span>Weak spots</span></div>' +
       '</div>' +
+      lessonNavigation +
       '<div class="lesson-detail-actions">' +
         '<button type="button" class="btn primary lesson-detail-study" data-act="lesson-detail-study" data-id="' + detailDeck.id + '">Study this lesson</button>' +
         '<button type="button" class="btn lesson-detail-close" data-act="close">Close</button>' +
       '</div>' +
-    '</section>');
+    '</section>', focusAction ? { preserveReturnFocus: true, focusSelector: '[data-act="' + focusAction + '"]' } : null);
   }
   function ask(msg, label, fn) { pendingAsk = fn; openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><h2 id="dialog-title" class="dialog-title">Please confirm</h2><p>' + esc(msg) + '</p><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn danger" data-act="askok">' + esc(label) + '</button></div></div>'); }
   function closeModal() {
+    closeBiblePreview(false);
     modal.innerHTML = ''; pendingAsk = null;
     var rocketEl = document.querySelector('.rocket-container');
     if (rocketEl) rocketEl.style.display = '';
@@ -1083,7 +1360,8 @@
       if (ids.has(d.id)) throw new Error('This backup contains duplicate deck IDs.'); ids.add(d.id);
       var cardIds = new Set();
       var cards = d.cards.map(function (c) {
-        if (!c || typeof c.id !== 'string' || !/^[a-zA-Z0-9._-]{1,180}$/.test(c.id) || typeof c.question !== 'string' || !c.question.trim() || !Array.isArray(c.options) || c.options.length !== 4 || !c.options.every(function (x) { return typeof x === 'string' && x.trim(); }) || LET.indexOf(c.answer) < 0) throw new Error('A question in "' + d.title + '" is malformed.');
+        var isDangerousKey = c && (c.id === '__proto__' || c.id === 'constructor' || c.id === 'prototype');
+        if (!c || isDangerousKey || typeof c.id !== 'string' || !/^[a-zA-Z0-9._-]{1,180}$/.test(c.id) || typeof c.question !== 'string' || !c.question.trim() || !Array.isArray(c.options) || c.options.length !== 4 || !c.options.every(function (x) { return typeof x === 'string' && x.trim(); }) || LET.indexOf(c.answer) < 0) throw new Error('A question in "' + d.title + '" is malformed.');
         if (cardIds.has(c.id)) throw new Error('A deck in this backup contains duplicate question IDs.'); cardIds.add(c.id);
         return { id: c.id, question: c.question, options: c.options.slice(), answer: c.answer, explanation: typeof c.explanation === 'string' ? c.explanation : '', ref: typeof c.ref === 'string' ? c.ref : '', bible: typeof c.bible === 'string' ? c.bible : '' };
       });
@@ -1760,25 +2038,65 @@
     var parsed = MobileStudy.parseChapterTitle(d.title), section = parsed.sectionNum || 1;
     var videos = lessonVideosForDeck(d.id), index = Math.max(0, Math.min(Number.isInteger(V.videoIndex) ? V.videoIndex : 0, videos.length - 1));
     var video = videos[index] || null, title = video ? video.title : parsed.topic + ' video lesson';
+    var videoNavigation = videos.length > 1
+      ? '<nav class="lesson-video-navigation" aria-label="Lesson video navigation">' +
+        '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-index="' + Math.max(0, index - 1) + '"' + (index === 0 ? ' disabled' : '') + ' aria-label="Previous video' + (index > 0 ? ': ' + esc(videos[index - 1].title) : '') + '" title="' + (index > 0 ? 'Previous: ' + esc(videos[index - 1].title) : 'First video') + '">‹ <span>Previous</span></button>' +
+        '<span class="lesson-video-position" aria-live="polite">Video ' + (index + 1) + ' of ' + videos.length + '</span>' +
+        '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-index="' + Math.min(videos.length - 1, index + 1) + '"' + (index === videos.length - 1 ? ' disabled' : '') + ' aria-label="Next video' + (index < videos.length - 1 ? ': ' + esc(videos[index + 1].title) : '') + '" title="' + (index < videos.length - 1 ? 'Next: ' + esc(videos[index + 1].title) : 'Last video') + '"><span>Next</span> ›</button>' +
+      '</nav>'
+      : '';
     var canWatchVideo = !!(accountStatus.user && accountStatus.videoReady);
+    var isNative = typeof window !== 'undefined' && window.CciNative && window.CciNative.isNative;
+    var tokenParam = canWatchVideo && isNative && account && typeof account.playbackTicket === 'function' ? account.playbackTicket(video && video.id) : '';
+    var ticketError = isNative && account && typeof account.playbackTicketError === 'function' ? account.playbackTicketError(video && video.id) : '';
+    if (canWatchVideo && isNative && video && !tokenParam && !ticketError && account && typeof account.preparePlaybackTicket === 'function') {
+      account.preparePlaybackTicket(video.id).then(function () {
+        if (V.name === 'lesson-video' && V.id === d.id && lessonVideosForDeck(V.id)[V.videoIndex] && lessonVideosForDeck(V.id)[V.videoIndex].id === video.id) render(true);
+      });
+    }
+    var videoSourceUrl = video ? video.videoUrl : '';
+    var captionsSourceUrl = video ? video.captionsUrl : '';
+    var transcriptSourceUrl = video ? video.transcriptUrl : '';
+    if (tokenParam && isNative) {
+      videoSourceUrl = nativeTicketUrl(videoSourceUrl, tokenParam);
+      captionsSourceUrl = nativeTicketUrl(captionsSourceUrl, tokenParam);
+      transcriptSourceUrl = nativeTicketUrl(transcriptSourceUrl, tokenParam);
+    }
+    var canStartPlayback = canWatchVideo && (!isNative || !!tokenParam);
     var player = video
-      ? (canWatchVideo
-          ? '<video class="lesson-video-player" id="lesson-video-player" controls playsinline preload="metadata" crossorigin="use-credentials"' + (video.posterUrl ? ' poster="' + esc(video.posterUrl) + '"' : '') + ' aria-label="Video lesson: ' + esc(title) + '"><source src="' + esc(video.videoUrl) + '" type="video/mp4">' + (video.captionsUrl ? '<track kind="captions" src="' + esc(video.captionsUrl) + '" srclang="' + esc(video.captionsLanguage) + '" label="' + esc(video.captionsLabel) + '" default>' : '') + '<span>Your browser does not support video playback.</span></video>'
-          : '<div class="lesson-video-unavailable lesson-video-auth-required" role="status"><strong>' + (accountStatus.user ? 'Preparing secure video access' : 'Sign in to watch this lesson') + '</strong><p>' + (accountStatus.user ? 'Your lesson files stay private. Video access is being prepared for your account.' : 'Create a free account or sign in to watch. You can continue studying locally without an account.') + '</p><button type="button" class="btn primary" data-act="nav-tab" data-tab="settings" data-return-video="' + esc(d.id) + '" data-return-video-index="' + index + '">' + (accountStatus.user ? 'Account settings' : 'Sign in or create account') + '</button></div>')
+      ? (canStartPlayback
+          ? '<video class="lesson-video-player" id="lesson-video-player" controls playsinline preload="metadata" crossorigin="use-credentials"' + (video.posterUrl ? ' poster="' + esc(video.posterUrl) + '"' : '') + ' aria-label="Video lesson: ' + esc(title) + '"><source src="' + esc(videoSourceUrl) + '" type="video/mp4">' + (captionsSourceUrl ? '<track kind="captions" src="' + esc(captionsSourceUrl) + '" srclang="' + esc(video.captionsLanguage) + '" label="' + esc(video.captionsLabel) + '" default>' : '') + '<span>Your browser does not support video playback.</span></video>'
+          : '<div class="lesson-video-unavailable lesson-video-auth-required" role="status"><strong>' + (canWatchVideo ? (ticketError ? 'Secure video access needs attention' : 'Preparing secure video access') : (accountStatus.user ? 'Preparing secure video access' : 'Sign in to watch this lesson')) + '</strong><p>' + (ticketError ? esc(ticketError) : (accountStatus.user ? 'Your lesson files stay private. ' + (isNative ? 'A short-lived ticket for this lesson is being prepared.' : 'Video access is being prepared for your account.') : 'Create a free account or sign in to watch. You can continue studying locally without an account.')) + '</p>' + (canWatchVideo && isNative ? '<button type="button" class="btn primary" data-act="video-ticket-retry" data-video-id="' + esc(video.id) + '"' + (ticketError ? '' : ' disabled') + '>' + (ticketError ? 'Retry secure access' : 'Preparing…') + '</button>' : '<button type="button" class="btn primary" data-act="nav-tab" data-tab="settings" data-return-video="' + esc(d.id) + '" data-return-video-index="' + index + '" data-return-video-asset-id="' + esc(video.id) + '">' + (accountStatus.user ? 'Account settings' : 'Sign in or create account') + '</button>') + '</div>')
       : '<div class="lesson-video-unavailable" role="status"><strong>Lesson video not available yet</strong><p>The ' + esc(parsed.topic) + ' video has not been added yet. Use Flashcards or Take quiz below.</p></div>';
-    var transcriptPanel = video && video.transcriptUrl
+    var transcriptPanel = video && transcriptSourceUrl
       ? (canWatchVideo
-          ? '<details class="lesson-transcript" data-video-id="' + esc(video.id) + '" data-transcript-url="' + esc(video.transcriptUrl) + '"><summary>Search transcript</summary><div class="lesson-transcript-body"><label for="lesson-transcript-search">Find a word or phrase</label><input id="lesson-transcript-search" type="search" autocomplete="off" aria-controls="lesson-transcript-cues"><p class="lesson-transcript-status" role="status" aria-live="polite">Open to load transcript segments.</p><ol class="lesson-transcript-cues" id="lesson-transcript-cues" hidden></ol></div></details>'
+          ? '<details class="lesson-transcript" data-video-id="' + esc(video.id) + '" data-transcript-url="' + esc(transcriptSourceUrl) + '"><summary>Search transcript</summary><div class="lesson-transcript-body"><label for="lesson-transcript-search">Find a word or phrase</label><input id="lesson-transcript-search" type="search" autocomplete="off" aria-controls="lesson-transcript-cues"><p class="lesson-transcript-status" role="status" aria-live="polite">Open to load transcript segments.</p><ol class="lesson-transcript-cues" id="lesson-transcript-cues" hidden></ol></div></details>'
           : '<p class="lesson-transcript-note">English captions and a searchable transcript are available after you sign in to watch.</p>')
-      : (video && canWatchVideo ? '<p class="lesson-transcript-note">Captions and a searchable transcript are not available for this recording yet.</p>' : '');
+      : (video && canStartPlayback ? '<p class="lesson-transcript-note">Captions and a searchable transcript are not available for this recording yet.</p>' : '');
     var videoNav = videos.length > 1
       ? '<nav class="lesson-video-segments" aria-label="Videos in this chapter">' + videos.map(function (item, itemIndex) { return '<button type="button" class="lesson-video-segment' + (itemIndex === index ? ' is-active' : '') + '" data-act="lesson-video-select" data-index="' + itemIndex + '" aria-current="' + (itemIndex === index ? 'true' : 'false') + '">' + (itemIndex + 1) + '. ' + esc(item.title) + '</button>'; }).join('') + '</nav>'
       : '<div class="lesson-video-progress" aria-label="Chapter ' + section + ' of ' + S.decks.length + '"><span>Chapter ' + section + ' of ' + S.decks.length + '</span><progress value="' + section + '" max="' + S.decks.length + '">Chapter ' + section + ' of ' + S.decks.length + '</progress></div>';
     return '<main class="lesson-video-page" aria-labelledby="lesson-video-title">' +
       '<header class="lesson-video-topbar"><button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button><div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong></div><span class="lesson-video-section-count">' + section + ' / ' + S.decks.length + '</span></header>' +
-      '<section class="lesson-video-frame' + (video && canWatchVideo ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
-      '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title">' + esc(title) + '</h1><p>' + (canWatchVideo ? 'Watch the lesson, then reinforce what you learned with a quick study activity.' : 'Study this lesson locally with flashcards or a quiz. Sign in to watch its video.') + '</p></div>' + (video && canWatchVideo ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">Continue lesson</button>' : '') + '</section>' +
-      '<div class="lesson-video-study-actions" role="group" aria-label="Study this lesson"><button type="button" class="btn" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '">Flashcards</button><button type="button" class="btn" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '">Take quiz</button></div>' +
+      '<section class="lesson-video-frame' + (video && canStartPlayback ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
+      '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title" tabindex="-1">' + esc(title) + '</h1><p>' + (canStartPlayback ? 'Watch this lesson video, then reinforce Chapter ' + section + ' (' + esc(parsed.topic) + ') with study activities covering all ' + d.cards.length + ' questions across the chapter’s ' + videos.length + ' recordings.' : 'Study Chapter ' + section + ' (' + esc(parsed.topic) + ') locally with flashcards or a quiz covering all ' + d.cards.length + ' questions.' + (accountStatus.user ? ' Secure video access is being prepared.' : ' Sign in to watch its lesson videos.')) + '</p></div>' + (video && canStartPlayback ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">' + (V.videoTime > 0 ? 'Resume lesson' : 'Play lesson') + '</button>' : '') + '</section>' +
+      videoNavigation +
+      (function () {
+        var videoCards = video ? cardsForVideo(d, video) : [];
+        var isLastVideo = !videos.length || index >= videos.length - 1;
+        var resumePausedBtn = (S.pausedSession && S.pausedSession.cards && S.pausedSession.cards.length)
+          ? '<button type="button" class="btn primary resume-study-btn" data-act="resume-paused-study" style="margin-bottom:var(--space-xs);width:100%;">Resume ' + (S.pausedSession.name === 'quiz' ? 'Quiz' : 'Flashcards') + ' (' + (Math.min((S.pausedSession.i || 0) + 1, S.pausedSession.cards.length)) + ' of ' + S.pausedSession.cards.length + ')</button>'
+          : '';
+        var videoStudyButtons = videoCards.length
+          ? '<button type="button" class="btn primary" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" data-video-id="' + esc(video.id) + '" aria-label="Study Video Flashcards, ' + videoCards.length + ' cards">Video Flashcards (' + videoCards.length + ')</button>' +
+            '<button type="button" class="btn primary" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" data-video-id="' + esc(video.id) + '" aria-label="Take Video Quiz, ' + videoCards.length + ' questions">Video Quiz (' + videoCards.length + ')</button>'
+          : (isLastVideo ? '' : '<p class="note" style="margin:var(--space-xs) 0;">Video practice questions in preparation · Chapter quiz available on the final lesson</p>');
+        var chapterStudyButtons = isLastVideo
+          ? '<button type="button" class="btn' + (videoCards.length ? ' ghost sm' : '') + '" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" aria-label="Study Chapter ' + section + ' (' + esc(parsed.topic) + ') Flashcards, ' + d.cards.length + ' cards">Chapter Flashcards (' + d.cards.length + ')</button>' +
+            '<button type="button" class="btn' + (videoCards.length ? ' ghost sm' : '') + '" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" aria-label="Take Chapter ' + section + ' (' + esc(parsed.topic) + ') Quiz, ' + d.cards.length + ' questions">Chapter Quiz (' + d.cards.length + ')</button>'
+          : '';
+        return '<div class="lesson-video-study-actions" role="group" aria-label="Study Chapter ' + section + ' (' + esc(parsed.topic) + ')">' + resumePausedBtn + videoStudyButtons + chapterStudyButtons + '</div>';
+      })() +
       transcriptPanel +
       videoNav +
     '</main>';
@@ -1961,17 +2279,18 @@
     return '<div class="barin"><span>' + plural(SEL.size, 'deck') + ' · ' + plural(n, 'card') + '</span><div class="row"><button class="btn sm" data-act="setup" data-mode="flash" data-id="*">Flashcards</button><button class="btn primary sm" data-act="setup" data-mode="quiz" data-id="*">Quiz</button></div></div>';
   }
 
-  views.flash = function () {
-    var it = V.cards[V.i], c = it.card, ai = LET.indexOf(c.answer), d = deck(it.deckId);
-    var title = V.opts && V.opts.daily ? 'Today’s Study' : (d ? d.title : 'Flashcards');
+  views.flash = function (session) {
+    var s = session || V;
+    var it = s.cards[s.i], c = it.card, ai = LET.indexOf(c.answer), d = deck(it.deckId);
+    var title = s.opts && s.opts.daily ? 'Today’s Study' : (d ? d.title : 'Flashcards');
     var parsed = MobileStudy.parseChapterTitle(title);
     var displayTitle = parsed.topic || title;
-    var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') + bibleNote(c);
-    var isLast = V.i === V.cards.length - 1;
-    var cardFace = V.flipped
+    var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + renderReferenceNote(c, it.deckId) + bibleNote(c);
+    var isLast = s.i === s.cards.length - 1;
+    var cardFace = s.flipped
       ? '<div class="flip on flash-card-back" data-flip-surface="true">' +
           '<div class="inner"><div class="face back" aria-hidden="false">' +
-            '<span class="card-face-top"><span class="tag">Answer · ' + c.answer + '</span><span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span></span>' +
+            '<span class="card-face-top"><span class="tag">Answer · ' + c.answer + '</span><span class="face-index">' + (s.i + 1) + ' / ' + s.cards.length + '</span></span>' +
             '<span class="a">' + esc(c.options[ai]) + '</span>' +
             notes +
             '<span class="qs">' + esc(c.question) + '</span>' +
@@ -1980,39 +2299,40 @@
         '</div>'
       : '<button class="flip" data-act="flip" type="button" aria-pressed="false" aria-label="Reveal answer">' +
           '<span class="inner"><span class="face front" aria-hidden="false">' +
-            '<span class="card-face-top"><span class="tag">' + esc(d ? (MobileStudy.parseChapterTitle(d.title).topic || d.title) : '') + '</span><span class="face-index">' + (V.i + 1) + ' / ' + V.cards.length + '</span></span>' +
+            '<span class="card-face-top"><span class="tag">' + esc(d ? (MobileStudy.parseChapterTitle(d.title).topic || d.title) : '') + '</span><span class="face-index">' + (s.i + 1) + ' / ' + s.cards.length + '</span></span>' +
             '<span class="q">' + esc(c.question) + '</span>' +
             '<span class="flip-cue"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap or Space to flip</span>' +
           '</span></span>' +
         '</button>';
 
     return '<section class="study-shell flash-session coaching-study-flow" aria-label="Flashcard study session">' +
-      sessionHead(displayTitle, (V.i + 1) + ' / ' + V.cards.length) +
-      progressBar(V.i + 1, V.cards.length) +
+      sessionHead(displayTitle, (s.i + 1) + ' / ' + s.cards.length) +
+      progressBar(s.i + 1, s.cards.length) +
       '<div class="coaching-question-container">' + cardFace + '</div>' +
-      (V.flipped ? '<div class="flash-rating row grow" role="group" aria-label="Mark your confidence">' +
+      (s.flipped ? '<div class="flash-rating row grow" role="group" aria-label="Mark your confidence">' +
         '<button class="btn btn-confidence" data-act="mark" data-v="unknown">Still learning</button>' +
         '<button class="btn primary btn-confidence" data-act="mark" data-v="known">I know it</button>' +
       '</div>' : '') +
       '<div class="study-bottom-bar"><div class="row grow nav study-navigation">' +
-        '<button class="btn ghost btn-prev" data-act="prev"' + (V.i ? '' : ' disabled') + '>Previous</button>' +
-        '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'Finish session' : (V.flipped ? 'Next card' : 'Skip card')) + '</button>' +
+        '<button class="btn ghost btn-prev" data-act="prev"' + (s.i ? '' : ' disabled') + '>Previous</button>' +
+        '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'Finish session' : (s.flipped ? 'Next card' : 'Skip card')) + '</button>' +
       '</div></div>' +
       '<p class="study-shortcuts">Use ← / → to move between cards</p>' +
     '</section>';
   };
 
-  views.quiz = function () {
-    var isExam = V.name === 'exam', it = V.cards[V.i], c = it.card, picked = V.picked, done = picked !== null;
+  views.quiz = function (session) {
+    var s = session || V;
+    var isExam = s.name === 'exam', it = s.cards[s.i], c = it.card, picked = s.picked, done = picked !== null;
     var d = deck(it.deckId);
     var order = it.optionOrder || [0, 1, 2, 3];
-    var isLast = V.i === V.cards.length - 1;
+    var isLast = s.i === s.cards.length - 1;
     var parsed = d ? MobileStudy.parseChapterTitle(d.title) : { topic: isExam ? 'Timed Exam' : 'Quiz' };
     var sessionTitle = isExam ? 'Timed Exam' : parsed.topic;
 
     var hasSeenTooltip = false;
     try { hasSeenTooltip = !!window.localStorage.getItem('cci_seen_answer_tooltip'); } catch (e) {}
-    var showTooltip = !hasSeenTooltip && !done && V.i === 0;
+    var showTooltip = !hasSeenTooltip && !done && s.i === 0;
 
     var opts = order.map(function (source, k) {
       var cls = 'opt';
@@ -2048,19 +2368,21 @@
               '</div>' +
               (!ok ? '<p class="feedback-answer"><span class="feedback-answer-letter" aria-label="Correct option ' + LET[answerAt] + '">' + LET[answerAt] + '</span><span>' + esc(c.options[order[answerAt]]) + '</span></p>' : '') +
               (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') +
-              (c.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(c.ref) + '</p>' : '') +
+              renderReferenceNote(c, it.deckId) +
               bibleNote(c) +
             '</div>';
         };
-        fbSheet = '<div class="coaching-bottom-sheet ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '" role="status" aria-live="polite">' +
-          '<div class="sheet-drag-handle" aria-hidden="true"></div>' +
-          '<div class="sheet-content">' +
-            feedbackContent() +
+        fbSheet = '<div class="coaching-bottom-sheet quiz-feedback-sheet ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '">' +
+          '<button type="button" class="quiz-feedback-resize-control" data-act="quiz-feedback-toggle" aria-label="Collapse answer feedback panel" aria-expanded="true" aria-controls="quiz-feedback-content" title="Drag to resize; press to collapse or expand">' +
+            '<span class="sheet-drag-handle" aria-hidden="true"></span>' +
+          '</button>' +
+          '<div class="sheet-content quiz-feedback-content" id="quiz-feedback-content" role="status" aria-live="polite">' + feedbackContent() + '</div>' +
+          '<div class="quiz-feedback-actions">' +
             '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Next question') + '</button>' +
           '</div>' +
         '</div>';
-        desktopFeedback = '<aside class="quiz-explanation-card ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '" role="status" aria-live="polite">' +
-          '<div class="quiz-explanation-content">' + feedbackContent() + '</div>' +
+        desktopFeedback = '<aside class="quiz-explanation-card ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '">' +
+          '<div class="quiz-explanation-content" role="status" aria-live="polite">' + feedbackContent() + '</div>' +
           '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Continue') + '</button>' +
         '</aside>';
       }
@@ -2068,16 +2390,16 @@
 
     var title = isExam ? 'Exam' : 'Quiz';
     var status = isExam
-      ? '<span id="exam-clock" role="timer" aria-label="Time remaining ' + formatClock(V.remaining) + '">' + formatClock(V.remaining) + '</span>'
-      : '<span class="score-inline" aria-label="Question ' + (V.i + 1) + ' of ' + V.cards.length + '">' + (V.i + 1) + '<span aria-hidden="true"> / </span><span class="sr-only">of</span>' + V.cards.length + '</span>';
+      ? '<span id="exam-clock" role="timer" aria-label="Time remaining ' + formatClock(s.remaining) + '">' + formatClock(s.remaining) + '</span>'
+      : '<span class="score-inline" aria-label="Question ' + (s.i + 1) + ' of ' + s.cards.length + '">' + (s.i + 1) + '<span aria-hidden="true"> / </span><span class="sr-only">of</span>' + s.cards.length + '</span>';
 
     return '<section class="study-shell ' + (isExam ? 'exam-session' : 'quiz-session') + ' coaching-study-flow" aria-label="' + (isExam ? 'Timed exam' : 'Quiz') + '">' +
       sessionHead(sessionTitle, status, isExam) +
-      progressBar(V.i + (done ? 1 : 0), V.cards.length) +
+      progressBar(s.i + (done ? 1 : 0), s.cards.length) +
       '<div class="quiz-question-layout' + (desktopFeedback ? ' has-feedback' : '') + '">' +
         '<article class="question-panel coaching-question-panel">' +
           '<div class="question-meta-row">' +
-            '<span class="count">Question ' + (V.i + 1) + ' of ' + V.cards.length + '</span>' +
+            '<span class="count">Question ' + (s.i + 1) + ' of ' + s.cards.length + '</span>' +
             (showTooltip ? '<div class="coaching-first-tooltip" role="tooltip"><span class="tooltip-dot" aria-hidden="true"></span>Tap an answer to check it</div>' : '') +
           '</div>' +
           '<h2 class="qtext coaching-question-text" id="question-prompt" tabindex="-1">' + esc(c.question) + '</h2>' +
@@ -2090,8 +2412,8 @@
     '</section>';
   };
 
-  views.results = function () {
-    var R = V;
+  views.results = function (session) {
+    var R = session || V;
     var durationMs = (R.finishedAt || Date.now()) - (R.startedAt || (Date.now() - 60000));
     var minutes = Math.max(1, Math.round(durationMs / 60000));
     var cardsMastered = 0;
@@ -2129,7 +2451,7 @@
           selected +
           '<p class="answer-review-line correct-answer"><span class="answer-label">Correct answer</span><span class="answer-copy"><b>' + card.answer + '</b> ' + esc(card.options[LET.indexOf(card.answer)]) + '</span></p>' +
           (card.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(card.explanation) + '</p>' : '') +
-          (card.ref ? '<p class="card-note card-ref"><strong>Reference:</strong> ' + esc(card.ref) + '</p>' : '') +
+          renderReferenceNote(card, entry.item ? entry.item.deckId : '') +
           bibleNote(card) +
         '</li>';
       }).join('');
@@ -2164,6 +2486,7 @@
           '<ol>' + examRows + '</ol>' +
         '</section>' +
         '<div class="completion-actions-bar">' +
+          (R.returnToVideo ? '<button class="btn ' + (V.videoStudy ? 'primary ' : '') + 'full video-study-return-btn" data-act="results-return-video">Return to video</button>' : '') +
           '<button class="btn primary full btn-continue" data-act="home">Continue</button>' +
         '</div>' +
       '</section>';
@@ -2194,6 +2517,7 @@
       '</div>' +
       '<div class="result-actions completion-actions-bar">' +
         (miss.length ? '<button class="btn primary full" data-act="review">Review ' + plural(miss.length, R.kind === 'quiz' ? 'missed card' : 'card') + '</button>' : '<p class="note result-note">' + (R.kind === 'quiz' ? 'No missed cards. Outstanding work!' : 'Nothing left marked as still learning.') + '</p>') +
+        (R.returnToVideo ? '<button class="btn ' + (V.videoStudy ? 'primary ' : '') + 'full video-study-return-btn" data-act="results-return-video">Return to video</button>' : '') +
         '<button class="btn full" data-act="again">' + (R.kind === 'quiz' ? 'Retake quiz' : 'Study again') + '</button>' +
         '<button class="btn full ghost btn-continue" data-act="results-continue">Continue</button>' +
       '</div>' +
@@ -2731,8 +3055,10 @@
 
   function sessionHead(t, right, isExam) {
     return '<header class="top study-header coaching-study-header">' +
-      '<button class="study-close-btn" data-act="pause-session" aria-label="Close study session">' +
-        '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+      '<button class="study-close-btn" data-act="' + (V.returnToVideo ? 'study-return-video' : 'pause-session') + '" aria-label="' + (V.returnToVideo ? 'Return to video' : 'Close study session') + '" title="' + (V.returnToVideo ? 'Return to video' : 'Close study session') + '">' +
+        (V.returnToVideo
+          ? '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>'
+          : '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>') +
       '</button>' +
       '<div class="study-heading">' +
         '<span class="eyebrow">CCI · DISCIPLESHIP</span>' +
@@ -2826,10 +3152,40 @@
     var showRocket = (V.name === 'home' || V.name === 'journey');
     var rocketHtml = showRocket ? renderRocketFab() : '';
     app.innerHTML = banner() +
-      '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + '">' +
+      '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + (animateRouteChange ? ' app-screen-enter' : '') + '">' +
         (hasDesktopSidebar ? renderDesktopSidebar(V.name === 'devotional' ? 'home' : V.name) : '') +
         '<main class="desktop-main">' + view() + tabBarHtml + rocketHtml + '</main>' +
       '</div>';
+    animateRouteChange = false;
+    var renderedVideo = document.getElementById('lesson-video-player');
+    if (renderedVideo) {
+      var videoAction = app.querySelector('.lesson-video-continue');
+      var syncVideoAction = function () {
+        if (!videoAction) return;
+        var label = renderedVideo.ended ? 'Replay lesson' : (renderedVideo.paused ? (renderedVideo.currentTime > 0 ? 'Resume lesson' : 'Play lesson') : 'Pause lesson');
+        var accessibleLabel = label + ': ' + (renderedVideo.getAttribute('aria-label') || 'video');
+        if (videoAction.textContent !== label) videoAction.textContent = label;
+        if (videoAction.getAttribute('aria-label') !== accessibleLabel) videoAction.setAttribute('aria-label', accessibleLabel);
+      };
+      ['play', 'pause', 'ended', 'timeupdate', 'loadedmetadata'].forEach(function (eventName) { renderedVideo.addEventListener(eventName, syncVideoAction); });
+      var seekTime = Number(V.videoTime);
+      if (Number.isFinite(seekTime) && seekTime >= 0 && (seekTime > 0 || V.autoPlayVideo)) {
+        var seekVideo = function () {
+          try {
+            if (seekTime > 0) {
+              renderedVideo.currentTime = Math.min(seekTime, Number.isFinite(renderedVideo.duration) ? renderedVideo.duration : seekTime);
+            }
+            if (V.autoPlayVideo) {
+              delete V.autoPlayVideo;
+              renderedVideo.play().catch(function () {});
+            }
+          } catch (e) {}
+        };
+        if (renderedVideo.readyState >= 1) seekVideo();
+        else renderedVideo.addEventListener('loadedmetadata', seekVideo, { once: true });
+      }
+      syncVideoAction();
+    }
     if (!keep) window.scrollTo(0, 0);
     if (V.name === 'flash') {
       var f = app.querySelector('.flip');
@@ -2840,48 +3196,325 @@
     }
   }
 
+  function viewToHash(v) {
+    if (!v || !v.name || v.name === 'home') return '#/';
+    switch (v.name) {
+      case 'journey':
+      case 'practice':
+      case 'progress':
+      case 'settings':
+      case 'import':
+        return '#/' + v.name;
+      case 'chapter':
+        return '#/chapter/' + encodeURIComponent(v.id || '');
+      case 'lesson-video': {
+        var base = '#/video/' + encodeURIComponent(v.id || '');
+        var vIndex = Number.isInteger(v.videoIndex) ? Math.max(0, v.videoIndex) : 0;
+        base += '/' + vIndex;
+        if (Number.isFinite(v.videoTime) && v.videoTime > 0) {
+          base += '?t=' + Math.floor(v.videoTime);
+        }
+        return base;
+      }
+      case 'devotional':
+        return '#/devotional/' + encodeURIComponent(v.id || '');
+      case 'streak':
+        return '#/streak';
+      case 'picker':
+        return '#/picker/' + encodeURIComponent(v.mode || 'flash');
+      case 'edit':
+        return '#/edit/' + encodeURIComponent(v.id || '');
+      case 'onboarding':
+        return '#/onboarding';
+      case 'flash':
+      case 'quiz': {
+        var targetId = v.id || (Array.isArray(v.ids) && v.ids.length === 1 ? v.ids[0] : '');
+        return '#/study/' + v.name + (targetId ? '/' + encodeURIComponent(targetId) : '');
+      }
+      case 'exam':
+        return '#/study/exam';
+      case 'results':
+        return '#/results';
+      default:
+        return '#/';
+    }
+  }
+
+  function hashToView(hash) {
+    if (typeof hash !== 'string') return { name: 'home' };
+    var cleaned = hash.trim().replace(/^#\/?/, '');
+    if (!cleaned) return { name: 'home' };
+
+    var query = {};
+    var qIdx = cleaned.indexOf('?');
+    if (qIdx >= 0) {
+      var qs = cleaned.slice(qIdx + 1);
+      cleaned = cleaned.slice(0, qIdx);
+      qs.split('&').forEach(function (param) {
+        var parts = param.split('=');
+        if (parts[0]) {
+          query[decodeURIComponent(parts[0])] = parts[1] ? decodeURIComponent(parts[1]) : '';
+        }
+      });
+    }
+
+    var segments = cleaned.split('/').filter(Boolean).map(function (seg) {
+      try { return decodeURIComponent(seg); } catch (e) { return seg; }
+    });
+    var root = segments[0] ? segments[0].toLowerCase() : '';
+
+    switch (root) {
+      case '':
+      case 'home':
+        return { name: 'home' };
+      case 'journey':
+        return { name: 'journey' };
+      case 'practice':
+        return { name: 'practice' };
+      case 'progress':
+      case 'stats':
+        return { name: 'progress' };
+      case 'settings':
+      case 'account':
+        return { name: 'settings' };
+      case 'chapter':
+      case 'deck':
+        return segments[1] ? { name: 'chapter', id: segments[1] } : { name: 'journey' };
+      case 'video':
+      case 'lesson-video': {
+        var deckId = segments[1] || '';
+        if (!deckId) return { name: 'journey' };
+        var vIdx = segments[2] ? parseInt(segments[2], 10) : 0;
+        if (isNaN(vIdx) || vIdx < 0) vIdx = 0;
+        var vTime = query.t ? parseFloat(query.t) : 0;
+        if (isNaN(vTime) || vTime < 0) vTime = 0;
+        return { name: 'lesson-video', id: deckId, videoIndex: vIdx, videoTime: vTime };
+      }
+      case 'devotional':
+        return segments[1] ? { name: 'devotional', id: segments[1] } : { name: 'home' };
+      case 'streak':
+        return { name: 'streak', returnTo: 'home' };
+      case 'picker': {
+        var mode = segments[1] === 'quiz' ? 'quiz' : 'flash';
+        return { name: 'picker', mode: mode, from: 'home', pickerMulti: false, pickerMixed: false };
+      }
+      case 'edit':
+        return segments[1] ? { name: 'edit', id: segments[1], editing: null, filter: '' } : { name: 'home' };
+      case 'import':
+        return { name: 'import' };
+      case 'onboarding':
+        return { name: 'onboarding', step: 0, answers: MobileStudy.defaultOnboarding(false) };
+      case 'study': {
+        var studyMode = segments[1] || 'flash';
+        if (studyMode === 'quiz' || studyMode === 'flash') {
+          return segments[2] ? { name: 'study', mode: studyMode, id: segments[2] } : { name: 'study', mode: studyMode };
+        }
+        if (studyMode === 'exam') {
+          return { name: 'study', mode: 'exam' };
+        }
+        return { name: 'home' };
+      }
+      case 'quiz':
+      case 'flash':
+        return segments[1] ? { name: 'study', mode: root, id: segments[1] } : { name: 'study', mode: root };
+      case 'exam':
+        return { name: 'study', mode: 'exam' };
+      case 'results':
+        return { name: 'results' };
+      default:
+        return { name: 'home' };
+    }
+  }
+
+  function normalizeHash(h) {
+    if (!h) return '#/';
+    var str = String(h).trim();
+    if (str === '#' || str === '#/' || str === '') return '#/';
+    return str.charAt(0) === '#' ? str : '#' + str;
+  }
+
+  function syncHashWithView(v, replace) {
+    if (typeof window === 'undefined' || !window.location) return;
+    var targetHash = viewToHash(v);
+    try {
+      if (window.history && (replace ? window.history.replaceState : window.history.pushState)) {
+        var stateObj = { name: v.name, id: v.id || null, hash: targetHash };
+        if (v.returnToVideoId) stateObj.returnToVideoId = v.returnToVideoId;
+        if (Number.isInteger(v.returnVideoIndex)) stateObj.returnVideoIndex = v.returnVideoIndex;
+        if (typeof v.returnVideoAssetId === 'string' && v.returnVideoAssetId) stateObj.returnVideoAssetId = v.returnVideoAssetId;
+        stateObj.videoIndex = Number.isInteger(v.videoIndex) ? v.videoIndex : 0;
+        if (Number.isFinite(v.videoTime) && v.videoTime >= 0) stateObj.videoTime = v.videoTime;
+        var targetUrl = (window.location.pathname || '') + (window.location.search || '') + targetHash;
+        if (replace) {
+          window.history.replaceState(stateObj, '', targetUrl);
+        } else {
+          window.history.pushState(stateObj, '', targetUrl);
+        }
+      } else if (typeof window.location.hash === 'string' && normalizeHash(window.location.hash) !== normalizeHash(targetHash)) {
+        window.location.hash = targetHash;
+      }
+    } catch (e) {
+      try {
+        if (typeof window.location.hash === 'string' && normalizeHash(window.location.hash) !== normalizeHash(targetHash)) {
+          window.location.hash = targetHash;
+        }
+      } catch (err) {}
+    }
+  }
+
   function go(v, replace) {
     if (V.name === 'exam' && v.name !== 'exam') stopExamTimer();
     rocketMenuOpen = false;
     var prev = V;
+    animateRouteChange = !!prev && (prev.name !== v.name || prev.id !== v.id);
+    if (prev && (prev.name === 'quiz' || prev.name === 'flash' || prev.name === 'exam') && v.name !== prev.name) scheduleCloudProgressSync(true);
     V = v;
-    try {
-      if (window.history && window.history.pushState) {
-        var stateObj = { name: V.name, id: V.id || null };
-        if (replace) {
-          window.history.replaceState(stateObj, '', window.location.href);
-        } else if (!prev || prev.name !== V.name || prev.id !== V.id) {
-          stateObj.videoIndex = Number.isInteger(V.videoIndex) ? V.videoIndex : 0;
-          window.history.pushState(stateObj, '', window.location.href);
-        }
+    var shouldReplace = !!replace;
+    var prevHash = prev ? viewToHash(prev) : '';
+    var newHash = viewToHash(V);
+    if (!replace && prev && prev.name === V.name && prev.id === V.id && prevHash === newHash) {
+      shouldReplace = true;
+    }
+    syncHashWithView(V, shouldReplace);
+    render();
+  }
+
+  function handleLocationChange(e) {
+    var currentHash = (typeof window !== 'undefined' && window.location && typeof window.location.hash === 'string') ? window.location.hash : '';
+    var currentViewHash = viewToHash(V);
+    if (normalizeHash(currentHash) === normalizeHash(currentViewHash) && !(e && e.state && Number.isFinite(e.state.videoTime) && e.state.videoTime !== V.videoTime)) {
+      return;
+    }
+    if (isStudySession(V.name)) {
+      if (V.name === 'exam') stopExamTimer();
+      saveActiveSession();
+    }
+    rocketMenuOpen = false;
+    var targetView = hashToView(currentHash);
+    if (e && e.state) {
+      if (e.state.returnToVideoId) targetView.returnToVideoId = e.state.returnToVideoId;
+      if (Number.isInteger(e.state.returnVideoIndex)) targetView.returnVideoIndex = e.state.returnVideoIndex;
+      if (e.state.returnVideoAssetId) targetView.returnVideoAssetId = e.state.returnVideoAssetId;
+      if (Number.isFinite(e.state.videoTime) && e.state.videoTime >= 0 && !targetView.videoTime) {
+        targetView.videoTime = e.state.videoTime;
       }
-    } catch (e) {}
+    }
+    if (targetView.name === 'study' || isStudySession(targetView.name)) {
+      var restored = S.pausedSession ? MobileStudy.restore(S.pausedSession, S.decks) : null;
+      if (restored) {
+        V = restored;
+        if (V.name === 'exam') startExamTimer();
+        saveActiveSession();
+      } else {
+        var targetDeck = targetView.id && deck(targetView.id);
+        V = targetDeck ? { name: 'chapter', id: targetDeck.id } : { name: 'home' };
+        syncHashWithView(V, true);
+      }
+    } else if (targetView.name === 'results') {
+      V = { name: 'home' };
+      syncHashWithView(V, true);
+    } else {
+      V = targetView;
+    }
     render();
   }
 
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-    window.addEventListener('popstate', function (e) {
-      if (e.state && e.state.name) {
-        if (isStudySession(V.name)) {
-          pauseStudySession();
-        }
-        rocketMenuOpen = false;
-        V = { name: e.state.name, id: e.state.id, videoIndex: Number.isInteger(e.state.videoIndex) ? e.state.videoIndex : 0 };
-        render();
-      }
-    });
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+  }
+
+  var Routing = {
+    viewToHash: viewToHash,
+    hashToView: hashToView,
+    syncHashWithView: syncHashWithView
+  };
+
+  if (typeof window !== 'undefined') {
+    window.Routing = Routing;
   }
 
   /* ---------- sessions ---------- */
-  function setup(mode, id) {
+  function setup(mode, id, videoId) {
     var ids = id === '*' ? (SEL.size ? Array.from(SEL) : S.decks.map(function (d) { return d.id; })) : [id];
     if (!ids.length) ids = S.decks.map(function (d) { return d.id; });
-    V.setup = { mode: mode, ids: ids };
+    var returnToVideo = null;
+    if (V.name === 'lesson-video') {
+      var currentVideo = document.getElementById('lesson-video-player');
+      var videoTime = currentVideo && Number.isFinite(currentVideo.currentTime) ? Math.max(0, currentVideo.currentTime) : 0;
+      returnToVideo = {
+        deckId: V.id,
+        videoIndex: Number.isInteger(V.videoIndex) ? V.videoIndex : 0,
+        currentTime: videoTime
+      };
+      if (currentVideo && !currentVideo.paused) currentVideo.pause();
+    }
+    var targetVideo = null, videoCards = [];
+    if (videoId && returnToVideo && returnToVideo.deckId === id) {
+      var matchedVideos = lessonVideosForDeck(id);
+      targetVideo = matchedVideos.filter(function (v) { return v.id === videoId; })[0] || null;
+      if (targetVideo) {
+        var d = deck(id);
+        videoCards = d ? cardsForVideo(d, targetVideo) : [];
+      }
+    }
+    V.setup = {
+      mode: mode,
+      ids: ids,
+      videoId: targetVideo ? targetVideo.id : null,
+      cards: videoCards.length ? videoCards.map(function (c) { return { deckId: id, card: c }; }) : null,
+      returnToVideo: returnToVideo
+    };
     var q = mode === 'quiz';
-    openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setup-title"><h2 id="setup-title">' + (q ? 'Start quiz' : 'Start flashcards') + '</h2>' +
-      (q ? '<label class="field"><span>Questions</span><select id="s-len"><option value="0">All cards</option><option value="10">10</option><option value="20">20</option><option value="30">30</option></select></label>'
+    var scopeNote = '';
+    var resumeBtn = '';
+    if (returnToVideo && ids.length === 1) {
+      var targetDeck = deck(ids[0]);
+      if (targetDeck) {
+        var targetParsed = MobileStudy.parseChapterTitle(targetDeck.title);
+        var targetVideos = lessonVideosForDeck(targetDeck.id);
+        if (targetVideo && videoCards.length) {
+          var targetIndex = targetVideos.findIndex(function (v) { return v.id === targetVideo.id; });
+          scopeNote = '<p class="note" style="margin-top:4px;margin-bottom:var(--space-md);">' +
+            'Video ' + (targetIndex >= 0 ? targetIndex + 1 : 1) + ': ' + esc(targetVideo.title) +
+            ' · ' + videoCards.length + ' ' + (videoCards.length === 1 ? 'question' : 'questions') +
+            ' · Chapter ' + (targetParsed.sectionNum || 1) + '</p>';
+        } else {
+          scopeNote = '<p class="note" style="margin-top:4px;margin-bottom:var(--space-md);">' +
+            'Chapter ' + (targetParsed.sectionNum || 1) + ': ' + esc(targetParsed.topic) +
+            ' · ' + targetVideos.length + ' ' + (targetVideos.length === 1 ? 'video' : 'videos') +
+            ' · ' + targetDeck.cards.length + ' ' + (targetDeck.cards.length === 1 ? 'question' : 'questions') + '</p>';
+        }
+      }
+      if (S.pausedSession && S.pausedSession.returnToVideo && S.pausedSession.returnToVideo.deckId === ids[0] && S.pausedSession.name === mode && S.pausedSession.cards && S.pausedSession.cards.length) {
+        var savedCardNum = Math.min((S.pausedSession.i || 0) + 1, S.pausedSession.cards.length);
+        resumeBtn = '<button type="button" class="btn primary full" data-act="resume-video-study" style="margin-bottom:var(--space-md);">Resume saved ' + (q ? 'quiz' : 'flashcards') + ' (' + savedCardNum + ' of ' + S.pausedSession.cards.length + ')</button>';
+      }
+    }
+    var totalCards = videoCards.length || (function () {
+      var count = 0;
+      ids.forEach(function (deckId) {
+        var d = deck(deckId);
+        if (d && d.cards) count += d.cards.length;
+      });
+      return count;
+    })();
+    var questionCountOptions = (function () {
+      var opts = ['<option value="0">All cards' + (totalCards ? ' (' + totalCards + ')' : '') + '</option>'];
+      var counts = totalCards <= 10
+        ? (totalCards >= 6 ? [5] : [])
+        : [10, 20, 30, 50].filter(function (n) { return n < totalCards; });
+      counts.forEach(function (n) {
+        opts.push('<option value="' + n + '">' + n + '</option>');
+      });
+      return opts.join('');
+    })();
+    openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setup-title"><h2 id="setup-title">' + (targetVideo && videoCards.length ? (q ? 'Start video quiz' : 'Start video flashcards') : (q ? 'Start quiz' : 'Start flashcards')) + '</h2>' +
+      scopeNote +
+      resumeBtn +
+      (q ? '<label class="field"><span>Questions</span><select id="s-len">' + questionCountOptions + '</select></label>'
          : '<label class="check"><input type="checkbox" id="s-shuf"' + (S.settings.shuffle ? ' checked' : '') + '> Shuffle cards</label>') +
-      '<label class="check"><input type="checkbox" id="s-unk"> Skip cards I already know</label><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="start">Start</button></div></div>');
+      '<label class="check"><input type="checkbox" id="s-unk"> Skip cards I already know</label><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="start">' + (resumeBtn ? 'Start fresh' : 'Start') + '</button></div></div>');
   }
   function setupExam(ids, mixed, defaultCount, defaultMinutes) {
     var selectedIds = ids && ids.length ? ids.slice() : S.decks.map(function (d) { return d.id; });
@@ -2950,7 +3583,14 @@
     if (o.unk) cards = cards.filter(function (x) { return !isMastered(x.deckId, x.card.id); });
     if (exam) cards = StudyLogic.examQuestions(cards, o.limit);
     if (!cards.length) { toast(selectedCount ? 'All selected cards are already marked known.' : 'There are no cards in this selection yet.'); return; }
-    closeModal(); begin(s.mode, exam ? cards : (o.shuf ? shuffle(cards) : cards), o, s.ids);
+    if (s.returnToVideo) {
+      var studyVideo = document.getElementById('lesson-video-player');
+      s.returnToVideo.currentTime = studyVideo && Number.isFinite(studyVideo.currentTime) ? Math.max(0, studyVideo.currentTime) : 0;
+      if (studyVideo && !studyVideo.paused) studyVideo.pause();
+      startVideoStudyModal(s.mode, exam ? cards : (o.shuf ? shuffle(cards) : cards), o, s.ids, s.returnToVideo);
+      return;
+    }
+    closeModal(); begin(s.mode, exam ? cards : (o.shuf ? shuffle(cards) : cards), o, s.ids, s.returnToVideo);
   }
   function startDue() {
     var cards = dueReviewItems(allCardItems(), Date.now());
@@ -2985,12 +3625,203 @@
     var mode = requestedMode === 'flash' ? 'flash' : 'quiz';
     begin(mode, shuffle(cards), { unk: false, limit: mode === 'quiz' ? 10 : 0, shuf: true, challenge: true, saveBest: false }, deckIdsFor(cards));
   }
-  function begin(mode, cards, o, ids) {
+
+  function startVideoStudyModal(mode, cards, o, ids, returnToVideo, restoredState) {
+    if (!restoredState && (mode === 'quiz' || mode === 'exam')) {
+      cards = cards.map(function (it) { return { deckId: it.deckId, card: it.card, optionOrder: shuffle([0, 1, 2, 3]) }; });
+      if (mode === 'quiz' && o && o.limit && o.limit < cards.length) cards = cards.slice(0, o.limit);
+    } else if (!restoredState && o && o.shuf) {
+      cards = shuffle(cards);
+    }
+    V.videoStudy = restoredState ? restoredState : {
+      name: mode,
+      cards: cards,
+      i: 0,
+      flipped: false,
+      picked: null,
+      score: 0,
+      answers: [],
+      marks: {},
+      opts: o || {},
+      ids: ids,
+      startedAt: Date.now(),
+      returnToVideo: returnToVideo || null,
+      results: null
+    };
+    S.pausedSession = MobileStudy.snapshot(V.videoStudy);
+    save();
+    renderVideoStudyModal();
+  }
+
+  function renderVideoStudyModal() {
+    if (!V.videoStudy) return;
+    var s = V.videoStudy;
+    var d = deck(s.returnToVideo ? s.returnToVideo.deckId : (s.ids && s.ids[0]));
+    var parsed = d ? MobileStudy.parseChapterTitle(d.title) : { sectionNum: 1, topic: 'Lesson Study' };
+    var section = parsed.sectionNum || 1;
+    var modeName = s.name === 'flash' ? 'Flashcards' : 'Quiz';
+    var headerTitle = 'Chapter ' + section + ' ' + modeName;
+    var counter = s.results ? 'Complete' : ((s.i + 1) + ' / ' + s.cards.length);
+
+    var bodyHtml = '';
+    if (s.results) {
+      bodyHtml = views.results(s.results);
+    } else if (s.name === 'flash') {
+      bodyHtml = views.flash(s);
+    } else {
+      bodyHtml = views.quiz(s);
+    }
+
+    var modalHtml = '<div class="scrim video-study-scrim" data-act="close-video-study"></div>' +
+      '<section class="sheet video-study-modal" role="dialog" aria-modal="true" aria-labelledby="video-study-modal-title">' +
+        '<header class="video-study-header">' +
+          '<button type="button" class="btn sm ghost video-study-close-btn" data-act="close-video-study" aria-label="Close and return to video">' +
+            '<span aria-hidden="true">✕</span> <span>Close & Return</span>' +
+          '</button>' +
+          '<div class="video-study-header-title">' +
+            '<h2 id="video-study-modal-title">' + esc(headerTitle) + '</h2>' +
+          '</div>' +
+          '<span class="video-study-header-counter" aria-live="polite">' + esc(counter) + '</span>' +
+        '</header>' +
+        '<div class="video-study-body">' + bodyHtml + '</div>' +
+      '</section>';
+
+    openModal(modalHtml, { preserveReturnFocus: true });
+
+    if (!s.results) {
+      if (s.name === 'flash') {
+        var f = modal.querySelector('.flip');
+        if (f) f.focus({ preventScroll: true });
+      } else if (s.name === 'quiz') {
+        var q = modal.querySelector('.qtext');
+        if (q) q.focus({ preventScroll: true });
+      }
+    } else {
+      var retBtn = modal.querySelector('.video-study-return-btn');
+      if (retBtn) retBtn.focus({ preventScroll: true });
+    }
+  }
+
+  function stepVideoStudy(dir) {
+    if (!V.videoStudy) return;
+    var s = V.videoStudy;
+    var n = s.i + dir;
+    if (n >= s.cards.length) {
+      finishVideoStudy();
+      return;
+    }
+    if (n < 0) return;
+    s.i = n;
+    s.flipped = false;
+    s.picked = null;
+    S.pausedSession = MobileStudy.snapshot(s);
+    save();
+    renderVideoStudyModal();
+  }
+
+  function pickVideoStudy(k) {
+    if (!V.videoStudy || V.videoStudy.picked !== null) return;
+    var s = V.videoStudy;
+    try { window.localStorage.setItem('cci_seen_answer_tooltip', 'true'); } catch (e) {}
+    var it = s.cards[s.i], selected = LET[(it.optionOrder || [0, 1, 2, 3])[k]], ok = selected === it.card.answer;
+    triggerHaptic(ok ? 'correct' : 'wrong');
+    s.picked = k;
+    s.answers.push({ item: it, ok: ok, selected: selected });
+    if (ok) s.score++;
+    var p = prog(it.deckId);
+    p.cards[it.card.id] = StudyLogic.review(p.cards[it.card.id], ok, Date.now());
+    trackStudied(1);
+    S.pausedSession = MobileStudy.snapshot(s);
+    save();
+    renderVideoStudyModal();
+  }
+
+  function finishVideoStudy() {
+    if (!V.videoStudy) return;
+    var s = V.videoStudy;
+    var isFirst = checkAndRecordFirstSessionToday();
+    S.pausedSession = null;
+    save();
+
+    if (s.name === 'flash') {
+      var learn = s.cards.filter(function (x) { return s.marks[x.card.id] === 'unknown'; });
+      var known = s.cards.filter(function (x) { return s.marks[x.card.id] === 'known'; }).length;
+      s.results = {
+        name: 'results',
+        kind: 'flash',
+        known: known,
+        learning: learn,
+        skipped: s.cards.length - known - learn.length,
+        all: s.cards,
+        opts: s.opts,
+        ids: s.ids,
+        isFirstSessionToday: isFirst,
+        returnToVideo: s.returnToVideo || null
+      };
+    } else {
+      var per = {}, missed = [];
+      s.answers.forEach(function (a) {
+        var p = per[a.item.deckId] || (per[a.item.deckId] = { s: 0, t: 0 });
+        p.t++;
+        if (a.ok) p.s++;
+        else missed.push(a.item);
+      });
+      var newBest = false;
+      Object.keys(per).forEach(function (id) {
+        var d = deck(id), p = per[id];
+        if (!d || s.opts.saveBest === false || p.t < Math.min(10, d.cards.length)) return;
+        var pct = Math.round(100 * p.s / p.t), pr = prog(id);
+        if (!pr.best || pct > pr.best.pct) {
+          pr.best = { pct: pct, score: p.s, total: p.t, date: Date.now() };
+          newBest = true;
+        }
+      });
+      s.results = {
+        name: 'results',
+        kind: 'quiz',
+        score: s.score,
+        total: s.answers.length,
+        missed: missed,
+        newBest: newBest,
+        all: s.cards,
+        opts: s.opts,
+        ids: s.ids,
+        isFirstSessionToday: isFirst,
+        returnToVideo: s.returnToVideo || null
+      };
+    }
+    renderVideoStudyModal();
+  }
+
+  function closeVideoStudyModal() {
+    if (!V.videoStudy) {
+      closeModal();
+      return;
+    }
+    if (!V.videoStudy.results) {
+      S.pausedSession = MobileStudy.snapshot(V.videoStudy);
+      save();
+      scheduleCloudProgressSync(true);
+      toast('Study paused. Your progress is saved.');
+    }
+    V.videoStudy = null;
+    closeModal();
+    var currentVideo = document.getElementById('lesson-video-player');
+    var videoAction = app.querySelector('.lesson-video-continue');
+    if (currentVideo && videoAction) {
+      var label = currentVideo.ended ? 'Replay lesson' : (currentVideo.paused ? (currentVideo.currentTime > 0 ? 'Resume lesson' : 'Play lesson') : 'Pause lesson');
+      videoAction.textContent = label;
+      videoAction.setAttribute('aria-label', label + ': ' + (currentVideo.getAttribute('aria-label') || 'video'));
+      videoAction.focus();
+    }
+  }
+
+  function begin(mode, cards, o, ids, returnToVideo) {
     if (mode === 'quiz' || mode === 'exam') {
       cards = cards.map(function (it) { return { deckId: it.deckId, card: it.card, optionOrder: shuffle([0, 1, 2, 3]) }; });
       if (mode === 'quiz' && o.limit && o.limit < cards.length) cards = cards.slice(0, o.limit);
     }
-    var session = { name: mode, cards: cards, i: 0, flipped: false, picked: null, score: 0, answers: [], marks: {}, opts: o, ids: ids, startedAt: Date.now() };
+    var session = { name: mode, cards: cards, i: 0, flipped: false, picked: null, score: 0, answers: [], marks: {}, opts: o, ids: ids, startedAt: Date.now(), returnToVideo: returnToVideo || null };
     if (mode === 'exam') session.remaining = o.duration;
     go(session);
     saveActiveSession();
@@ -3053,7 +3884,7 @@
     var learn = V.cards.filter(function (x) { return V.marks[x.card.id] === 'unknown'; }), known = V.cards.filter(function (x) { return V.marks[x.card.id] === 'known'; }).length;
     var isFirst = checkAndRecordFirstSessionToday();
     S.pausedSession = null; save();
-    go({ name: 'results', kind: 'flash', known: known, learning: learn, skipped: V.cards.length - known - learn.length, all: V.cards, opts: V.opts, ids: V.ids, isFirstSessionToday: isFirst });
+    go({ name: 'results', kind: 'flash', known: known, learning: learn, skipped: V.cards.length - known - learn.length, all: V.cards, opts: V.opts, ids: V.ids, isFirstSessionToday: isFirst, returnToVideo: V.returnToVideo || null });
   }
   function finishQuiz() {
     var per = {}, missed = [];
@@ -3066,7 +3897,7 @@
     });
     var isFirst = checkAndRecordFirstSessionToday();
     S.pausedSession = null; save();
-    go({ name: 'results', kind: 'quiz', score: V.score, total: V.answers.length, missed: missed, newBest: newBest, all: V.cards, opts: V.opts, ids: V.ids, isFirstSessionToday: isFirst });
+    go({ name: 'results', kind: 'quiz', score: V.score, total: V.answers.length, missed: missed, newBest: newBest, all: V.cards, opts: V.opts, ids: V.ids, isFirstSessionToday: isFirst, returnToVideo: V.returnToVideo || null });
   }
   function finishExam(expired) {
     if (V.name !== 'exam') return;
@@ -3112,7 +3943,7 @@
     var target = e.target && e.target.closest ? e.target : null;
     if (!target) return;
     var wrapper = target.closest('.bible-reference-wrap');
-    if (activeBiblePreview && wrapper === activeBiblePreview.wrapper && biblePreviewCloseTimer) {
+    if (activeBiblePreview && (wrapper === activeBiblePreview.wrapper || activeBiblePreview.preview.contains(target)) && biblePreviewCloseTimer) {
       window.clearTimeout(biblePreviewCloseTimer); biblePreviewCloseTimer = null;
     }
     var link = target.closest('.bible-reference-link');
@@ -3122,7 +3953,7 @@
     var target = e.target && e.target.closest ? e.target : null;
     if (!target || !activeBiblePreview) return;
     var wrapper = target.closest('.bible-reference-wrap');
-    if (wrapper !== activeBiblePreview.wrapper || (e.relatedTarget && wrapper.contains(e.relatedTarget))) return;
+    if ((wrapper !== activeBiblePreview.wrapper && !activeBiblePreview.preview.contains(target)) || isWithinActiveBiblePreview(e.relatedTarget)) return;
     scheduleBiblePreviewClose();
   });
   document.addEventListener('focusin', function (e) {
@@ -3130,7 +3961,7 @@
     if (!target) return;
     if (target === suppressBiblePreviewFocus) { suppressBiblePreviewFocus = null; return; }
     var wrapper = target.closest('.bible-reference-wrap');
-    if (activeBiblePreview && wrapper === activeBiblePreview.wrapper && biblePreviewCloseTimer) {
+    if (activeBiblePreview && (wrapper === activeBiblePreview.wrapper || activeBiblePreview.preview.contains(target)) && biblePreviewCloseTimer) {
       window.clearTimeout(biblePreviewCloseTimer); biblePreviewCloseTimer = null;
     }
     var link = target.closest('.bible-reference-link');
@@ -3140,12 +3971,50 @@
     var target = e.target && e.target.closest ? e.target : null;
     if (!target || !activeBiblePreview) return;
     var wrapper = target.closest('.bible-reference-wrap');
-    if (wrapper !== activeBiblePreview.wrapper || (e.relatedTarget && wrapper.contains(e.relatedTarget))) return;
+    if ((wrapper !== activeBiblePreview.wrapper && !activeBiblePreview.preview.contains(target)) || isWithinActiveBiblePreview(e.relatedTarget)) return;
     scheduleBiblePreviewClose();
   });
   document.addEventListener('pointerdown', function (e) {
-    if (activeBiblePreview && !activeBiblePreview.wrapper.contains(e.target)) closeBiblePreview(false);
+    if (activeBiblePreview && !isWithinActiveBiblePreview(e.target)) closeBiblePreview(false);
   });
+  function setQuizFeedbackExpanded(control, expanded) {
+    if (!control) return;
+    var sheet = control.closest('.quiz-feedback-sheet');
+    if (!sheet) return;
+    sheet.classList.toggle('is-compact', !expanded);
+    control.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    control.setAttribute('aria-label', expanded ? 'Collapse answer feedback panel' : 'Expand answer feedback panel');
+    control.title = expanded ? 'Drag down to reduce; press to collapse' : 'Drag up to expand; press to expand';
+  }
+
+  document.addEventListener('pointerdown', function (e) {
+    var control = e.target.closest('.quiz-feedback-resize-control');
+    if (!control || e.button !== 0 || window.matchMedia('(min-width: 901px)').matches) return;
+    quizFeedbackDrag = { control: control, pointerId: e.pointerId, startY: e.clientY, lastY: e.clientY, moved: false };
+    control.focus({ preventScroll: true });
+    try { control.setPointerCapture(e.pointerId); } catch (error) {}
+    e.preventDefault();
+  }, true);
+  document.addEventListener('pointermove', function (e) {
+    if (!quizFeedbackDrag || e.pointerId !== quizFeedbackDrag.pointerId) return;
+    quizFeedbackDrag.lastY = e.clientY;
+    if (Math.abs(e.clientY - quizFeedbackDrag.startY) > 8) quizFeedbackDrag.moved = true;
+  }, true);
+  document.addEventListener('pointerup', function (e) {
+    if (!quizFeedbackDrag || e.pointerId !== quizFeedbackDrag.pointerId) return;
+    var drag = quizFeedbackDrag;
+    quizFeedbackDrag = null;
+    var delta = drag.lastY - drag.startY;
+    if (drag.moved && Math.abs(delta) >= 28) {
+      setQuizFeedbackExpanded(drag.control, delta < 0);
+      quizFeedbackIgnoreClick = true;
+      window.setTimeout(function () { quizFeedbackIgnoreClick = false; }, 0);
+    }
+  }, true);
+  document.addEventListener('pointercancel', function (e) {
+    if (quizFeedbackDrag && e.pointerId === quizFeedbackDrag.pointerId) quizFeedbackDrag = null;
+  }, true);
+
   document.addEventListener('click', function (e) {
     var target = e.target && e.target.closest ? e.target : null;
     if (!target) return;
@@ -3167,14 +4036,30 @@
     if (e.target.closest('.bible-reference-wrap')) return;
     var flipSurface = e.target.closest('[data-flip-surface]');
     if (flipSurface && !e.target.closest('a, button, input, select, textarea, [contenteditable="true"]')) {
-      V.flipped = false; saveActiveSession(); render(true); return;
+      if (V.videoStudy) {
+        V.videoStudy.flipped = false;
+        S.pausedSession = MobileStudy.snapshot(V.videoStudy);
+        save();
+        renderVideoStudyModal();
+      } else {
+        V.flipped = false;
+        saveActiveSession();
+        render(true);
+      }
+      return;
     }
     var t = e.target.closest('[data-act]'); if (!t) return;
+    if (quizFeedbackIgnoreClick && t.matches('.quiz-feedback-resize-control')) { quizFeedbackIgnoreClick = false; e.preventDefault(); return; }
     var a = t.dataset.act, d;
     switch (a) {
+      case 'quiz-feedback-toggle':
+        setQuizFeedbackExpanded(t, t.getAttribute('aria-expanded') !== 'true');
+        break;
       case 'home': closeModal(); go({ name: 'home' }); break;
       case 'open-chapter': go({ name: 'chapter', id: t.dataset.id }); break;
       case 'lesson-detail-open': openLessonDetailSheet(t.dataset.id); break;
+      case 'lesson-detail-prev':
+      case 'lesson-detail-next': openLessonDetailSheet(t.dataset.id, a); break;
       case 'lesson-detail-study':
         closeModal();
         go({ name: 'chapter', id: t.dataset.id });
@@ -3186,18 +4071,108 @@
         go({ name: 'chapter', id: t.dataset.id || V.id });
         break;
       case 'lesson-video-select':
-        if (lessonVideosForDeck(V.id)[+t.dataset.index]) { V.videoIndex = +t.dataset.index; render(true); }
+        if (lessonVideosForDeck(V.id)[+t.dataset.index] && +t.dataset.index !== V.videoIndex) {
+          var currentLessonPlayer = document.getElementById('lesson-video-player');
+          if (currentLessonPlayer) currentLessonPlayer.pause();
+          V.videoIndex = +t.dataset.index;
+          V.videoTime = 0;
+          syncHashWithView(V, false);
+          render(true);
+          returnToLessonVideo();
+        }
         break;
       case 'lesson-video-play':
         var lessonVideoElement = document.getElementById('lesson-video-player');
-        if (lessonVideoElement && lessonVideoElement.play) {
-          var playbackAttempt = lessonVideoElement.play();
+        if (lessonVideoElement) {
+          var playbackAttempt = !lessonVideoElement.paused && !lessonVideoElement.ended
+            ? (lessonVideoElement.pause(), null)
+            : lessonVideoElement.play();
           if (playbackAttempt && playbackAttempt.catch) playbackAttempt.catch(function () { toast('Video playback could not start. Check the video source and try again.'); });
+        }
+        break;
+      case 'video-ticket-retry':
+        if (account && typeof account.preparePlaybackTicket === 'function' && V.name === 'lesson-video' && lessonVideosForDeck(V.id)[V.videoIndex] && lessonVideosForDeck(V.id)[V.videoIndex].id === t.dataset.videoId) {
+          t.disabled = true;
+          account.preparePlaybackTicket(t.dataset.videoId, true).then(function () {
+            accountStatus = account.status();
+            if (V.name === 'lesson-video' && lessonVideosForDeck(V.id)[V.videoIndex] && lessonVideosForDeck(V.id)[V.videoIndex].id === t.dataset.videoId) render(true);
+          });
+        }
+        break;
+      case 'study-return-video':
+        if (isStudySession(V.name) && V.returnToVideo) {
+          var returnContext = V.returnToVideo;
+          if (V.name === 'exam') stopExamTimer();
+          S.pausedSession = MobileStudy.snapshot(V);
+          save();
+          go({ name: 'lesson-video', id: returnContext.deckId, videoIndex: returnContext.videoIndex, videoTime: returnContext.currentTime });
         }
         break;
       case 'lesson-transcript-seek':
         var transcriptVideo = document.getElementById('lesson-video-player'), seekTime = Number(t.dataset.time);
         if (transcriptVideo && Number.isFinite(seekTime) && seekTime >= 0) transcriptVideo.currentTime = seekTime;
+        break;
+      case 'seek-video-reference':
+        var refDeckId = t.dataset.deckId;
+        var refVideoId = t.dataset.videoId;
+        var targetTime = Number(t.dataset.time);
+        if (!Number.isFinite(targetTime) || targetTime < 0) targetTime = 0;
+
+        if (V.videoStudy) {
+          var vPlayer = document.getElementById('lesson-video-player');
+          var activeVideos = lessonVideosForDeck(V.id);
+          var currentVideoObj = activeVideos[Number.isInteger(V.videoIndex) ? V.videoIndex : 0];
+
+          if (vPlayer && currentVideoObj && currentVideoObj.id === refVideoId) {
+            closeVideoStudyModal();
+            try {
+              vPlayer.currentTime = targetTime;
+              vPlayer.play().catch(function () {});
+              vPlayer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (e) {}
+            break;
+          }
+
+          closeVideoStudyModal();
+          var newIdx = 0;
+          activeVideos.forEach(function (v, idx) {
+            if (v.id === refVideoId) newIdx = idx;
+          });
+          go({ name: 'lesson-video', id: refDeckId || V.id, videoIndex: newIdx, videoTime: targetTime, autoPlayVideo: true });
+          break;
+        }
+
+        if (isStudySession(V.name)) {
+          if (V.name === 'exam') stopExamTimer();
+          S.pausedSession = MobileStudy.snapshot(V);
+          save();
+        }
+
+        var targetDeckVideos = lessonVideosForDeck(refDeckId);
+        var targetVideoIdx = 0;
+        targetDeckVideos.forEach(function (v, idx) {
+          if (v.id === refVideoId) targetVideoIdx = idx;
+        });
+
+        go({
+          name: 'lesson-video',
+          id: refDeckId,
+          videoIndex: targetVideoIdx,
+          videoTime: targetTime,
+          autoPlayVideo: true
+        });
+        break;
+      case 'resume-paused-study':
+        var restoredPaused = MobileStudy.restore(S.pausedSession, S.decks);
+        if (restoredPaused) {
+          var currPlayer = document.getElementById('lesson-video-player');
+          if (currPlayer && !currPlayer.paused) currPlayer.pause();
+          if (restoredPaused.returnToVideo) {
+            startVideoStudyModal(restoredPaused.name, restoredPaused.cards, restoredPaused.opts, restoredPaused.ids, restoredPaused.returnToVideo, restoredPaused);
+          } else {
+            begin(restoredPaused.name, restoredPaused.cards, restoredPaused.opts, restoredPaused.ids, null, restoredPaused);
+          }
+        }
         break;
       case 'chapter-info':
         openLessonDetailSheet(t.dataset.id);
@@ -3239,6 +4214,10 @@
           if (nextRoute.name === 'settings' && t.dataset.returnVideo) {
             nextRoute.returnToVideoId = t.dataset.returnVideo;
             nextRoute.returnVideoIndex = Number(t.dataset.returnVideoIndex) || 0;
+            nextRoute.returnVideoAssetId = t.dataset.returnVideoAssetId || '';
+            savePendingVideoReturn(nextRoute.returnToVideoId, nextRoute.returnVideoIndex, nextRoute.returnVideoAssetId);
+          } else if (nextRoute.name !== 'settings' || V.name !== 'settings') {
+            savePendingVideoReturn(null);
           }
           go(nextRoute);
         }
@@ -3304,10 +4283,36 @@
         go({ name: 'streak', returnTo: 'home' });
         break;
       case 'results-continue':
+        if (V.videoStudy) {
+          closeVideoStudyModal();
+          break;
+        }
         if (V.isFirstSessionToday && S.settings.showStreak !== false) {
           go({ name: 'streak', returnTo: 'home' });
         } else {
           go({ name: 'home' });
+        }
+        break;
+      case 'close-video-study':
+        closeVideoStudyModal();
+        break;
+      case 'resume-video-study':
+        var restored = MobileStudy.restore(S.pausedSession, S.decks);
+        if (restored) {
+          var studyVid = document.getElementById('lesson-video-player');
+          if (studyVid && !studyVid.paused) studyVid.pause();
+          startVideoStudyModal(restored.name, restored.cards, restored.opts, restored.ids, restored.returnToVideo, restored);
+        } else {
+          S.pausedSession = null;
+          save();
+          toast('Saved session could not be restored.');
+        }
+        break;
+      case 'results-return-video':
+        if (V.videoStudy) {
+          closeVideoStudyModal();
+        } else if (V.returnToVideo) {
+          go({ name: 'lesson-video', id: V.returnToVideo.deckId, videoIndex: V.returnToVideo.videoIndex, videoTime: V.returnToVideo.currentTime });
         }
         break;
       case 'close-streak':
@@ -3344,8 +4349,7 @@
         finishOnboarding(true, true);
         break;
       case 'retake-onboarding':
-        V = { name: 'onboarding', step: 2, answers: Object.assign({}, S.onboarding || MobileStudy.defaultOnboarding(true)) };
-        render();
+        go({ name: 'onboarding', step: 2, answers: Object.assign({}, S.onboarding || MobileStudy.defaultOnboarding(true)) });
         break;
       case 'close': closeModal(); break;
       case 'askok': var fn = pendingAsk; closeModal(); if (fn) fn(); break;
@@ -3357,7 +4361,7 @@
       case 'rocket-challenge': closeRocketMenu(); startChallenge(); break;
       case 'rocket-exam': closeRocketMenu(); setupExam(); break;
       case 'close-picker': go({ name: V.from || 'home' }); break;
-      case 'setup': setup(t.dataset.mode, t.dataset.id); break;
+      case 'setup': setup(t.dataset.mode, t.dataset.id, t.dataset.videoId); break;
       case 'picker-multi':
         V.pickerMulti = !V.pickerMulti;
         if (!V.pickerMulti && SEL.size > 1) SEL = new Set([Array.from(SEL).pop()]);
@@ -3477,13 +4481,59 @@
       case 'ccancel': V.editing = null; render(true); break;
       case 'csave': saveCard(); break;
       case 'cdel': d = deck(V.id); var ci = +t.dataset.i; ask('Delete question ' + (ci + 1) + '?', 'Delete card', function () { var c = d.cards.splice(ci, 1)[0], p = prog(d.id); delete p.cards[c.id]; p.best = null; V.editing = null; save(); render(true); }); break;
-      case 'flip': V.flipped = !V.flipped; saveActiveSession(); render(true); break;
-      case 'mark': mark(V.cards[V.i], t.dataset.v); V.marks[V.cards[V.i].card.id] = t.dataset.v; step(1); break;
-      case 'next': step(1); break;
-      case 'prev': step(-1); break;
-      case 'pick': pick(+t.dataset.i); break;
-      case 'review': begin('flash', shuffle(V.kind === 'quiz' ? V.missed : V.learning), {}, V.ids); break;
-      case 'again': var all = V.all; begin(V.kind === 'quiz' ? 'quiz' : 'flash', V.kind === 'quiz' ? shuffle(all) : all, V.opts, V.ids); break;
+      case 'flip':
+        if (V.videoStudy) {
+          V.videoStudy.flipped = !V.videoStudy.flipped;
+          S.pausedSession = MobileStudy.snapshot(V.videoStudy);
+          save();
+          renderVideoStudyModal();
+        } else {
+          V.flipped = !V.flipped;
+          saveActiveSession();
+          render(true);
+        }
+        break;
+      case 'mark':
+        if (V.videoStudy) {
+          mark(V.videoStudy.cards[V.videoStudy.i], t.dataset.v);
+          V.videoStudy.marks[V.videoStudy.cards[V.videoStudy.i].card.id] = t.dataset.v;
+          stepVideoStudy(1);
+        } else {
+          mark(V.cards[V.i], t.dataset.v);
+          V.marks[V.cards[V.i].card.id] = t.dataset.v;
+          step(1);
+        }
+        break;
+      case 'next':
+        if (V.videoStudy) stepVideoStudy(1);
+        else step(1);
+        break;
+      case 'prev':
+        if (V.videoStudy) stepVideoStudy(-1);
+        else step(-1);
+        break;
+      case 'pick':
+        if (V.videoStudy) pickVideoStudy(+t.dataset.i);
+        else pick(+t.dataset.i);
+        break;
+      case 'review':
+        if (V.videoStudy && V.videoStudy.results) {
+          var missed = V.videoStudy.results.kind === 'quiz' ? V.videoStudy.results.missed : V.videoStudy.results.learning;
+          startVideoStudyModal('flash', shuffle(missed), {}, V.videoStudy.results.ids, V.videoStudy.results.returnToVideo);
+        } else {
+          begin('flash', shuffle(V.kind === 'quiz' ? V.missed : V.learning), {}, V.ids, V.returnToVideo);
+        }
+        break;
+      case 'again':
+        if (V.videoStudy && V.videoStudy.results) {
+          var allCards = V.videoStudy.results.all;
+          var nextMode = V.videoStudy.results.kind === 'quiz' ? 'quiz' : 'flash';
+          startVideoStudyModal(nextMode, nextMode === 'quiz' ? shuffle(allCards) : allCards, V.videoStudy.results.opts, V.videoStudy.results.ids, V.videoStudy.results.returnToVideo);
+        } else {
+          var all = V.all;
+          begin(V.kind === 'quiz' ? 'quiz' : 'flash', V.kind === 'quiz' ? shuffle(all) : all, V.opts, V.ids, V.returnToVideo);
+        }
+        break;
     }
   });
   function step(dir) {
@@ -3623,7 +4673,13 @@
   }, true);
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && activeBiblePreview) {
-      e.preventDefault(); closeBiblePreview(activeBiblePreview.wrapper.contains(document.activeElement)); return;
+      e.preventDefault(); closeBiblePreview(isWithinActiveBiblePreview(document.activeElement)); return;
+    }
+    var feedbackResizeControl = e.target && e.target.closest ? e.target.closest('.quiz-feedback-resize-control') : null;
+    if (feedbackResizeControl && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      setQuizFeedbackExpanded(feedbackResizeControl, e.key === 'ArrowUp');
+      return;
     }
     if (rocketMenuOpen) {
       if (e.key === 'Escape') {
@@ -3651,7 +4707,11 @@
       go({ name: V.from || 'home' });
       return;
     }
-    if (modal.innerHTML && e.key === 'Escape') { e.preventDefault(); return closeModal(); }
+    if (modal.innerHTML && e.key === 'Escape') {
+      e.preventDefault();
+      if (V.videoStudy) return closeVideoStudyModal();
+      return closeModal();
+    }
     if (modal.innerHTML && e.key === 'Tab') {
       var focusable = Array.from(modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
       if (focusable.length) {
@@ -3661,7 +4721,27 @@
       }
       return;
     }
-    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || modal.innerHTML) return;
+    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    if (V.videoStudy && !V.videoStudy.results) {
+      if (V.videoStudy.name === 'flash') {
+        if (e.key === 'ArrowRight') stepVideoStudy(1);
+        else if (e.key === 'ArrowLeft') stepVideoStudy(-1);
+        else if ((e.key === ' ' || e.key === 'Enter') && e.target.closest('button.flip[data-act="flip"], button.flip-cue-button')) {
+          e.preventDefault();
+          V.videoStudy.flipped = !V.videoStudy.flipped;
+          S.pausedSession = MobileStudy.snapshot(V.videoStudy);
+          save();
+          renderVideoStudyModal();
+        }
+      } else if (V.videoStudy.name === 'quiz') {
+        var k = 'abcd'.indexOf(e.key.toLowerCase());
+        if (k < 0) k = '1234'.indexOf(e.key);
+        if (k >= 0 && V.videoStudy.picked === null) pickVideoStudy(k);
+        else if ((e.key === 'Enter' || e.key === 'ArrowRight') && V.videoStudy.picked !== null) stepVideoStudy(1);
+      }
+      return;
+    }
+    if (modal.innerHTML) return;
     if (V.name === 'flash') {
       if (e.key === 'ArrowRight') step(1); else if (e.key === 'ArrowLeft') step(-1);
       else if ((e.key === ' ' || e.key === 'Enter') && e.target.closest('button.flip[data-act="flip"], button.flip-cue-button')) { e.preventDefault(); V.flipped = !V.flipped; render(true); }
@@ -3673,9 +4753,13 @@
   var tx = 0, ty = 0;
   document.addEventListener('touchstart', function (e) { if (e.target.closest('.flip') && !e.target.closest('a, button')) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; } else tx = 0; }, { passive: true });
   document.addEventListener('touchend', function (e) {
-    if (!tx || V.name !== 'flash') return;
+    if (!tx || (V.name !== 'flash' && (!V.videoStudy || V.videoStudy.name !== 'flash'))) return;
     var dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; tx = 0;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) { e.preventDefault(); step(dx < 0 ? 1 : -1); }
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      e.preventDefault();
+      if (V.videoStudy) stepVideoStudy(dx < 0 ? 1 : -1);
+      else step(dx < 0 ? 1 : -1);
+    }
   });
 
   function registerNativeNavigation() {
@@ -3695,13 +4779,24 @@
   }
 
   async function removeRetiredLocalData() {
-    var result = await storageAdapter.removeRetiredSermonData();
-    if (!result.ok && window.console) window.console.warn('Some retired local data could not be cleaned; cleanup will retry next launch.');
+    function warn(message) {
+      if (window.console && typeof window.console.warn === 'function') window.console.warn(message);
+    }
+    try {
+      var result = await storageAdapter.removeRetiredSermonData();
+      if (!result.ok) warn('Some retired local data could not be cleaned; cleanup will retry next launch.');
+    } catch (error) {
+      warn('Some retired local data could not be cleaned; cleanup will retry next launch.');
+    }
     try {
       if (window.caches) await Promise.all(['cci-sermon-downloads-v1', 'cci-sermon-audio-v1'].map(function (name) { return window.caches.delete(name); }));
+    } catch (error) {
+      warn('Retired browser downloads could not be cleaned; cleanup will retry next launch.');
+    }
+    try {
       if (window.CciNative && window.CciNative.removeRetiredDownloads) await window.CciNative.removeRetiredDownloads();
     } catch (error) {
-      if (window.console) window.console.warn('Retired downloads could not be cleaned; cleanup will retry next launch.');
+      warn('Retired native downloads could not be cleaned; cleanup will retry next launch.');
     }
   }
 
@@ -3745,6 +4840,29 @@
         if (!activeStorageOwnerId) { requestedStorageOwnerId = null; }
         if (isFirstRun) {
           V = { name: 'onboarding', step: 0, answers: MobileStudy.defaultOnboarding(false) };
+          syncHashWithView(V, true);
+        } else {
+          var initialHash = (typeof window !== 'undefined' && window.location && typeof window.location.hash === 'string') ? window.location.hash : '';
+          var route = hashToView(initialHash);
+          if (route.name === 'study' || isStudySession(route.name)) {
+            var restored = S.pausedSession ? MobileStudy.restore(S.pausedSession, S.decks) : null;
+            if (restored) {
+              V = restored;
+              if (V.name === 'exam') startExamTimer();
+              saveActiveSession();
+              syncHashWithView(V, true);
+            } else {
+              var targetDeck = route.id && deck(route.id);
+              V = targetDeck ? { name: 'chapter', id: targetDeck.id } : { name: 'home' };
+              syncHashWithView(V, true);
+            }
+          } else if (route.name === 'results') {
+            V = { name: 'home' };
+            syncHashWithView(V, true);
+          } else {
+            V = route;
+            syncHashWithView(V, true);
+          }
         }
         render();
         registerServiceWorker();
@@ -3752,8 +4870,16 @@
       });
     });
   }
-  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('online', function () {
-    if (accountStatus.user) syncCloudProgress();
-  });
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('online', function () {
+      if (accountStatus.user) syncCloudProgress();
+    });
+    window.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden' && cloudSyncTimer) syncCloudProgress();
+    });
+    window.addEventListener('pagehide', function () {
+      if (cloudSyncTimer) syncCloudProgress();
+    });
+  }
   boot();
 })();
