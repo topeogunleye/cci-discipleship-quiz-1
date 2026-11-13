@@ -9413,6 +9413,8 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 .bible-version-picker input, .bible-version-picker select { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
 .bible-preview-notice, .bible-preview-copyright { display: block; margin-top: 8px; font-size: 12px; }
 .bible-preview-notice:empty, .bible-preview-copyright:empty { display: none; }
+.bible-preview-esv-link { display: inline-block; margin-top: 4px; font-size: 12px; }
+[hidden].bible-preview-esv-link { display: none !important; }
 /* Short, purposeful transitions help route and dialog changes feel connected. */
 @keyframes appScreenEnter{from{opacity:.72;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
 @keyframes appModalScrimEnter{from{opacity:0}to{opacity:1}}

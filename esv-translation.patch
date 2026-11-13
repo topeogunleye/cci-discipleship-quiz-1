@@ -1,0 +1,799 @@
+diff --git a/docs/youversion-integration.md b/docs/youversion-integration.md
+index 741810e..9d0e206 100644
+--- a/docs/youversion-integration.md
++++ b/docs/youversion-integration.md
+@@ -62,8 +62,28 @@ Usage guide: https://developers.youversion.com/api-usage
+ 
+ The integration preserves the current video study modal and its portaled Bible
+ preview, hash routing, cloud sync and security changes. It reuses the existing
+-private `ESV_RATE_LIMITER` service binding for every outgoing YouVersion request.
+-Both providers conservatively share its IP/daily budget during rollout; missing
+-or failed rate-limit protection fails closed. Preview deployments therefore need
+-both the YouVersion secret and the service binding. No new secret is introduced
++private `ESV_RATE_LIMITER` service binding for every outgoing YouVersion and ESV
++request. Each provider has its own per-IP limit key and its own upstream budget
++(`/check/esv` and `/check/youversion`), so heavy use of one cannot exhaust the
++other. The ESV budget stays below the ESV API's published 5,000/day and 1,000/hour
++limits (4,000 per rolling day and 900 per clock hour); budgets are kept as hourly
++counters in the Durable Object rather than one entry per request. Missing or failed
++rate-limit protection fails closed. Preview deployments therefore need the
++YouVersion secret, the ESV key and the service binding. No new secret is introduced
+ for the limiter, and no existing security control is disabled.
++
++## ESV translation
++
++ESV is a built-in option in the translation dropdown (Settings and verse previews)
++next to ASV, which remains the default. Selecting it loads text from
++`/api/esv-passage`; if that request fails, is rate limited, or the daily budget is
++spent, the preview shows ASV from `/api/bible` with the notice "ESV unavailable —
++showing ASV. Your saved default is unchanged."
++
++Crossway's ESV API terms apply: the ESV copyright notice and a link to esv.org are
++shown with every ESV passage, a request is limited to one chapter (at most 176
++verses, well under the 500-verse / half-a-book limit), and no more than 500 verses
++may be stored. For that reason ESV text is never written to a shared server cache
++(Cache API, KV or R2); `/api/esv-passage` responses are `no-store`. The app keeps at
++most eight recently opened passages (about 40,000 characters) in memory for the
++current session only, which avoids repeat requests without persisting text.
+diff --git a/functions/api/bible.js b/functions/api/bible.js
+index c76c458..f9b6571 100644
+--- a/functions/api/bible.js
++++ b/functions/api/bible.js
+@@ -16,7 +16,7 @@ export async function onRequestGet({ request, env }) {
+     const limitedFetch = async (url, options) => {
+       const limiter = env.ESV_RATE_LIMITER, ip = request.headers.get('CF-Connecting-IP');
+       if (!limiter || typeof limiter.fetch !== 'function' || !ip) throw new Error('Limiter unavailable');
+-      const reservation = await limiter.fetch(new Request('https://esv-rate-limiter.internal/check', {
++      const reservation = await limiter.fetch(new Request('https://esv-rate-limiter.internal/check/youversion', {
+         method: 'POST', headers: { 'X-ESV-Client-IP': ip }, signal: AbortSignal.timeout(5000)
+       }));
+       if (!reservation.ok) {
+diff --git a/functions/api/esv-passage.js b/functions/api/esv-passage.js
+index 511b878..6b16bd5 100644
+--- a/functions/api/esv-passage.js
++++ b/functions/api/esv-passage.js
+@@ -7,6 +7,15 @@ const MAX_REFERENCE_LENGTH = 80;
+ const MAX_CHAPTER = 150;
+ const MAX_VERSE = 176;
+ const MAX_VERSES_PER_REQUEST = 176;
++// Crossway's ESV API terms allow up to 500 verses per query/page and no more than half of
++// any book. Requests here are limited to a single chapter (at most 176 verses), and no
++// chapter of a book with three or more chapters reaches half of that book, so the
++// published limits hold by construction. Do not raise MAX_VERSES_PER_REQUEST above 500 or
++// accept multi-chapter references without adding an explicit half-of-book check.
++//
++// The ESV terms also cap locally stored text at 500 verses in total, so passage text is
++// never written to a shared server cache (Cache API, KV or R2). Responses are no-store;
++// the app keeps a small in-memory copy per browser session.
+ const UPSTREAM_TIMEOUT_MS = 5000;
+ 
+ function isBoundedPassageReference(reference) {
+@@ -72,7 +81,7 @@ async function checkRateLimit(request, env) {
+   if (!clientIp) return { status: 'unavailable' };
+ 
+   try {
+-    const limiterRequest = new Request('https://esv-rate-limiter.internal/check', {
++    const limiterRequest = new Request('https://esv-rate-limiter.internal/check/esv', {
+       method: 'POST',
+       headers: { 'X-ESV-Client-IP': clientIp }
+     });
+diff --git a/js/app.js b/js/app.js
+index acdf5b8..f219e73 100644
+--- a/js/app.js
++++ b/js/app.js
+@@ -33,6 +33,7 @@
+           '<span class="bible-preview-notice" role="status"></span>' +
+           '<span class="bible-preview-text" hidden></span>' +
+           '<span class="bible-preview-copyright meta"></span>' +
++          '<a class="bible-preview-esv-link meta" href="https://www.esv.org/" target="_blank" rel="noopener noreferrer" hidden>ESV.org</a>' +
+           '<span class="bible-preview-fallback" id="' + messageId + '">Verse text is unavailable. Connect to the internet and try again, or open YouVersion.</span>' +
+           '<a class="btn sm primary bible-preview-open" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">Open passage on YouVersion</a>' +
+         '</span>' +
+@@ -107,10 +108,66 @@
+     }
+   }
+   var bibleVersions = [], bibleVersionsRequest = null;
+-  function validBibleVersion(value) { return /^(?:[1-9]\d{0,9}|NKJV|ASV)$/.test(String(value || '')) ? String(value) : 'ASV'; }
+-  function bibleApiUrl() { return (account ? account.apiBase : (window.CCI_API_BASE || (Account && Account.DEFAULT_API_BASE) || '')) + '/api/bible'; }
++  function validBibleVersion(value) { return /^(?:[1-9]\d{0,9}|NKJV|ASV|ESV)$/.test(String(value || '')) ? String(value) : 'ASV'; }
++  function apiBase() { return account ? account.apiBase : (window.CCI_API_BASE || (Account && Account.DEFAULT_API_BASE) || ''); }
++  function bibleApiUrl() { return apiBase() + '/api/bible'; }
++  function esvApiUrl() { return apiBase() + '/api/esv-passage'; }
++  var ESV_COPYRIGHT = 'Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.';
++  // ESV terms allow caching at most 500 verses. Keep a small per-session, in-memory copy
++  // (never persisted) so reopening a passage does not spend ESV API quota.
++  var ESV_CACHE_MAX_ENTRIES = 8, ESV_CACHE_MAX_CHARS = 40000, esvPassageCache = [];
++  function esvCacheKey(reference) { return String(reference).toLowerCase().replace(/\s+/g, ' ').trim(); }
++  function esvCacheGet(reference) {
++    var key = esvCacheKey(reference), index = esvPassageCache.findIndex(function (entry) { return entry.key === key; });
++    if (index < 0) return null;
++    var entry = esvPassageCache.splice(index, 1)[0];
++    esvPassageCache.push(entry);
++    return entry.text;
++  }
++  function esvCachePut(reference, text) {
++    if (typeof text !== 'string' || !text || text.length > ESV_CACHE_MAX_CHARS) return;
++    var key = esvCacheKey(reference);
++    esvPassageCache = esvPassageCache.filter(function (entry) { return entry.key !== key; });
++    esvPassageCache.push({ key: key, text: text });
++    function total() { return esvPassageCache.reduce(function (sum, entry) { return sum + entry.text.length; }, 0); }
++    while (esvPassageCache.length > ESV_CACHE_MAX_ENTRIES || total() > ESV_CACHE_MAX_CHARS) esvPassageCache.shift();
++  }
++  function esvPassageLink(reference) { return 'https://www.esv.org/' + encodeURIComponent(reference).replace(/%20/g, '+').replace(/%3A/gi, ':') + '/'; }
++  // Resolves to a normalised passage result. ESV is fetched through /api/esv-passage; if it
++  // fails for any reason other than the user closing the preview, ASV is loaded from
++  // /api/bible and marked as a fallback so the UI can say which translation is shown.
++  function requestBiblePassage(reference, version, signal) {
++    var init = { cache: 'no-store', headers: { Accept: 'application/json' }, signal: signal };
++    function fromYouVersion(requested, markFallback) {
++      return fetch(bibleApiUrl() + '?q=' + encodeURIComponent(reference) + '&version=' + encodeURIComponent(requested), init).then(function (response) {
++        if (!response.ok) throw new Error('Passage service unavailable');
++        return response.json();
++      }).then(function (result) {
++        if (!result.text || !result.version) throw new Error('Passage text unavailable');
++        if (markFallback) result.fallback = true;
++        return result;
++      });
++    }
++    if (version !== 'ESV') return fromYouVersion(version, false);
++    var cached = esvCacheGet(reference);
++    var text = cached ? Promise.resolve(cached) : fetch(esvApiUrl() + '?q=' + encodeURIComponent(reference), init).then(function (response) {
++      if (!response.ok) throw new Error('ESV passage unavailable');
++      return response.json();
++    }).then(function (result) {
++      var passage = result && typeof result.text === 'string' ? result.text.trim() : '';
++      if (!passage) throw new Error('ESV passage text unavailable');
++      esvCachePut(reference, passage);
++      return passage;
++    });
++    return text.then(function (passage) {
++      return { text: passage, provider: 'esv', fallback: false, version: { id: 'ESV', abbreviation: 'ESV', title: 'English Standard Version', copyright: ESV_COPYRIGHT, publisher: '' } };
++    }, function (error) {
++      if (signal && signal.aborted) throw error;
++      return fromYouVersion('ASV', true);
++    });
++  }
+   function bibleVersionOptions(selected, query) {
+-    var options = [{ id: 'ASV', abbreviation: 'ASV', title: 'Preferred default (when available)' }].concat(bibleVersions);
++    var options = [{ id: 'ASV', abbreviation: 'ASV', title: 'Preferred default (when available)' }, { id: 'ESV', abbreviation: 'ESV', title: 'English Standard Version (Crossway)' }].concat(bibleVersions);
+     if (!options.some(function (v) { return v.id === selected; })) options.unshift({ id: selected, abbreviation: 'Saved translation', title: selected });
+     return options.filter(function (v) { return v.id === selected || !query || (v.abbreviation + ' ' + v.title).toLowerCase().indexOf(query.toLowerCase()) >= 0; }).map(function (v) {
+       return '<option value="' + esc(v.id) + '"' + (v.id === selected ? ' selected' : '') + '>' + esc(v.abbreviation + ' — ' + v.title) + '</option>';
+@@ -120,7 +177,7 @@
+     var selected = validBibleVersion(S.settings.bibleVersion);
+     return '<span class="bible-version-picker"><label>Search English translations<input type="search" data-bible-version-search placeholder="Name or abbreviation" /></label>' +
+       '<label>' + (settings ? 'Default Bible translation' : 'Translation for this preview') + '<select data-bible-version="' + (settings ? 'default' : 'preview') + '">' + bibleVersionOptions(selected, '') + '</select></label>' +
+-      '<span class="bible-catalog-status meta" role="status">' + (bibleVersions.length ? 'Translations available through YouVersion.' : 'Open the selector to load available translations.') + '</span></span>';
++      '<span class="bible-catalog-status meta" role="status">' + (bibleVersions.length ? 'Translations available through YouVersion and the ESV API.' : 'Open the selector to load available translations.') + '</span></span>';
+   }
+   function loadBibleVersions() {
+     if (bibleVersions.length) return Promise.resolve();
+@@ -134,7 +191,7 @@
+       document.querySelectorAll('[data-bible-version]').forEach(function (select) {
+         select.innerHTML = bibleVersionOptions(select.value, '');
+       });
+-      document.querySelectorAll('.bible-catalog-status').forEach(function (el) { el.textContent = bibleVersions.length ? 'Translations available through YouVersion.' : 'No English translations are available for this app yet.'; });
++      document.querySelectorAll('.bible-catalog-status').forEach(function (el) { el.textContent = bibleVersions.length ? 'Translations available through YouVersion and the ESV API.' : 'Only ASV and ESV are available right now.'; });
+     }).catch(function () {
+       document.querySelectorAll('.bible-catalog-status').forEach(function (el) { el.textContent = 'Translations could not load. Focus the selector again to retry.'; });
+     }).finally(function () { window.clearTimeout(timeout); bibleVersionsRequest = null; });
+@@ -152,26 +209,29 @@
+     preview.querySelector('.bible-preview-version').textContent = 'Loading';
+     preview.querySelector('.bible-preview-notice').textContent = '';
+     preview.querySelector('.bible-preview-copyright').textContent = '';
+-    var openLink = preview.querySelector('.bible-preview-open');
+-    openLink.href = 'https://www.bible.com/search/bible?q=' + encodeURIComponent(reference);
++    var openLink = preview.querySelector('.bible-preview-open'), esvLink = preview.querySelector('.bible-preview-esv-link');
++    if (esvLink) esvLink.hidden = true;
++    openLink.href = version === 'ESV' ? esvPassageLink(reference) : 'https://www.bible.com/search/bible?q=' + encodeURIComponent(reference);
++    openLink.textContent = version === 'ESV' ? 'Open passage on ESV.org' : 'Open passage on YouVersion';
+     var controller = new AbortController();
+     var request = { id: ++biblePreviewRequestSequence, controller: controller, link: link, preview: preview };
+     biblePreviewRequest = request;
+     var timeout = window.setTimeout(function () { request.timedOut = true; controller.abort(); }, 20000);
+-    fetch(bibleApiUrl() + '?q=' + encodeURIComponent(reference) + '&version=' + encodeURIComponent(version), {
+-      cache: 'no-store', headers: { Accept: 'application/json' }, signal: controller.signal
+-    }).then(function (response) {
+-      if (!response.ok) throw new Error('Passage service unavailable');
+-      return response.json();
+-    }).then(function (result) {
++    requestBiblePassage(reference, version, controller.signal).then(function (result) {
+       if (biblePreviewRequest !== request || !activeBiblePreview || activeBiblePreview.link !== link) return;
+-      if (!result.text || !result.version) throw new Error('Passage text unavailable');
+       updateBiblePreviewText(preview, result.text);
+       preview.querySelector('.bible-preview-version').textContent = result.version.abbreviation;
+       var selectedLabel = bibleVersions.find(function (v) { return v.id === version; });
+-      preview.querySelector('.bible-preview-notice').textContent = result.fallback ? (selectedLabel ? selectedLabel.abbreviation : (version === 'ASV' || version === 'NKJV') ? version : 'Selected translation') + ' unavailable — showing ' + result.version.abbreviation + '. Your saved default is unchanged.' : '';
+-      preview.querySelector('.bible-preview-copyright').textContent = result.version.title + '. ' + result.version.copyright + (result.version.publisher ? ' ' + result.version.publisher : '') + ' Provided by YouVersion.';
+-      if (/^https:\/\/www\.bible\.com\/bible\/[0-9]+\//.test(result.url || '')) openLink.href = result.url;
++      preview.querySelector('.bible-preview-notice').textContent = result.fallback ? (selectedLabel ? selectedLabel.abbreviation : (version === 'ASV' || version === 'NKJV' || version === 'ESV') ? version : 'Selected translation') + ' unavailable — showing ' + result.version.abbreviation + '. Your saved default is unchanged.' : '';
++      if (result.provider === 'esv') {
++        preview.querySelector('.bible-preview-copyright').textContent = result.version.copyright;
++        if (esvLink) esvLink.hidden = false;
++      } else {
++        preview.querySelector('.bible-preview-copyright').textContent = result.version.title + '. ' + result.version.copyright + (result.version.publisher ? ' ' + result.version.publisher : '') + ' Provided by YouVersion.';
++        openLink.href = 'https://www.bible.com/search/bible?q=' + encodeURIComponent(reference);
++        openLink.textContent = 'Open passage on YouVersion';
++        if (/^https:\/\/www\.bible\.com\/bible\/[0-9]+\//.test(result.url || '')) openLink.href = result.url;
++      }
+       positionBiblePreview(link, preview);
+     }).catch(function () {
+       if ((controller.signal.aborted && !request.timedOut) || biblePreviewRequest !== request) return;
+diff --git a/service-worker.js b/service-worker.js
+index 186101f..b176d22 100644
+--- a/service-worker.js
++++ b/service-worker.js
+@@ -1,7 +1,7 @@
+ 'use strict';
+ 
+ const CACHE_PREFIX = 'cci-study-pwa-';
+-const CACHE_NAME = CACHE_PREFIX + 'v55';
++const CACHE_NAME = CACHE_PREFIX + 'v56';
+ const CORE_FILES = [
+   './',
+   'offline.html',
+diff --git a/style.css b/style.css
+index 9645c7d..ef42ddd 100644
+--- a/style.css
++++ b/style.css
+@@ -9413,6 +9413,8 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
+ .bible-version-picker input, .bible-version-picker select { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+ .bible-preview-notice, .bible-preview-copyright { display: block; margin-top: 8px; font-size: 12px; }
+ .bible-preview-notice:empty, .bible-preview-copyright:empty { display: none; }
++.bible-preview-esv-link { display: inline-block; margin-top: 4px; font-size: 12px; }
++[hidden].bible-preview-esv-link { display: none !important; }
+ /* Short, purposeful transitions help route and dialog changes feel connected. */
+ @keyframes appScreenEnter{from{opacity:.72;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+ @keyframes appModalScrimEnter{from{opacity:0}to{opacity:1}}
+diff --git a/tests/esv-quota.test.js b/tests/esv-quota.test.js
+new file mode 100644
+index 0000000..03263ad
+--- /dev/null
++++ b/tests/esv-quota.test.js
+@@ -0,0 +1,142 @@
++const assert = require('node:assert/strict');
++const fs = require('node:fs');
++const path = require('node:path');
++const test = require('node:test');
++const vm = require('node:vm');
++
++const source = fs.readFileSync(path.join(__dirname, '..', 'workers/esv-rate-limiter/index.js'), 'utf8')
++  .replace(/export class /g, 'class ')
++  .replace(/export function /g, 'function ')
++  .replace('export default {', 'const worker = {');
++
++function loadWorker(clock) {
++  return vm.runInNewContext(source + '\n({ worker, EsvDailyQuota, pruneBuckets, admit })', {
++    URL, Request, Response, Date: { now: () => clock.now }
++  });
++}
++
++function makeStorage(initial) {
++  const data = new Map(Object.entries(initial || {}));
++  return {
++    data,
++    storage: {
++      async transaction(fn) {
++        return fn({
++          get: async key => data.get(key),
++          put: async (key, value) => { data.set(key, JSON.parse(JSON.stringify(value))); },
++          delete: async key => { data.delete(key); }
++        });
++      }
++    }
++  };
++}
++
++const HOUR = 60 * 60 * 1000;
++const reserve = (quota, scope) => quota.fetch(new Request('https://esv-quota.internal/reserve' + (scope ? '?scope=' + scope : ''), { method: 'POST' }));
++
++test('quota is stored as a handful of hourly counters, never one entry per request', async () => {
++  const clock = { now: Date.UTC(2026, 10, 13, 10, 5) };
++  const { EsvDailyQuota } = loadWorker(clock);
++  const { data, storage } = makeStorage();
++  const quota = new EsvDailyQuota({ storage });
++  for (let i = 0; i < 300; i++) assert.equal((await reserve(quota, 'esv')).status, 204);
++  const buckets = data.get('hour-buckets');
++  assert.equal(Array.isArray(buckets), false);
++  assert.deepEqual(Object.values(buckets), [300]);
++  assert.equal(data.has('request-timestamps'), false);
++});
++
++test('ESV hourly cap stays under the API limit and resets at the next clock hour', async () => {
++  const clock = { now: Date.UTC(2026, 10, 13, 10, 5) };
++  const { EsvDailyQuota } = loadWorker(clock);
++  const quota = new EsvDailyQuota({ storage: makeStorage().storage });
++  for (let i = 0; i < 900; i++) assert.equal((await reserve(quota, 'esv')).status, 204);
++  const denied = await reserve(quota, 'esv');
++  assert.equal(denied.status, 429);
++  const retryAfter = Number(denied.headers.get('Retry-After'));
++  assert.ok(retryAfter > 0 && retryAfter <= 3600, 'retry-after waits for the next hour: ' + retryAfter);
++  clock.now += HOUR;
++  assert.equal((await reserve(quota, 'esv')).status, 204);
++});
++
++test('ESV daily budget of 4000 is enforced across hours and frees up as the window rolls', async () => {
++  const clock = { now: Date.UTC(2026, 10, 13, 0, 1) };
++  const { EsvDailyQuota } = loadWorker(clock);
++  const { data, storage } = makeStorage();
++  const quota = new EsvDailyQuota({ storage });
++  for (let hour = 0; hour < 5; hour++) {
++    for (let i = 0; i < 800; i++) assert.equal((await reserve(quota, 'esv')).status, 204);
++    clock.now += HOUR;
++  }
++  const denied = await reserve(quota, 'esv');
++  assert.equal(denied.status, 429);
++  assert.ok(Number(denied.headers.get('Retry-After')) > 0);
++  assert.ok(Object.keys(data.get('hour-buckets')).length <= 25);
++  clock.now += 21 * HOUR; // the oldest buckets are now older than the 25-hour window
++  assert.equal((await reserve(quota, 'esv')).status, 204);
++});
++
++test('requests accounted before the deploy are migrated from the old timestamp array', async () => {
++  const clock = { now: Date.UTC(2026, 10, 13, 12, 30) };
++  const { EsvDailyQuota } = loadWorker(clock);
++  const legacy = Array.from({ length: 3999 }, (_, i) => clock.now - (i % 20) * HOUR);
++  const { data, storage } = makeStorage({ 'request-timestamps': legacy });
++  const quota = new EsvDailyQuota({ storage });
++  assert.equal((await reserve(quota, 'youversion')).status, 204); // 4000th request
++  assert.equal(data.has('request-timestamps'), false);
++  assert.equal((await reserve(quota, 'youversion')).status, 429);
++});
++
++test('unknown quota scopes and routes are rejected', async () => {
++  const clock = { now: Date.UTC(2026, 10, 13, 10, 0) };
++  const { EsvDailyQuota, worker } = loadWorker(clock);
++  const quota = new EsvDailyQuota({ storage: makeStorage().storage });
++  assert.equal((await reserve(quota, 'other')).status, 404);
++  const env = { ESV_RATE_LIMITER: { limit: async () => ({ success: true }) }, ESV_DAILY_QUOTA: {} };
++  const headers = { 'X-ESV-Client-IP': '198.51.100.7' };
++  assert.equal((await worker.fetch(new Request('https://x.internal/check/other', { method: 'POST', headers }), env)).status, 404);
++  assert.equal((await worker.fetch(new Request('https://x.internal/check/esv', { method: 'GET', headers }), env)).status, 404);
++  assert.equal((await worker.fetch(new Request('https://x.internal/check/esv', { method: 'POST' }), env)).status, 400);
++});
++
++test('ESV and YouVersion have separate per-IP keys and separate upstream budgets', async () => {
++  const clock = { now: Date.UTC(2026, 10, 13, 10, 5) };
++  const { EsvDailyQuota, worker } = loadWorker(clock);
++  const objects = new Map(), limitKeys = [];
++  const env = {
++    ESV_RATE_LIMITER: { limit: async ({ key }) => { limitKeys.push(key); return { success: true }; } },
++    ESV_DAILY_QUOTA: {
++      idFromName: name => name,
++      get: name => {
++        if (!objects.has(name)) objects.set(name, new EsvDailyQuota({ storage: makeStorage().storage }));
++        const object = objects.get(name);
++        // A Durable Object stub accepts (url, init) just like fetch().
++        return { fetch: (url, init) => object.fetch(new Request(url, init)) };
++      }
++    }
++  };
++  const call = path => worker.fetch(new Request('https://esv-rate-limiter.internal' + path, { method: 'POST', headers: { 'X-ESV-Client-IP': '198.51.100.7' } }), env);
++
++  for (let i = 0; i < 900; i++) assert.equal((await call('/check/esv')).status, 204);
++  assert.equal((await call('/check/esv')).status, 429, 'ESV is out of budget for this hour');
++  assert.equal((await call('/check/youversion')).status, 204, 'YouVersion is unaffected by ESV usage');
++  assert.deepEqual([...objects.keys()].sort(), ['esv-passage-upstream', 'youversion-upstream']);
++  assert.ok(limitKeys.includes('esv:198.51.100.7') && limitKeys.includes('youversion:198.51.100.7'));
++
++  const legacy = await call('/check');
++  assert.equal(legacy.status, 429, 'the legacy /check path is accounted to the ESV budget');
++});
++
++test('per-IP limiter denial returns 429 without touching the upstream budget', async () => {
++  const clock = { now: Date.UTC(2026, 10, 13, 10, 5) };
++  const { worker } = loadWorker(clock);
++  let touched = false;
++  const env = {
++    ESV_RATE_LIMITER: { limit: async () => ({ success: false }) },
++    ESV_DAILY_QUOTA: { idFromName: () => { touched = true; }, get: () => { touched = true; } }
++  };
++  const res = await worker.fetch(new Request('https://x.internal/check/esv', { method: 'POST', headers: { 'X-ESV-Client-IP': '198.51.100.7' } }), env);
++  assert.equal(res.status, 429);
++  assert.equal(res.headers.get('Retry-After'), '60');
++  assert.equal(touched, false);
++});
+diff --git a/tests/esv-translation.test.js b/tests/esv-translation.test.js
+new file mode 100644
+index 0000000..5502748
+--- /dev/null
++++ b/tests/esv-translation.test.js
+@@ -0,0 +1,229 @@
++const assert = require('node:assert/strict');
++const fs = require('node:fs');
++const path = require('node:path');
++const test = require('node:test');
++const vm = require('node:vm');
++
++const root = path.join(__dirname, '..');
++const response = (data, status) => new Response(JSON.stringify(data), { status: status || 200 });
++const flush = () => new Promise(resolve => setImmediate(resolve));
++
++/* ---------- server: /api/esv-passage limits and quota scope ---------- */
++
++const esvSource = fs.readFileSync(path.join(root, 'functions/api/esv-passage.js'), 'utf8')
++  .replace(/export function /g, 'function ').replace(/export async function /g, 'async function ');
++
++function esvHandler(fetchImpl) {
++  return vm.runInNewContext(esvSource + '\n({ onRequestGet })', { URL, Request, Response, Headers, fetch: fetchImpl });
++}
++
++function esvRequest(reference, env, handler) {
++  return handler.onRequestGet({
++    request: new Request('https://study.example/api/esv-passage?q=' + encodeURIComponent(reference), { headers: { 'CF-Connecting-IP': '198.51.100.7' } }),
++    env
++  });
++}
++
++test('ESV requests stay within one chapter and the 500-verse / half-book limits', async () => {
++  let upstream = 0;
++  const handler = esvHandler(async () => { upstream++; return response({ passages: ['text (ESV)'] }); });
++  const env = { ESV_API_KEY: 'key', ESV_RATE_LIMITER: { fetch: async () => new Response(null, { status: 204 }) } };
++
++  // The longest chapter, and a full chapter selection, are fine.
++  assert.equal((await esvRequest('Psalm 119', env, handler)).status, 200);
++  assert.equal((await esvRequest('Psalm 119:1-176', env, handler)).status, 200);
++  assert.equal((await esvRequest('John 3:16,18-21', env, handler)).status, 200);
++  const accepted = upstream;
++
++  for (const bad of ['Psalm 119:1-177', 'Psalm 119:1-100,101-177', 'Psalm 151', 'Genesis 1-2', 'Genesis 1:1-2:3', 'Genesis', 'John 3:20-16', 'John 3:0', 'Romans 8:1-39,40-300']) {
++    assert.equal((await esvRequest(bad, env, handler)).status, 400, bad + ' should be rejected');
++  }
++  assert.equal(upstream, accepted, 'rejected references never reach the ESV API');
++  const two = await esvRequest('John 3:16', env, handler);
++  assert.equal(two.headers.get('Cache-Control'), 'no-store', 'ESV text is never put in a shared or persistent cache');
++});
++
++test('ESV requests reserve quota from the ESV scope of the private limiter', async () => {
++  const seen = [];
++  const handler = esvHandler(async () => response({ passages: ['text (ESV)'] }));
++  const env = { ESV_API_KEY: 'key', ESV_RATE_LIMITER: { fetch: async request => { seen.push({ url: request.url, ip: request.headers.get('X-ESV-Client-IP') }); return new Response(null, { status: 204 }); } } };
++  assert.equal((await esvRequest('John 3:16', env, handler)).status, 200);
++  assert.deepEqual(seen, [{ url: 'https://esv-rate-limiter.internal/check/esv', ip: '198.51.100.7' }]);
++
++  const exhausted = { ESV_API_KEY: 'key', ESV_RATE_LIMITER: { fetch: async () => new Response(null, { status: 429, headers: { 'Retry-After': '1200' } }) } };
++  const limited = await esvRequest('John 3:16', exhausted, handler);
++  assert.equal(limited.status, 429);
++  assert.equal(limited.headers.get('Retry-After'), '1200');
++});
++
++test('YouVersion requests reserve quota from their own scope', async () => {
++  const seen = [];
++  const auth = require('../functions/_lib/auth.cjs');
++  const bibleSource = fs.readFileSync(path.join(root, 'functions/api/bible.js'), 'utf8').replace(/^import .*;\n/gm, '').replace('export async function', 'async function');
++  const handler = vm.runInNewContext(bibleSource + '\nonRequestGet', {
++    URL, Request, Response, AbortSignal, auth,
++    fetch: async () => response({}),
++    bible: {
++      passageIds: () => ['JHN.3.16'],
++      versions: async (key, fetcher) => { await fetcher('https://upstream.test/bibles', {}); return [{ id: '12', abbreviation: 'ASV', title: 'ASV' }]; },
++      passage: async () => ({ text: 'x', version: { abbreviation: 'ASV' } })
++    }
++  });
++  const env = { YOUVERSION_APP_KEY: 'k', ESV_RATE_LIMITER: { fetch: async request => { seen.push(request.url); return new Response(null, { status: 204 }); } } };
++  await handler({ request: new Request('https://study.example/api/bible', { headers: { 'CF-Connecting-IP': '198.51.100.7' } }), env });
++  assert.deepEqual(seen, ['https://esv-rate-limiter.internal/check/youversion']);
++});
++
++/* ---------- client: ESV in the translation dropdown and preview ---------- */
++
++function previewUi(fetcher) {
++  const listeners = {}, timers = new Map();
++  const elements = { app: {}, modal: {}, toast: {} };
++  const window = { DeckParser: require('../js/parser.js'), StudyStorage: require('../js/storage.js'),
++    setTimeout: (fn, ms) => { timers.set(ms, fn); return ms; }, clearTimeout: id => timers.delete(id),
++    location: { protocol: 'https:', origin: 'https://study.example' } };
++  const document = { getElementById: id => elements[id], querySelectorAll: () => [], addEventListener: (name, fn) => { (listeners[name] ||= []).push(fn); } };
++  const source = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8').replace('  boot();', `
++    save = function () {}; toast = function () {}; positionBiblePreview = function () {};
++    bibleVersions = [{id:'1', abbreviation:'KJV', title:'King James'}];
++    window.ui = { state: S, load: loadBiblePreviewText, picker: bibleVersionPicker, options: bibleVersionOptions, valid: validBibleVersion,
++      activate: function(link, preview) { activeBiblePreview = {link:link,preview:preview}; } };
++  `);
++  vm.runInNewContext(source, { window, document, URL, AbortController, fetch: fetcher });
++  const nodes = {
++    '[data-bible-version]': { value: 'ASV', textContent: '', hidden: false },
++    '.bible-preview-version': { textContent: '' }, '.bible-preview-notice': { textContent: '' }, '.bible-preview-copyright': { textContent: '' },
++    '.bible-preview-open': { href: '', textContent: 'Open passage on YouVersion' }, '.bible-preview-text': { textContent: '', hidden: true },
++    '.bible-preview-fallback': { textContent: '', hidden: false }, '.bible-preview-esv-link': { hidden: true }
++  };
++  const preview = { querySelector: key => nodes[key] }, link = { textContent: 'John 3:16' };
++  window.ui.activate(link, preview);
++  return { ui: window.ui, nodes, preview, link, timers, change: target => listeners.change.forEach(fn => fn({ target })) };
++}
++
++test('ESV is offered in the preview and Settings dropdown and can be saved as the default', () => {
++  const h = previewUi(async () => response({}));
++  assert.equal(h.ui.valid('ESV'), 'ESV');
++  assert.equal(h.ui.valid('esv'), 'ASV');
++  const options = h.ui.options('ASV', '');
++  assert.match(options, /<option value="ESV">ESV — English Standard Version \(Crossway\)<\/option>/);
++  assert.ok(options.indexOf('value="ASV"') < options.indexOf('value="ESV"') && options.indexOf('value="ESV"') < options.indexOf('value="1"'));
++  assert.match(h.ui.options('ASV', 'crossway'), /value="ESV"/);
++  assert.doesNotMatch(h.ui.options('ASV', 'crossway'), /King James/);
++  assert.match(h.ui.options('ESV', ''), /value="ESV" selected/);
++  assert.equal(h.ui.state.settings.bibleVersion, 'ASV', 'ASV remains the default');
++  h.change({ dataset: { bibleVersion: 'default' }, value: 'ESV' });
++  assert.equal(h.ui.state.settings.bibleVersion, 'ESV');
++});
++
++test('choosing ESV loads text from /api/esv-passage with the ESV notice and a link to esv.org', async () => {
++  const urls = [];
++  const h = previewUi(async url => { urls.push(url); return response({ text: 'For God so loved the world. (ESV)' }); });
++  h.change({ dataset: { bibleVersion: 'preview' }, value: 'ESV' });
++  await flush();
++  assert.equal(urls.length, 1);
++  assert.match(urls[0], /\/api\/esv-passage\?q=John%203%3A16$/);
++  assert.equal(h.nodes['.bible-preview-text'].textContent, 'For God so loved the world. (ESV)');
++  assert.equal(h.nodes['.bible-preview-version'].textContent, 'ESV');
++  assert.match(h.nodes['.bible-preview-copyright'].textContent, /ESV® Bible.*Crossway.*Used by permission/);
++  assert.equal(h.nodes['.bible-preview-notice'].textContent, '');
++  assert.equal(h.nodes['.bible-preview-esv-link'].hidden, false);
++  assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.esv.org/John+3:16/');
++  assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open passage on ESV.org');
++  assert.equal(h.ui.state.settings.bibleVersion, 'ASV', 'a preview choice does not change the saved default');
++});
++
++test('reopening an ESV passage uses the in-memory copy instead of another API request', async () => {
++  let requests = 0;
++  const h = previewUi(async () => { requests++; return response({ text: 'Fixture (ESV)' }); });
++  h.ui.load(h.link, h.preview, 'ESV');
++  await flush();
++  h.ui.load(h.link, h.preview, 'ESV');
++  await flush();
++  assert.equal(requests, 1);
++  assert.equal(h.nodes['.bible-preview-text'].textContent, 'Fixture (ESV)');
++  assert.equal(h.nodes['.bible-preview-esv-link'].hidden, false);
++});
++
++test('the in-memory ESV copy is bounded', async () => {
++  let requests = 0;
++  const h = previewUi(async () => { requests++; return response({ text: 'Fixture (ESV)' }); });
++  for (let verse = 1; verse <= 10; verse++) {
++    h.link.textContent = 'John 3:' + verse;
++    h.ui.load(h.link, h.preview, 'ESV');
++    await flush();
++  }
++  assert.equal(requests, 10);
++  h.link.textContent = 'John 3:1'; // evicted: only the 8 most recent passages are kept
++  h.ui.load(h.link, h.preview, 'ESV');
++  await flush();
++  assert.equal(requests, 11);
++  h.link.textContent = 'John 3:10'; // still cached
++  h.ui.load(h.link, h.preview, 'ESV');
++  await flush();
++  assert.equal(requests, 11);
++});
++
++for (const [label, esvReply] of [
++  ['an error status', () => response({ error: 'The ESV passage service is temporarily unavailable.' }, 503)],
++  ['a rate-limit', () => response({ error: 'Too many passage requests.' }, 429)],
++  ['an empty body', () => response({})],
++  ['a network failure', () => { throw new TypeError('network'); }]
++]) {
++  test('ESV falls back to ASV with a clear notice when the ESV API returns ' + label, async () => {
++    const urls = [];
++    const h = previewUi(async url => {
++      urls.push(url);
++      if (/\/api\/esv-passage/.test(url)) return esvReply();
++      return response({ text: 'ASV fixture', version: { id: '12', abbreviation: 'ASV', title: 'American Standard Version', copyright: 'Public domain.', publisher: '' }, fallback: false, url: 'https://www.bible.com/bible/12/JHN.3.16' });
++    });
++    h.ui.load(h.link, h.preview, 'ESV');
++    await flush();
++    assert.match(urls[0], /\/api\/esv-passage/);
++    assert.match(urls[1], /\/api\/bible\?q=John%203%3A16&version=ASV$/);
++    assert.equal(h.nodes['.bible-preview-text'].textContent, 'ASV fixture');
++    assert.equal(h.nodes['.bible-preview-version'].textContent, 'ASV');
++    assert.equal(h.nodes['.bible-preview-notice'].textContent, 'ESV unavailable — showing ASV. Your saved default is unchanged.');
++    assert.match(h.nodes['.bible-preview-copyright'].textContent, /Public domain\./);
++    assert.equal(h.nodes['.bible-preview-esv-link'].hidden, true, 'the ESV notice is only shown with ESV text');
++    assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/12/JHN.3.16');
++    assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open passage on YouVersion');
++    assert.equal(h.ui.state.settings.bibleVersion, 'ASV');
++  });
++}
++
++test('if both ESV and the ASV fallback fail, the preview shows the unavailable message', async () => {
++  const h = previewUi(async () => response({ error: 'down' }, 503));
++  h.ui.load(h.link, h.preview, 'ESV');
++  await flush();
++  assert.equal(h.nodes['.bible-preview-version'].textContent, 'Unavailable');
++  assert.match(h.nodes['.bible-preview-fallback'].textContent, /unavailable/i);
++  assert.equal(h.nodes['.bible-preview-esv-link'].hidden, true);
++});
++
++test('switching away from ESV restores the YouVersion link and hides the ESV notice', async () => {
++  const h = previewUi(async url => /esv-passage/.test(url)
++    ? response({ text: 'ESV text (ESV)' })
++    : response({ text: 'KJV text', version: { id: '1', abbreviation: 'KJV', title: 'King James', copyright: 'c', publisher: '' }, fallback: false, url: 'https://www.bible.com/bible/1/JHN.3.16' }));
++  h.ui.load(h.link, h.preview, 'ESV');
++  await flush();
++  assert.equal(h.nodes['.bible-preview-esv-link'].hidden, false);
++  h.ui.load(h.link, h.preview, '1');
++  await flush();
++  assert.equal(h.nodes['.bible-preview-esv-link'].hidden, true);
++  assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open passage on YouVersion');
++  assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/1/JHN.3.16');
++});
++
++test('closing a preview during an ESV request does not trigger the ASV fallback', async () => {
++  const urls = [];
++  const h = previewUi((url, options) => new Promise((resolve, reject) => {
++    urls.push(url);
++    options.signal.addEventListener('abort', () => reject(new Error('aborted')));
++  }));
++  h.ui.load(h.link, h.preview, 'ESV');
++  h.timers.get(20000)(); // request timeout aborts the in-flight ESV request
++  await flush();
++  assert.equal(urls.length, 1, 'no second request after an abort');
++  assert.match(h.nodes['.bible-preview-fallback'].textContent, /took too long/);
++});
+diff --git a/tests/pwa.test.js b/tests/pwa.test.js
+index fbca773..cefc264 100644
+--- a/tests/pwa.test.js
++++ b/tests/pwa.test.js
+@@ -26,7 +26,7 @@ test('web app manifest declares standalone install metadata and valid icon asset
+ test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
+   const serviceWorker = read('service-worker.js');
+   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
+-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v55'/);
++  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v56'/);
+   assert.match(serviceWorker, /decks\/manifest\.json/);
+   assert.match(serviceWorker, /content\/devotionals\.json/);
+   assert.match(serviceWorker, /content\/lesson-transcripts\.json/);
+@@ -57,7 +57,7 @@ test('activation deletes previous app caches and deck assets absent from the cur
+     [url('settings.json'), {}]
+   ]);
+   const cacheStore = new Map([
+-    ['cci-study-pwa-v55', activeEntries],
++    ['cci-study-pwa-v56', activeEntries],
+     ['cci-study-pwa-v51', new Map()],
+     ['cci-study-pwa-v50', new Map()],
+     ['cci-study-pwa-v36', new Map()],
+@@ -104,7 +104,7 @@ test('activation deletes previous app caches and deck assets absent from the cur
+ 
+   assert.equal(cacheStore.has('cci-study-pwa-v50'), false);
+   assert.equal(cacheStore.has('cci-study-pwa-v51'), false);
+-  assert.equal(cacheStore.has('cci-study-pwa-v55'), true);
++  assert.equal(cacheStore.has('cci-study-pwa-v56'), true);
+   assert.equal(cacheStore.has('cci-study-pwa-v34'), false);
+   assert.equal(cacheStore.has('cci-study-pwa-v33'), false);
+   assert.equal(cacheStore.has('cci-study-pwa-v32'), false);
+@@ -254,7 +254,7 @@ test('standalone dist package includes all PWA runtime assets', () => {
+   assert.match(html, /<script src="js\/supabase\.bundle\.js"><\/script>/);
+   assert.match(html, /rel="manifest" href="manifest\.webmanifest"/);
+   const worker = fs.readFileSync(path.join(dist, 'service-worker.js'), 'utf8');
+-  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v55'/);
++  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v56'/);
+   const coreBlock = worker.match(/const CORE_FILES = \[([\s\S]*?)\];/);
+   assert.ok(coreBlock, 'Service worker defines its core precache files');
+   const coreFiles = Array.from(coreBlock[1].matchAll(/'([^']+)'/g), match => match[1]);
+diff --git a/workers/esv-rate-limiter/index.js b/workers/esv-rate-limiter/index.js
+index b9529cf..7cfe671 100644
+--- a/workers/esv-rate-limiter/index.js
++++ b/workers/esv-rate-limiter/index.js
+@@ -1,5 +1,46 @@
+-const ESV_DAILY_QUERY_BUDGET = 4000;
+-const ROLLING_DAY_MS = 24 * 60 * 60 * 1000;
++// Private rate limiter shared by the Pages Functions that call paid or quota-limited
++// upstream APIs. Each provider has its own per-IP limit key and its own upstream budget,
++// so heavy use of one provider cannot exhaust the other.
++//
++// The upstream budget is a small set of hourly counters (never one entry per request):
++//   - daily:  requests in the current hour plus the previous 24 hours (a 24-25 hour
++//             rolling window, deliberately a little conservative);
++//   - hourly: requests in the current clock hour (optional).
++// ESV API published limits are 5,000/day and 1,000/hour; budgets stay below both.
++const HOUR_MS = 60 * 60 * 1000;
++const WINDOW_HOURS = 25;
++const BUDGETS = {
++  esv: { daily: 4000, hourly: 900 },
++  youversion: { daily: 4000, hourly: null }
++};
++const DEFAULT_SCOPE = 'esv'; // Legacy callers hit /check without a provider.
++const LEGACY_TIMESTAMPS_KEY = 'request-timestamps';
++const BUCKETS_KEY = 'hour-buckets';
++
++export function pruneBuckets(stored, currentHour) {
++  const buckets = {};
++  if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
++    for (const [hour, count] of Object.entries(stored)) {
++      const index = Number(hour);
++      if (Number.isInteger(index) && index > currentHour - WINDOW_HOURS && index <= currentHour && Number.isInteger(count) && count > 0) buckets[index] = count;
++    }
++  }
++  return buckets;
++}
++
++export function admit(buckets, budget, now) {
++  const currentHour = Math.floor(now / HOUR_MS);
++  const total = Object.values(buckets).reduce((sum, count) => sum + count, 0);
++  if (budget.hourly && (buckets[currentHour] || 0) >= budget.hourly) {
++    return { allowed: false, retryAfter: Math.max(1, Math.ceil(((currentHour + 1) * HOUR_MS - now) / 1000)) };
++  }
++  if (total >= budget.daily) {
++    const oldest = Math.min(...Object.keys(buckets).map(Number));
++    return { allowed: false, retryAfter: Math.max(1, Math.ceil(((oldest + WINDOW_HOURS) * HOUR_MS - now) / 1000)) };
++  }
++  buckets[currentHour] = (buckets[currentHour] || 0) + 1;
++  return { allowed: true };
++}
+ 
+ export class EsvDailyQuota {
+   constructor(state) {
+@@ -8,23 +49,33 @@ export class EsvDailyQuota {
+ 
+   async fetch(request) {
+     const url = new URL(request.url);
+-    if (request.method !== 'POST' || url.pathname !== '/reserve') {
++    const scope = url.searchParams.get('scope') || DEFAULT_SCOPE;
++    if (request.method !== 'POST' || url.pathname !== '/reserve' || !Object.hasOwn(BUDGETS, scope)) {
+       return new Response(null, { status: 404 });
+     }
+ 
+     const now = Date.now();
++    const currentHour = Math.floor(now / HOUR_MS);
+     const admission = await this.state.storage.transaction(async transaction => {
+-      const stored = await transaction.get('request-timestamps');
+-      const timestamps = (Array.isArray(stored) ? stored : []).filter(timestamp =>
+-        Number.isFinite(timestamp) && timestamp > now - ROLLING_DAY_MS
+-      );
+-      if (timestamps.length >= ESV_DAILY_QUERY_BUDGET) {
+-        return { allowed: false, retryAfter: Math.max(1, Math.ceil((timestamps[0] + ROLLING_DAY_MS - now) / 1000)) };
++      let stored = await transaction.get(BUCKETS_KEY);
++      if (stored === undefined || stored === null) {
++        // One-time migration from the former one-entry-per-request array: keep today's
++        // usage instead of resetting the budget at deploy time.
++        const legacy = await transaction.get(LEGACY_TIMESTAMPS_KEY);
++        if (Array.isArray(legacy)) {
++          stored = {};
++          for (const timestamp of legacy) {
++            if (!Number.isFinite(timestamp)) continue;
++            const hour = Math.floor(timestamp / HOUR_MS);
++            stored[hour] = (stored[hour] || 0) + 1;
++          }
++          await transaction.delete(LEGACY_TIMESTAMPS_KEY);
++        }
+       }
+-
+-      timestamps.push(now);
+-      await transaction.put('request-timestamps', timestamps);
+-      return { allowed: true };
++      const buckets = pruneBuckets(stored, currentHour);
++      const result = admit(buckets, BUDGETS[scope], now);
++      await transaction.put(BUCKETS_KEY, buckets);
++      return result;
+     });
+ 
+     return new Response(null, {
+@@ -37,9 +88,11 @@ export class EsvDailyQuota {
+ export default {
+   async fetch(request, env) {
+     const url = new URL(request.url);
+-    if (request.method !== 'POST' || url.pathname !== '/check') {
++    const match = /^\/check(?:\/(esv|youversion))?$/.exec(url.pathname);
++    if (request.method !== 'POST' || !match) {
+       return new Response(null, { status: 404 });
+     }
++    const scope = match[1] || DEFAULT_SCOPE;
+ 
+     const clientIp = request.headers.get('X-ESV-Client-IP');
+     if (!clientIp || clientIp.length > 64) {
+@@ -47,14 +100,14 @@ export default {
+     }
+ 
+     try {
+-      const result = await env.ESV_RATE_LIMITER.limit({ key: 'esv-passage:' + clientIp });
++      const result = await env.ESV_RATE_LIMITER.limit({ key: scope + ':' + clientIp });
+       if (!result || result.success !== true) {
+         return new Response(null, { status: 429, headers: { 'Retry-After': '60' } });
+       }
+ 
+-      const quotaId = env.ESV_DAILY_QUOTA.idFromName('esv-passage-upstream');
++      const quotaId = env.ESV_DAILY_QUOTA.idFromName(scope === 'esv' ? 'esv-passage-upstream' : scope + '-upstream');
+       const quota = env.ESV_DAILY_QUOTA.get(quotaId);
+-      const reservation = await quota.fetch('https://esv-quota.internal/reserve', { method: 'POST' });
++      const reservation = await quota.fetch('https://esv-quota.internal/reserve?scope=' + scope, { method: 'POST' });
+       return new Response(null, {
+         status: reservation.status,
+         headers: reservation.headers.get('Retry-After') ? { 'Retry-After': reservation.headers.get('Retry-After') } : undefined
