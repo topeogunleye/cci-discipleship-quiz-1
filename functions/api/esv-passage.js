@@ -7,6 +7,15 @@ const MAX_REFERENCE_LENGTH = 80;
 const MAX_CHAPTER = 150;
 const MAX_VERSE = 176;
 const MAX_VERSES_PER_REQUEST = 176;
+// Crossway's ESV API terms allow up to 500 verses per query/page and no more than half of
+// any book. Requests here are limited to a single chapter (at most 176 verses), and no
+// chapter of a book with three or more chapters reaches half of that book, so the
+// published limits hold by construction. Do not raise MAX_VERSES_PER_REQUEST above 500 or
+// accept multi-chapter references without adding an explicit half-of-book check.
+//
+// The ESV terms also cap locally stored text at 500 verses in total, so passage text is
+// never written to a shared server cache (Cache API, KV or R2). Responses are no-store;
+// the app keeps a small in-memory copy per browser session.
 const UPSTREAM_TIMEOUT_MS = 5000;
 
 function isBoundedPassageReference(reference) {
@@ -72,7 +81,7 @@ async function checkRateLimit(request, env) {
   if (!clientIp) return { status: 'unavailable' };
 
   try {
-    const limiterRequest = new Request('https://esv-rate-limiter.internal/check', {
+    const limiterRequest = new Request('https://esv-rate-limiter.internal/check/esv', {
       method: 'POST',
       headers: { 'X-ESV-Client-IP': clientIp }
     });

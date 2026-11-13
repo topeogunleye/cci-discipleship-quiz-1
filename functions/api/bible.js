@@ -16,7 +16,7 @@ export async function onRequestGet({ request, env }) {
     const limitedFetch = async (url, options) => {
       const limiter = env.ESV_RATE_LIMITER, ip = request.headers.get('CF-Connecting-IP');
       if (!limiter || typeof limiter.fetch !== 'function' || !ip) throw new Error('Limiter unavailable');
-      const reservation = await limiter.fetch(new Request('https://esv-rate-limiter.internal/check', {
+      const reservation = await limiter.fetch(new Request('https://esv-rate-limiter.internal/check/youversion', {
         method: 'POST', headers: { 'X-ESV-Client-IP': ip }, signal: AbortSignal.timeout(5000)
       }));
       if (!reservation.ok) {

@@ -62,8 +62,28 @@ Usage guide: https://developers.youversion.com/api-usage
 
 The integration preserves the current video study modal and its portaled Bible
 preview, hash routing, cloud sync and security changes. It reuses the existing
-private `ESV_RATE_LIMITER` service binding for every outgoing YouVersion request.
-Both providers conservatively share its IP/daily budget during rollout; missing
-or failed rate-limit protection fails closed. Preview deployments therefore need
-both the YouVersion secret and the service binding. No new secret is introduced
+private `ESV_RATE_LIMITER` service binding for every outgoing YouVersion and ESV
+request. Each provider has its own per-IP limit key and its own upstream budget
+(`/check/esv` and `/check/youversion`), so heavy use of one cannot exhaust the
+other. The ESV budget stays below the ESV API's published 5,000/day and 1,000/hour
+limits (4,000 per rolling day and 900 per clock hour); budgets are kept as hourly
+counters in the Durable Object rather than one entry per request. Missing or failed
+rate-limit protection fails closed. Preview deployments therefore need the
+YouVersion secret, the ESV key and the service binding. No new secret is introduced
 for the limiter, and no existing security control is disabled.
+
+## ESV translation
+
+ESV is a built-in option in the translation dropdown (Settings and verse previews)
+next to ASV, which remains the default. Selecting it loads text from
+`/api/esv-passage`; if that request fails, is rate limited, or the daily budget is
+spent, the preview shows ASV from `/api/bible` with the notice "ESV unavailable —
+showing ASV. Your saved default is unchanged."
+
+Crossway's ESV API terms apply: the ESV copyright notice and a link to esv.org are
+shown with every ESV passage, a request is limited to one chapter (at most 176
+verses, well under the 500-verse / half-a-book limit), and no more than 500 verses
+may be stored. For that reason ESV text is never written to a shared server cache
+(Cache API, KV or R2); `/api/esv-passage` responses are `no-store`. The app keeps at
+most eight recently opened passages (about 40,000 characters) in memory for the
+current session only, which avoids repeat requests without persisting text.
