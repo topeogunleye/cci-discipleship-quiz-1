@@ -85,6 +85,57 @@ test('Function rejects invalid references/origins, hides upstream errors and nev
   assert.doesNotMatch(await failed.text(), /private-key/);
 });
 
+test('catalog caches in-memory and deduplicates concurrent fetches', async () => {
+  bible.__test.clearCatalogCache();
+  let calls = 0;
+  const mockFetcher = async () => {
+    calls++;
+    return response({ data: [{ id: 12, abbreviation: 'ASV', title: 'American Standard', language_tag: 'en' }] });
+  };
+  const [first, concurrent] = await Promise.all([
+    bible.versions('cache-test-key', mockFetcher),
+    bible.versions('cache-test-key', mockFetcher)
+  ]);
+  assert.equal(calls, 1, 'concurrent calls should share inflight fetch');
+  assert.deepEqual(first, concurrent);
+  const cached = await bible.versions('cache-test-key', mockFetcher);
+  assert.equal(calls, 1, 'subsequent call should return cached catalog');
+  assert.deepEqual(cached, first);
+  bible.__test.clearCatalogCache();
+});
+
+test('Function returns cacheable headers on successful catalog and passage queries', async () => {
+  const vm = require('node:vm');
+  const auth = require('../functions/_lib/auth.cjs');
+  const source = fs.readFileSync('functions/api/bible.js', 'utf8').replace(/^import .*;\n/gm, '').replace('export async function', 'async function');
+  const handler = vm.runInNewContext(source + '\nonRequestGet', {
+    URL, Response, auth,
+    bible: {
+      ...bible,
+      versions: async () => [{ id: '12', abbreviation: 'ASV', title: 'ASV' }],
+      passage: async () => ({ text: 'In the beginning...', version: { id: '12', abbreviation: 'ASV' }, status: 200 })
+    }
+  });
+  const env = {
+    YOUVERSION_APP_KEY: 'test-key',
+    ESV_RATE_LIMITER: { fetch: async () => new Response(null, { status: 200 }) }
+  };
+  const versionsRes = await handler({
+    request: new Request('https://study.example/api/bible', { headers: { 'CF-Connecting-IP': '127.0.0.1' } }),
+    env
+  });
+  assert.equal(versionsRes.status, 200);
+  assert.match(versionsRes.headers.get('Cache-Control'), /public, max-age=3600/);
+
+  const passageRes = await handler({
+    request: new Request('https://study.example/api/bible?q=Genesis%201:1', { headers: { 'CF-Connecting-IP': '127.0.0.1' } }),
+    env
+  });
+  assert.equal(passageRes.status, 200);
+  assert.match(passageRes.headers.get('Cache-Control'), /public, max-age=3600/);
+});
+
+
 function previewUi(fetcher) {
   const vm = require('node:vm'), listeners = {}, timers = new Map();
   const elements = { app: {}, modal: {}, toast: {} };

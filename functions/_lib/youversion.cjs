@@ -30,24 +30,56 @@ async function upstream(path, key, fetcher) {
   if (!response.ok) { const error = new Error('Bible service unavailable'); error.status = response.status; throw error; }
   return response.json();
 }
-async function versions(key, fetcher = fetch) {
-  const result = [], tokens = new Set();
-  let token = '';
-  do {
-    const query = new URLSearchParams({ 'language_ranges[]': 'en', page_size: '99' });
-    if (token) query.set('page_token', token);
-    const page = await upstream('/bibles?' + query, key, fetcher);
-    if (!Array.isArray(page.data)) throw new Error('Invalid Bible catalog');
-    for (const bible of page.data) {
-      if (!Number.isSafeInteger(bible.id) || !/^en(?:-|$)/i.test(bible.language_tag || '')) continue;
-      result.push({ id: String(bible.id), abbreviation: String(bible.abbreviation || ''), title: String(bible.title || bible.localized_title || ''), copyright: String(bible.copyright || ''), publisher: String(bible.publisher_name || '') });
-    }
-    token = page.next_page_token || '';
-    if (token && tokens.has(token)) throw new Error('Repeated catalog page');
-    tokens.add(token);
-    if (tokens.size > 50) throw new Error('Catalog pagination limit');
-  } while (token);
-  return [...new Map(result.map(b => [b.id, b])).values()].sort((a, b) => a.abbreviation.localeCompare(b.abbreviation) || a.id.localeCompare(b.id));
+const CATALOG_TTL_MS = 60 * 60 * 1000;
+let cachedCatalog = null;
+let cachedCatalogKey = '';
+let cachedCatalogTime = 0;
+let cachedCatalogInflight = null;
+
+function clearCatalogCache() {
+  cachedCatalog = null;
+  cachedCatalogKey = '';
+  cachedCatalogTime = 0;
+  cachedCatalogInflight = null;
+}
+
+async function versions(key, fetcher = fetch, force = false) {
+  const now = Date.now();
+  if (!force && cachedCatalog && cachedCatalogKey === key && (now - cachedCatalogTime) < CATALOG_TTL_MS) {
+    return cachedCatalog;
+  }
+  if (!force && cachedCatalogInflight && cachedCatalogKey === key) {
+    return cachedCatalogInflight;
+  }
+  cachedCatalogKey = key;
+  const loadPromise = (async () => {
+    const result = [], tokens = new Set();
+    let token = '';
+    do {
+      const query = new URLSearchParams({ 'language_ranges[]': 'en', page_size: '99' });
+      if (token) query.set('page_token', token);
+      const page = await upstream('/bibles?' + query, key, fetcher);
+      if (!Array.isArray(page.data)) throw new Error('Invalid Bible catalog');
+      for (const bible of page.data) {
+        if (!Number.isSafeInteger(bible.id) || !/^en(?:-|$)/i.test(bible.language_tag || '')) continue;
+        result.push({ id: String(bible.id), abbreviation: String(bible.abbreviation || ''), title: String(bible.title || bible.localized_title || ''), copyright: String(bible.copyright || ''), publisher: String(bible.publisher_name || '') });
+      }
+      token = page.next_page_token || '';
+      if (token && tokens.has(token)) throw new Error('Repeated catalog page');
+      tokens.add(token);
+      if (tokens.size > 50) throw new Error('Catalog pagination limit');
+    } while (token);
+    const sorted = [...new Map(result.map(b => [b.id, b])).values()].sort((a, b) => a.abbreviation.localeCompare(b.abbreviation) || a.id.localeCompare(b.id));
+    cachedCatalog = sorted;
+    cachedCatalogTime = Date.now();
+    return sorted;
+  })();
+  cachedCatalogInflight = loadPromise;
+  try {
+    return await loadPromise;
+  } finally {
+    if (cachedCatalogInflight === loadPromise) cachedCatalogInflight = null;
+  }
 }
 async function passage(reference, preferred, catalog, key, fetcher = fetch) {
   const ids = passageIds(reference);
@@ -71,4 +103,4 @@ async function passage(reference, preferred, catalog, key, fetcher = fetch) {
   }
   return { status: 503, error: 'No available translation could load this passage. Try again later or open YouVersion.' };
 }
-module.exports = { passageIds, versions, passage };
+module.exports = { passageIds, versions, passage, __test: { clearCatalogCache } };

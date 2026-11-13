@@ -71,7 +71,7 @@ for (const retired of ['content/sermons', 'content/sermons.json', 'js/sermons.js
 fs.rmSync(path.join(outputDir, 'transcripts'), { recursive: true, force: true });
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(path.join(outputDir, 'index.html'), html);
-for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html', 'favicon.ico', 'style.css']) {
+for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html', 'favicon.ico', 'style.css', '_headers']) {
   fs.copyFileSync(path.join(root, file), path.join(outputDir, file));
 }
 for (const directory of ['decks', 'icons', 'content', 'js']) {

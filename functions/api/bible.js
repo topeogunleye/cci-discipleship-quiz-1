@@ -27,9 +27,16 @@ export async function onRequestGet({ request, env }) {
       return fetch(url, options);
     };
     const catalog = await bible.versions(env.YOUVERSION_APP_KEY, limitedFetch);
-    if (reference === null) return reply({ versions: catalog });
+    if (reference === null) {
+      headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
+      return reply({ versions: catalog });
+    }
     const result = await bible.passage(reference, version, catalog, env.YOUVERSION_APP_KEY, limitedFetch);
-    return reply(result, result.status || 200);
+    const status = result.status || 200;
+    if (status === 200 && !result.error) {
+      headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
+    }
+    return reply(result, status);
   } catch (error) {
     if (error.status === 429) { headers.set('Retry-After', '60'); return reply({ error: 'Too many Bible requests. Please try again shortly.' }, 429); }
     return reply({ error: 'Bible service unavailable. Please try again later.' }, 503);
