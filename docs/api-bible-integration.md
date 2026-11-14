@@ -26,6 +26,9 @@ YouVersion IDs and the NIV UK edition. Preferences for removed editions remain i
 profiles and backups, but the picker and new previews use NKJV until the learner
 chooses another translation. The picker explains this rather than appending a
 seventh option or silently overwriting the saved preference.
+The warning updates immediately after choosing a supported Settings default or a
+temporary preview translation, and after metadata refresh. Reopening a preview
+reflects the saved default again; a temporary selection never overwrites it.
 
 Set `API_BIBLE_KEY` as an encrypted Cloudflare Pages secret in Production and any
 Preview environment that needs this integration. For local testing, put it in the
