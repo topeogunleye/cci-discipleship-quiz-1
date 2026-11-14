@@ -99,7 +99,7 @@ test('unknown quota scopes and routes are rejected', async () => {
   assert.equal((await worker.fetch(new Request('https://x.internal/check/esv', { method: 'POST' }), env)).status, 400);
 });
 
-test('ESV and YouVersion have separate per-IP keys and separate upstream budgets', async () => {
+test('ESV, YouVersion and API.Bible have separate per-IP keys and upstream budgets', async () => {
   const clock = { now: Date.UTC(2026, 10, 13, 10, 5) };
   const { EsvDailyQuota, worker } = loadWorker(clock);
   const objects = new Map(), limitKeys = [];
@@ -120,7 +120,9 @@ test('ESV and YouVersion have separate per-IP keys and separate upstream budgets
   for (let i = 0; i < 900; i++) assert.equal((await call('/check/esv')).status, 204);
   assert.equal((await call('/check/esv')).status, 429, 'ESV is out of budget for this hour');
   assert.equal((await call('/check/youversion')).status, 204, 'YouVersion is unaffected by ESV usage');
-  assert.deepEqual([...objects.keys()].sort(), ['esv-passage-upstream', 'youversion-upstream']);
+  assert.equal((await call('/check/apibible')).status, 204, 'API.Bible is unaffected by ESV usage');
+  assert.deepEqual([...objects.keys()].sort(), ['apibible-upstream', 'esv-passage-upstream', 'youversion-upstream']);
+  assert.ok(limitKeys.includes('apibible:198.51.100.7'));
   assert.ok(limitKeys.includes('esv:198.51.100.7') && limitKeys.includes('youversion:198.51.100.7'));
 
   const legacy = await call('/check');

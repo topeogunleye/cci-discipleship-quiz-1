@@ -11,7 +11,8 @@ const HOUR_MS = 60 * 60 * 1000;
 const WINDOW_HOURS = 25;
 const BUDGETS = {
   esv: { daily: 4000, hourly: 900 },
-  youversion: { daily: 4000, hourly: null }
+  youversion: { daily: 4000, hourly: null },
+  apibible: { daily: 150, hourly: 30 }
 };
 const DEFAULT_SCOPE = 'esv'; // Legacy callers hit /check without a provider.
 const LEGACY_TIMESTAMPS_KEY = 'request-timestamps';
@@ -88,7 +89,7 @@ export class EsvDailyQuota {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const match = /^\/check(?:\/(esv|youversion))?$/.exec(url.pathname);
+    const match = /^\/check(?:\/(esv|youversion|apibible))?$/.exec(url.pathname);
     if (request.method !== 'POST' || !match) {
       return new Response(null, { status: 404 });
     }

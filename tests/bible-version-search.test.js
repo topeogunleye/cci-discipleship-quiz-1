@@ -109,7 +109,7 @@ test('updateBibleCatalogStatus reports exact match counts and empty state', () =
   const picker = { querySelector: sel => sel === '.bible-catalog-status' ? statusEl : null };
 
   testApi.updateBibleCatalogStatus(picker, '');
-  assert.match(statusEl.textContent, /Translations available/);
+  assert.match(statusEl.textContent, /Choose a translation/);
 
   testApi.updateBibleCatalogStatus(picker, 'amp');
   assert.equal(statusEl.textContent, '1 translation found.');

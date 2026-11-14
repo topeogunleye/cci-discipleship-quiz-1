@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v57';
+const CACHE_NAME = CACHE_PREFIX + 'v58';
 const CORE_FILES = [
   './',
   'offline.html',

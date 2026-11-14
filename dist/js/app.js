@@ -119,7 +119,26 @@
     }
   }
   var bibleVersions = [], bibleVersionsRequest = null;
-  function validBibleVersion(value) { return /^(?:[1-9]\d{0,9}|NKJV|ASV|ESV)$/.test(String(value || '')) ? String(value) : 'ASV'; }
+  var builtinBibleVersions = [{ id: 'ASV', abbreviation: 'ASV', title: 'Preferred default (when available)' }, { id: 'ESV', abbreviation: 'ESV', title: 'English Standard Version (Crossway)' },
+    { id: 'APIBIBLE_KJV', abbreviation: 'KJV', title: 'King James Version' },
+    { id: 'APIBIBLE_MSG', abbreviation: 'MSG', title: 'The Message' },
+    { id: 'APIBIBLE_GNT', abbreviation: 'GNT', title: 'Good News Translation' }];
+  function validBibleVersion(value) { return /^(?:[1-9]\d{0,9}|NKJV|ASV|ESV|APIBIBLE_(?:KJV|MSG|GNT))$/.test(String(value || '')) ? String(value) : 'ASV'; }
+  var apiBibleTrackerLoading = false;
+  function reportApiBibleView(tokens) {
+    if (!tokens || !tokens.length) return;
+    window.fumsData = window.fumsData || [];
+    window.fums = window.fums || function () { window.fumsData.push(arguments); };
+    window.fums('trackView', tokens);
+    if (!apiBibleTrackerLoading) {
+      apiBibleTrackerLoading = true;
+      var script = document.createElement('script');
+      script.src = 'https://pkg.api.bible/fumsV3.min.js';
+      script.async = true;
+      script.onerror = function () { apiBibleTrackerLoading = false; script.remove(); };
+      document.head.appendChild(script);
+    }
+  }
   function apiBase() { return account ? account.apiBase : (window.CCI_API_BASE || (Account && Account.DEFAULT_API_BASE) || ''); }
   function bibleApiUrl() { return apiBase() + '/api/bible'; }
   function esvApiUrl() { return apiBase() + '/api/esv-passage'; }
@@ -159,6 +178,18 @@
         return result;
       });
     }
+    if (/^APIBIBLE_(KJV|MSG|GNT)$/.test(version)) {
+      return fetch(apiBase() + '/api/api-bible?q=' + encodeURIComponent(reference) + '&version=' + encodeURIComponent(version), init).then(function (response) {
+        if (!response.ok) throw biblePassageError(response);
+        return response.json();
+      }).then(function (result) {
+        if (typeof result.text !== 'string' || !result.text.trim() || !result.version || result.provider !== 'api-bible') throw biblePassageError({ status: 404 });
+        return result;
+      }).catch(function (error) {
+        if (signal && signal.aborted) throw error;
+        return fromYouVersion('ASV', true);
+      });
+    }
     if (version !== 'ESV') return fromYouVersion(version, false);
     var cached = esvCacheGet(reference);
     var text = cached ? Promise.resolve(cached) : fetch(esvApiUrl() + '?q=' + encodeURIComponent(reference), init).then(function (response) {
@@ -193,7 +224,7 @@
     return 'Could not connect to the Bible service. Check your connection and try again, or open the passage.';
   }
   function bibleVersionOptions(selected, query) {
-    var options = [{ id: 'ASV', abbreviation: 'ASV', title: 'Preferred default (when available)' }, { id: 'ESV', abbreviation: 'ESV', title: 'English Standard Version (Crossway)' }].concat(bibleVersions);
+    var options = builtinBibleVersions.concat(bibleVersions);
     if (!options.some(function (v) { return v.id === selected; })) options.unshift({ id: selected, abbreviation: 'Saved translation', title: selected });
     var q = (query || '').trim().toLowerCase();
     var filtered = options.filter(function (v) {
@@ -219,10 +250,10 @@
     if (!statusEl) return;
     var q = (query || '').trim();
     if (!q) {
-      statusEl.textContent = bibleVersions.length ? 'Translations available through YouVersion and the ESV API.' : 'Open the selector or type to search available translations.';
+      statusEl.textContent = bibleVersions.length ? 'Choose a translation for Bible passages.' : 'Open the selector or type to search available translations.';
       return;
     }
-    var options = [{ id: 'ASV', abbreviation: 'ASV', title: 'Preferred default (when available)' }, { id: 'ESV', abbreviation: 'ESV', title: 'English Standard Version (Crossway)' }].concat(bibleVersions);
+    var options = builtinBibleVersions.concat(bibleVersions);
     var qLower = q.toLowerCase();
     var matchCount = options.filter(function (v) {
       return (v.abbreviation && v.abbreviation.toLowerCase().indexOf(qLower) >= 0) || (v.title && v.title.toLowerCase().indexOf(qLower) >= 0);
@@ -244,7 +275,7 @@
     var selected = validBibleVersion(S.settings.bibleVersion);
     return '<span class="bible-version-picker"><label class="bible-version-search-label">Search English translations<input type="search" data-bible-version-search placeholder="Name or abbreviation (e.g. AMP, NIV, ESV)" autocomplete="off" /></label>' +
       '<label class="bible-version-select-label">' + (settings ? 'Default Bible translation' : 'Translation for this preview') + '<select data-bible-version="' + (settings ? 'default' : 'preview') + '" data-current-version="' + esc(selected) + '">' + bibleVersionOptions(selected, '') + '</select></label>' +
-      '<span class="bible-catalog-status meta" role="status">' + (bibleVersions.length ? 'Translations available through YouVersion and the ESV API.' : 'Open the selector or type to search available translations.') + '</span></span>';
+      '<span class="bible-catalog-status meta" role="status">' + (bibleVersions.length ? 'Choose a translation for Bible passages.' : 'Open the selector or type to search available translations.') + '</span></span>';
   }
   function loadBibleVersions() {
     if (bibleVersions.length) return Promise.resolve();
@@ -264,7 +295,7 @@
         var picker = el.closest('.bible-version-picker');
         var searchInput = picker ? picker.querySelector('[data-bible-version-search]') : null;
         if (!searchInput || !searchInput.value) {
-          el.textContent = bibleVersions.length ? 'Translations available through YouVersion and the ESV API.' : 'Only ASV and ESV are available right now.';
+          el.textContent = bibleVersions.length ? 'Choose a translation for Bible passages.' : 'Additional translations could not load. You can still select ASV, ESV, KJV, MSG, or GNT.';
         }
       });
     }).catch(function () {
@@ -299,11 +330,16 @@
       if (biblePreviewRequest !== request || !activeBiblePreview || activeBiblePreview.link !== link) return;
       updateBiblePreviewText(preview, result.text);
       preview.querySelector('.bible-preview-version').textContent = result.version.abbreviation;
-      var selectedLabel = bibleVersions.find(function (v) { return v.id === version; });
+      var selectedLabel = builtinBibleVersions.concat(bibleVersions).find(function (v) { return v.id === version; });
       preview.querySelector('.bible-preview-notice').textContent = result.fallback ? (selectedLabel ? selectedLabel.abbreviation : (version === 'ASV' || version === 'NKJV' || version === 'ESV') ? version : 'Selected translation') + ' unavailable — showing ' + result.version.abbreviation + '. Your saved default is unchanged.' : '';
       if (result.provider === 'esv') {
         preview.querySelector('.bible-preview-copyright').textContent = result.version.copyright;
         if (esvLink) esvLink.hidden = false;
+      } else if (result.provider === 'api-bible') {
+        preview.querySelector('.bible-preview-copyright').textContent = result.version.copyright + ' Provided by API.Bible.';
+        openLink.href = 'https://www.biblegateway.com/passage/?search=' + encodeURIComponent(reference) + '&version=' + encodeURIComponent(result.version.abbreviation);
+        openLink.textContent = 'Open passage on BibleGateway';
+        reportApiBibleView(result.fumsTokens);
       } else {
         preview.querySelector('.bible-preview-copyright').textContent = result.version.title + '. ' + result.version.copyright + (result.version.publisher ? ' ' + result.version.publisher : '') + ' Provided by YouVersion.';
         openLink.href = 'https://www.bible.com/search/bible?q=' + encodeURIComponent(reference);
