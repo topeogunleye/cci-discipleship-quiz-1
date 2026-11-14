@@ -114,7 +114,7 @@ async function checkRateLimit(request, env) {
     });
     const result = await limiterService.fetch(limiterRequest);
     if (result.status === 429) {
-      return { status: 'limited', retryAfter: result.headers.get('Retry-After') || '60' };
+      return { status: 'limited', retryAfter: result.headers.get('Retry-After') || '60', reason: result.headers.get('X-Bible-Limit-Reason') || 'rate-limit' };
     }
     return { status: result.ok ? 'allowed' : 'unavailable' };
   } catch (error) {
@@ -138,8 +138,8 @@ export async function onRequestGet(context) {
 
   const rateLimit = await checkRateLimit(request, env);
   if (rateLimit.status === 'limited') {
-    return jsonResponse({ error: 'Too many passage requests. Please try again later.' }, 429, {
-      'Retry-After': String(rateLimit.retryAfter)
+    return jsonResponse({ error: 'ESV previews are temporarily rate-limited. Please try again later.', source: 'app', reason: rateLimit.reason }, 429, {
+      'Retry-After': String(rateLimit.retryAfter), 'X-Bible-Limit-Source': 'app', 'Access-Control-Expose-Headers': 'Retry-After, X-Bible-Limit-Source'
     });
   }
   if (rateLimit.status === 'unavailable') {
@@ -170,7 +170,11 @@ export async function onRequestGet(context) {
     };
     if (controller) fetchOptions.signal = controller.signal;
     const response = await fetch(apiUrl.toString(), fetchOptions);
-    if (!response.ok) return jsonResponse({ error: 'The ESV passage could not be loaded.' }, response.status === 429 ? 503 : 502);
+    if (response.status === 429) return jsonResponse({ error: 'ESV previews are temporarily rate-limited. Please try again later.', source: 'provider' }, 429, {
+      'Retry-After': /^\d+$/.test(response.headers.get('Retry-After') || '') ? response.headers.get('Retry-After') : '60',
+      'X-Bible-Limit-Source': 'provider', 'Access-Control-Expose-Headers': 'Retry-After, X-Bible-Limit-Source'
+    });
+    if (!response.ok) return jsonResponse({ error: 'The ESV passage could not be loaded.' }, 502);
 
     const data = await response.json();
     const text = Array.isArray(data.passages)

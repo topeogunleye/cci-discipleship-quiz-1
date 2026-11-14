@@ -27,7 +27,7 @@ function passageIds(reference) {
 }
 async function upstream(path, key, fetcher) {
   const response = await fetcher(API + path, { headers: { 'X-YVP-App-Key': key, Accept: 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(8000) });
-  if (!response.ok) { const error = new Error('Bible service unavailable'); error.status = response.status; throw error; }
+  if (!response.ok) { const error = new Error('Bible service unavailable'); error.status = response.status; error.retryAfter = response.headers.get('Retry-After'); error.limitSource = 'provider'; throw error; }
   return response.json();
 }
 const CATALOG_TTL_MS = 60 * 60 * 1000;

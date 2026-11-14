@@ -20,7 +20,11 @@ export async function onRequestGet({ request, env }) {
       const reservation = await limiter.fetch(new Request('https://esv-rate-limiter.internal/check/apibible', {
         method: 'POST', headers: { 'X-ESV-Client-IP': ip }, signal: AbortSignal.timeout(5000)
       }));
-      if (!reservation.ok) { const error = new Error('Bible request limit'); error.status = reservation.status; throw error; }
+      if (!reservation.ok) {
+        const error = new Error('Bible request limit'); error.status = reservation.status;
+        error.retryAfter = reservation.headers.get('Retry-After'); error.limitSource = 'app';
+        error.limitReason = reservation.headers.get('X-Bible-Limit-Reason'); throw error;
+      }
       return fetch(url, options);
     };
     const cachedFetch = passageCache.createCachedFetch({
@@ -33,7 +37,12 @@ export async function onRequestGet({ request, env }) {
     headers.set('X-Bible-Cache', cacheStatuses.size > 1 ? 'MIXED' : [...cacheStatuses][0] || 'BYPASS');
     return reply(result, result.status || 200);
   } catch (error) {
-    if (error.status === 429) { headers.set('Retry-After', '60'); return reply({ error: 'Too many Bible requests. Please try again shortly.' }, 429); }
+    if (error.status === 429) {
+      headers.set('Retry-After', /^\d+$/.test(error.retryAfter || '') ? String(error.retryAfter) : '60');
+      headers.set('X-Bible-Limit-Source', error.limitSource || 'provider');
+      headers.set('Access-Control-Expose-Headers', 'Retry-After, X-Bible-Limit-Source');
+      return reply({ error: 'Bible previews are temporarily rate-limited. Please try again later.', source: error.limitSource || 'provider', reason: error.limitReason || 'rate-limit' }, 429);
+    }
     if ([403, 404].includes(error.status)) return reply({ error: 'This passage or translation is unavailable.' }, error.status);
     return reply({ error: 'Bible service unavailable. Please try again later.' }, 503);
   }

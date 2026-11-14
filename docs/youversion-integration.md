@@ -19,9 +19,9 @@ on YouVersion, except for displayed ESV text: its main button opens the exact
 passage on ESV.org, with a smaller YouVersion link for additional translations.
 Fallbacks link to the translation actually displayed. The current
 client uses the catalog only for saved-ID metadata, not to add picker options.
-Every non-AMP choice (NIV, NKJV, KJV, MSG and ESV) uses AMP as its only fallback
-for any loading failure, including missing text, provider errors, rate limits,
-network failures and timeouts.
+Previews try the selection, then ESV, then AMP, skipping editions already attempted.
+Missing text, provider errors, rate limits, network failures and timeouts all
+allow the next attempt. NKJV remains the default and saved preferences are preserved.
 Every passage uses one translation throughout. The UI shows
 the actual translation, publisher copyright, YouVersion link and an explicit
 fallback notice. Timeouts/rate limits do not trigger a catalog-wide request storm.
@@ -31,12 +31,12 @@ the edition's detailed metadata through the existing rate limiter. Unattributed
 text is not displayed. Resolved metadata shares the existing one-hour catalog TTL.
 
 The client requests `/api/bible` with `fallback=none` so the selected edition and
-the single AMP retry are controlled in one place across all three providers.
+the ESV/AMP attempts are controlled in one place across all three providers.
 Each attempt has a 20-second deadline; closing or switching cancels it without
 starting a fallback. Legacy callers without this parameter also get AMP as the
-only alternative. Direct AMP requests never substitute BSB, ASV, KJV or another
-edition. If AMP fails, the preview shows an unavailable notice and retains an
-external YouVersion reference link. Saved defaults remain unchanged. AMP text
+only server-side alternative. The client can fall back from a selected AMP to ESV,
+but never repeats AMP. If every attempt fails, the preview shows an unavailable
+notice and retains an external YouVersion reference link. Saved defaults remain unchanged. AMP text
 uses its own copyright and passage links. Strict, fallback, NKJV and AMP passage
 responses are `no-store`, including URLs distinct from older cached substitutions.
 
@@ -85,9 +85,11 @@ preview, hash routing, cloud sync and security changes. It reuses the existing
 private `ESV_RATE_LIMITER` service binding for every outgoing YouVersion and ESV
 request. Each provider has its own per-IP limit key and its own upstream budget
 (`/check/esv` and `/check/youversion`), so heavy use of one cannot exhaust the
-other. The ESV budget stays below the ESV API's published 5,000/day and 1,000/hour
-limits (4,000 per rolling day and 900 per clock hour); budgets are kept as hourly
-counters in the Durable Object rather than one entry per request. Missing or failed
+other. ESV budgets are 55/minute, 900/hour and 4,500/day. The account owner's
+YouVersion dashboard shows 10,000/hour; the app uses 9,000 per rolling hour without
+an artificial daily cap. Counters use bounded second/minute/hour buckets in the
+Durable Object, including conservative migration of existing usage. See
+[provider budgets and operations](provider-budgets.md). Missing or failed
 rate-limit protection fails closed. Preview deployments therefore need the
 YouVersion secret, the ESV key and the service binding. No new secret is introduced
 for the limiter, and no existing security control is disabled.

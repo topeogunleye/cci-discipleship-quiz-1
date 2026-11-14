@@ -268,7 +268,7 @@ test('saved profiles and backups retain old and new translation IDs and study pr
   }
 });
 
-test('NKJV failures request Amplified once and never substitute a different translation', async () => {
+test('NKJV failures request ESV first without changing the saved preference', async () => {
   for (const outcome of [403, 404, 429, 503, 'network', 'empty', 'wrong-version']) {
     const urls = [];
     const { api } = ui(async url => {
@@ -278,13 +278,13 @@ test('NKJV failures request Amplified once and never substitute a different tran
         if (outcome === 'network') throw new TypeError('Offline');
         return json({ text: outcome === 'empty' ? '' : 'Synthetic ASV', provider: 'api-bible', version: { abbreviation: 'ASV' } });
       }
-      return json({ text: 'Synthetic AMP', version: { id: '1588', abbreviation: 'AMP' } });
+      return json({ text: 'Synthetic ESV' });
     });
     const result = await api.request('John 3:16', 'NKJV', new AbortController().signal);
-    assert.equal(result.version.abbreviation, 'AMP', String(outcome));
+    assert.equal(result.version.abbreviation, 'ESV', String(outcome));
     assert.equal(result.fallback, true);
     assert.equal(urls.length, 2);
-    assert.match(urls[1], /\/api\/bible.*version=1588/);
+    assert.match(urls[1], /\/api\/esv-passage/);
     assert.equal(api.state.settings.bibleVersion, 'APIBIBLE_NKJV');
   }
 });
@@ -294,13 +294,14 @@ test('failed or substituted AMP fallback leaves NKJV unavailable; cancellation n
     const urls = [];
     const { api } = ui(async url => {
       urls.push(url);
+      if (url.includes('/api/esv-passage')) return new Response(null, { status: 503 });
       if (url.includes('version=APIBIBLE_NKJV') || outcome === 'denied') return new Response(null, { status: 403 });
       return json({ text: 'Synthetic BSB', fallback: true, version: { abbreviation: 'BSB' } });
     });
     await assert.rejects(api.request('John 3:16', 'APIBIBLE_NKJV', new AbortController().signal));
-    assert.equal(urls.length, 2);
+    assert.equal(urls.length, 3);
     assert.match(urls[0], /\/api\/api-bible.*version=APIBIBLE_NKJV/);
-    assert.match(urls[1], /\/api\/bible.*version=1588/);
+    assert.match(urls[2], /\/api\/bible.*version=1588/);
   }
   const controller = new AbortController();
   let calls = 0;
@@ -309,7 +310,7 @@ test('failed or substituted AMP fallback leaves NKJV unavailable; cancellation n
   assert.equal(calls, 1);
 });
 
-test('every offered non-AMP translation uses exactly one AMP attempt for any loading failure', async () => {
+test('each selection tries ESV once then AMP, except a rate-limited YouVersion provider is not retried', async () => {
   for (const version of ['APIBIBLE_NKJV', 'APIBIBLE_KJV', 'APIBIBLE_MSG', '111', 'ESV', '1', '97', '113', '59']) {
     for (const outcome of [403, 404, 429, 503, 'network', 'empty', 'invalid-json']) {
       const urls = [];
@@ -322,19 +323,24 @@ test('every offered non-AMP translation uses exactly one AMP attempt for any loa
         return json({ text: '' });
       });
       api.state.settings.bibleVersion = version;
+      if (outcome === 429 && ['111', '1', '97', '113'].includes(version)) {
+        await assert.rejects(api.request('John 3:16', version, new AbortController().signal));
+        assert.equal(urls.length, 2, 'do not retry AMP through the same limited provider');
+        continue;
+      }
       const result = await api.request('John 3:16', version, new AbortController().signal);
       assert.equal(result.version.abbreviation, 'AMP', version + ': ' + outcome);
       assert.equal(result.version.copyright, 'AMP publisher notice');
       assert.equal(result.url, 'https://www.bible.com/bible/1588/JHN.3.16');
       assert.equal(result.fallback, true);
-      assert.equal(urls.length, 2);
-      assert.match(urls[1], /version=1588&fallback=none$/);
+      assert.equal(urls.length, ['ESV', '59'].includes(version) ? 2 : 3);
+      assert.match(urls.at(-1), /version=1588&fallback=none$/);
       assert.equal(api.state.settings.bibleVersion, version);
     }
   }
 });
 
-test('AMP failure stops without another translation, even if a stale response claims the AMP ID', async () => {
+test('AMP is not repeated and mislabeled AMP text is rejected after the ESV attempt', async () => {
   for (const version of ['1588', 'APIBIBLE_KJV', 'APIBIBLE_MSG', '111', 'ESV']) {
     const urls = [];
     const { api } = ui(async url => {
@@ -344,7 +350,7 @@ test('AMP failure stops without another translation, even if a stale response cl
         : new Response(null, { status: 503 });
     });
     await assert.rejects(api.request('John 3:16', version, new AbortController().signal));
-    assert.equal(urls.length, version === '1588' ? 1 : 2);
+    assert.equal(urls.length, ['1588', 'ESV'].includes(version) ? 2 : 3);
   }
 });
 
@@ -360,9 +366,11 @@ test('a selected-translation timeout leaves AMP a fresh loading attempt', async 
     h.window.clearTimeout = callback => timers.delete(callback);
     const pending = h.api.request('John 3:16', version, new AbortController().signal);
     [...timers][0]();
+    await new Promise(resolve => setImmediate(resolve));
+    if (version !== 'ESV') [...timers][0]();
     const result = await pending;
     assert.equal(result.version.abbreviation, 'AMP');
-    assert.equal(urls.length, 2);
+    assert.equal(urls.length, version === 'ESV' ? 2 : 3);
     assert.equal(timers.size, 0);
   }
 });
@@ -378,37 +386,38 @@ test('closing during AMP loading aborts it without trying another translation', 
   await new Promise(resolve => setImmediate(resolve));
   controller.abort();
   await assert.rejects(pending);
-  assert.equal(urls.length, 2);
+  assert.equal(urls.length, 3);
 });
 
 test('API.Bible failure uses a labelled fallback; aborted requests do not issue fallback requests', async () => {
   const urls = [];
   const { api } = ui(async url => {
     urls.push(url);
-    return url.includes('/api/api-bible') ? new Response(null, { status: 429 }) : json({ text: 'Synthetic AMP', version: { abbreviation: 'AMP' } });
+    return url.includes('/api/api-bible') ? new Response(null, { status: 429 }) : json({ text: 'Synthetic ESV' });
   });
   const result = await api.request('John 3:16', 'APIBIBLE_MSG', new AbortController().signal);
   assert.equal(result.fallback, true);
-  assert.equal(result.version.abbreviation, 'AMP');
+  assert.equal(result.version.abbreviation, 'ESV');
   assert.equal(urls.length, 2);
   const controller = new AbortController(); controller.abort();
   await assert.rejects(api.request('John 3:16', 'APIBIBLE_MSG', controller.signal));
-  assert.equal(urls.length, 3);
+  assert.equal(urls.length, 2);
 });
 
-test('unavailable or substituted YouVersion text uses only AMP as its backup', async () => {
+test('unavailable or substituted YouVersion text tries ESV before AMP', async () => {
   for (const outcome of ['missing', 'fallback']) {
     const urls = [];
     const { api } = ui(async url => {
       urls.push(url);
+      if (url.includes('/api/esv-passage')) return new Response(null, { status: 503 });
       if (url.includes('version=1588')) return json({ text: 'Synthetic AMP', version: { abbreviation: 'AMP' } });
       return outcome === 'missing' ? new Response(null, { status: 503 }) : json({ text: 'Synthetic BSB', fallback: true, version: { abbreviation: 'BSB' } });
     });
     const result = await api.request('John 3:16', 'ASV', new AbortController().signal);
     assert.equal(result.version.abbreviation, 'AMP');
     assert.equal(result.fallback, true);
-    assert.equal(urls.length, 2);
-    assert.match(urls[1], /version=1588&fallback=none/);
+    assert.equal(urls.length, 3);
+    assert.match(urls[2], /version=1588&fallback=none/);
   }
 });
 
@@ -456,6 +465,7 @@ test('display tracking queues each displayed passage token and loads the officia
 test('rendered preview shows API.Bible attribution, correct link and fallback labels without changing saved default', async () => {
   let fail = false;
   const h = ui(async url => {
+    if (url.includes('/api/esv-passage')) return new Response(null, { status: 503 });
     if (url.includes('/api/api-bible')) return fail ? new Response(null, { status: 403 }) : json({
       text: 'Synthetic MSG text', provider: 'api-bible', version: { abbreviation: 'MSG', copyright: 'Publisher copyright' }, fumsTokens: ['displayed-token'], url: 'https://www.bible.com/bible/97/JHN.3.16'
     });
@@ -485,6 +495,7 @@ test('NKJV preview displays the actual translation, copyright, link and view tra
   for (const savedId of ['APIBIBLE_NKJV', 'NKJV', '114']) {
     let unavailable = false, ampUnavailable = false;
     const h = ui(async url => {
+      if (url.includes('/api/esv-passage')) return new Response(null, { status: 503 });
       const version = new URL(url, 'https://study.example').searchParams.get('version');
       if (!version) return json({ versions: [] });
       if ((version === 'APIBIBLE_NKJV' && unavailable) || ampUnavailable) return new Response(null, { status: 403 });

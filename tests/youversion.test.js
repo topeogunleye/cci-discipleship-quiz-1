@@ -335,6 +335,8 @@ test('preview timeout replaces the loading state with a retry message', async ()
   await flush();
   h.timers.get(20000)();
   await flush();
+  h.timers.get(20000)();
+  await flush();
   assert.match(h.nodes['.bible-preview-fallback'].textContent, /took too long/);
 });
 

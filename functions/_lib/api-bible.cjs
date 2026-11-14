@@ -30,6 +30,8 @@ async function upstream(path, key, fetcher) {
   if (!response.ok) {
     const error = new Error('Bible service unavailable');
     error.status = response.status;
+    error.retryAfter = response.headers.get('Retry-After');
+    error.limitSource = 'provider';
     throw error;
   }
   return response.json();

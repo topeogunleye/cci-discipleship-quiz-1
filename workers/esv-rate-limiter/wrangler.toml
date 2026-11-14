@@ -4,6 +4,11 @@ compatibility_date = "2026-11-03"
 workers_dev = false
 preview_urls = false
 
+[vars]
+APIBIBLE_BILLING_RESET_DAY = "13"
+APIBIBLE_INITIAL_CYCLE_START = "2026-11-13T00:00:00Z"
+APIBIBLE_INITIAL_USAGE = "155"
+
 [[ratelimits]]
 name = "ESV_RATE_LIMITER"
 namespace_id = "846209317"

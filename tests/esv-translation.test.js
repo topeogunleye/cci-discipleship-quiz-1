@@ -76,6 +76,8 @@ test('YouVersion requests reserve quota from their own scope', async () => {
 
 function previewUi(fetcher) {
   const listeners = {}, timers = new Map();
+  const clock = { now: Date.now() };
+  class ClockDate extends Date { static now() { return clock.now; } }
   const elements = { app: {}, modal: {}, toast: {} };
   const window = { DeckParser: require('../js/parser.js'), StudyStorage: require('../js/storage.js'),
     setTimeout: (fn, ms) => { timers.set(ms, fn); return ms; }, clearTimeout: id => timers.delete(id),
@@ -89,7 +91,7 @@ function previewUi(fetcher) {
       activate: function(link, preview) { activeBiblePreview = {link:link,preview:preview}; },
       cancel: function() { biblePreviewRequest.controller.abort(); biblePreviewRequest = null; activeBiblePreview = null; } };
   `);
-  vm.runInNewContext(source, { window, document, URL, AbortController, fetch: fetcher });
+  vm.runInNewContext(source, { window, document, URL, AbortController, fetch: fetcher, Date: ClockDate });
   const nodes = {
     '[data-bible-version]': { value: 'ASV', textContent: '', hidden: false },
     '.bible-preview-version': { textContent: '' }, '.bible-preview-notice': { textContent: '' }, '.bible-preview-copyright': { textContent: '' },
@@ -99,7 +101,7 @@ function previewUi(fetcher) {
   };
   const preview = { querySelector: key => nodes[key] }, link = { textContent: 'John 3:16' };
   window.ui.activate(link, preview);
-  return { ui: window.ui, nodes, preview, link, timers, change: target => listeners.change.forEach(fn => fn({ target })) };
+  return { ui: window.ui, nodes, preview, link, timers, advance: ms => { clock.now += ms; }, change: target => listeners.change.forEach(fn => fn({ target })) };
 }
 
 test('ESV is offered in the preview and Settings dropdown and can be saved as the default', () => {
@@ -250,7 +252,7 @@ for (const [label, esvReply] of [
     assert.match(urls[1], /\/api\/bible\?q=John%203%3A16&version=1588&fallback=none$/);
     assert.equal(h.nodes['.bible-preview-text'].textContent, 'AMP fixture');
     assert.equal(h.nodes['.bible-preview-version'].textContent, 'AMP');
-    assert.equal(h.nodes['.bible-preview-notice'].textContent, 'ESV unavailable — showing Amplified (AMP). Your saved default is unchanged.');
+    assert.equal(h.nodes['.bible-preview-notice'].textContent, 'ESV ' + (label === 'a rate-limit' ? 'temporarily rate-limited' : 'unavailable') + ' — showing Amplified (AMP). Your saved default is unchanged.');
     assert.match(h.nodes['.bible-preview-copyright'].textContent, /AMP publisher notice/);
     assert.equal(h.nodes['.bible-preview-esv-link'].hidden, true, 'the ESV notice is only shown with ESV text');
     assert.equal(h.nodes['.bible-preview-youversion-link'].hidden, true, 'a fallback has just its actual translation link');
@@ -259,6 +261,57 @@ for (const [label, esvReply] of [
     assert.equal(h.ui.state.settings.bibleVersion, 'APIBIBLE_NKJV');
   });
 }
+
+test('NKJV rate limiting shows ESV attribution and ESV links, and provider cooldown avoids repeated API calls', async () => {
+  const urls = [];
+  const h = previewUi(async url => {
+    urls.push(url);
+    if (url.includes('/esv-passage')) return response({ text: 'Synthetic ESV fixture' });
+    if (url.includes('/api-bible')) return new Response(null, { status: 429, headers: { 'Retry-After': '3600' } });
+    assert.fail('AMP should not be requested when ESV loads');
+  });
+  h.ui.state.settings.bibleVersion = '114';
+  h.ui.load(h.link, h.preview, '114'); await flush();
+  assert.equal(h.nodes['.bible-preview-version'].textContent, 'ESV');
+  assert.equal(h.nodes['.bible-preview-notice'].textContent, 'NKJV temporarily rate-limited — showing ESV. Your saved default is unchanged.');
+  assert.match(h.nodes['.bible-preview-copyright'].textContent, /Crossway/);
+  assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.esv.org/John+3:16/');
+  assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open passage on ESV');
+  assert.equal(h.nodes['.bible-preview-youversion-link'].hidden, false);
+  h.ui.load(h.link, h.preview, 'APIBIBLE_MSG'); await flush();
+  assert.equal(urls.filter(url => url.includes('/api-bible')).length, 1, 'MSG shares API.Bible cooldown with NKJV');
+  assert.equal(h.nodes['.bible-preview-version'].textContent, 'ESV');
+  assert.equal(h.ui.state.settings.bibleVersion, '114');
+});
+
+test('a selected AMP failure tries ESV once and never repeats AMP', async () => {
+  const urls = [];
+  const h = previewUi(async url => {
+    urls.push(url);
+    return url.includes('/esv-passage') ? response({ text: 'Synthetic ESV fixture' }) : new Response(null, { status: 503 });
+  });
+  h.ui.load(h.link, h.preview, '1588'); await flush();
+  assert.equal(h.nodes['.bible-preview-version'].textContent, 'ESV');
+  assert.equal(urls.length, 2);
+  assert.match(h.nodes['.bible-preview-notice'].textContent, /AMP unavailable — showing ESV/);
+});
+
+test('provider cooldown expires at Retry-After and does not block other providers', async () => {
+  let requests = 0;
+  const h = previewUi(async url => {
+    if (url.includes('/esv-passage')) return response({ text: 'Synthetic ESV fixture' });
+    requests++;
+    return new Response(null, { status: 429, headers: { 'Retry-After': '2' } });
+  });
+  // A clock is injected into the VM rather than waiting or contacting a real API.
+  h.ui.load(h.link, h.preview, 'APIBIBLE_NKJV'); await flush();
+  h.ui.load(h.link, h.preview, 'APIBIBLE_MSG'); await flush();
+  assert.equal(requests, 1);
+  assert.equal(h.nodes['.bible-preview-version'].textContent, 'ESV');
+  h.advance(2001);
+  h.ui.load(h.link, h.preview, 'APIBIBLE_KJV'); await flush();
+  assert.equal(requests, 2);
+});
 
 test('if both ESV and the AMP fallback fail, the preview shows the unavailable message', async () => {
   const h = previewUi(async () => response({ error: 'down' }, 503));

@@ -23,6 +23,8 @@ export async function onRequestGet({ request, env }) {
       if (!reservation.ok) {
         const error = new Error('Bible request limit');
         error.status = reservation.status;
+        error.retryAfter = reservation.headers.get('Retry-After'); error.limitSource = 'app';
+        error.limitReason = reservation.headers.get('X-Bible-Limit-Reason');
         throw error;
       }
       return fetch(url, options);
@@ -41,7 +43,12 @@ export async function onRequestGet({ request, env }) {
     }
     return reply(result, status);
   } catch (error) {
-    if (error.status === 429) { headers.set('Retry-After', '60'); return reply({ error: 'Too many Bible requests. Please try again shortly.' }, 429); }
+    if (error.status === 429) {
+      headers.set('Retry-After', /^\d+$/.test(error.retryAfter || '') ? String(error.retryAfter) : '60');
+      headers.set('X-Bible-Limit-Source', error.limitSource || 'provider');
+      headers.set('Access-Control-Expose-Headers', 'Retry-After, X-Bible-Limit-Source');
+      return reply({ error: 'Bible previews are temporarily rate-limited. Please try again later.', source: error.limitSource || 'provider', reason: error.limitReason || 'rate-limit' }, 429);
+    }
     return reply({ error: 'Bible service unavailable. Please try again later.' }, 503);
   }
 }

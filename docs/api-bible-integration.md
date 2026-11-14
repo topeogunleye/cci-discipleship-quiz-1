@@ -58,24 +58,27 @@ on YouVersion and the ESV-only secondary link is hidden. Web displays report
 the returned FUMS tokens through the official tracker, loaded only when API.Bible
 text is displayed. No account ID or learner details are supplied to the tracker.
 The CSP permits only the additional tracker script and its reporting endpoint.
-If any non-AMP selection fails, the preview requests YouVersion AMP (Amplified
-Bible, ID 1588) once and names the selected version in the notice, for example:
-"MSG unavailable — showing Amplified (AMP). Your saved default is unchanged."
-Both responses must match the requested translation. If AMP also fails, the preview
-shows an unavailable state; it does not silently substitute ASV or another version.
-Each attempt has its own 20-second timeout, so a timeout also allows the AMP retry.
-Closing or superseding a request never starts a fallback. The same AMP-only rule
-applies to NKJV, KJV, MSG, NIV and ESV; if AMP fails the unavailable preview retains
-its external YouVersion reference link. The saved preference remains unchanged
-in every case. Passage responses without publisher attribution
+Previews try the selected translation, then ESV, then AMP (YouVersion ID 1588),
+skipping editions already attempted. The initial default stays NKJV and saved
+preferences remain unchanged. Every attempt has a separate 20-second deadline;
+closing or switching cancels the chain. Notices name the actual edition, including
+"NKJV temporarily rate-limited — showing ESV. Your saved default is unchanged."
+ESV text always uses Crossway attribution and the ESV.org main link. If all
+attempts fail, the unavailable preview retains its external YouVersion reference
+link. `Retry-After` prevents repeat calls to a throttled provider in that browser
+session, including another translation that uses the same provider.
+Passage responses without publisher attribution
 are rejected rather than displayed.
 
 Deploy the private rate-limiter Worker before the Pages Function. The existing
 main deployment workflow already uses that order. The new `/check/apibible` scope
 isolates API.Bible usage from ESV and YouVersion, limits individual clients, and
-reserves quota for every upstream catalog or content call. Its conservative
-budget is 150 calls per rolling day and 30 per hour (at most 4,650 calls over 31
-days for this deployment). API.Bible also enforces the account's monthly quota;
+reserves quota for every upstream catalog or content call. API.Bible's app budget
+is 4,500 per billing month, leaving 500 of the 5,000-call allowance in reserve.
+The reset date is the 13th at 00:00 UTC and initial November 2026 usage is 155,
+as confirmed by the account owner. Persistent counters survive deployments.
+There is no fixed API.Bible daily/hourly budget; per-client burst protection stays.
+See [provider budgets and operations](provider-budgets.md). API.Bible also enforces the account's monthly quota;
 other apps sharing the key consume that allowance independently.
 
 Before rollout, verify a real passage for each of KJV, NKJV and MSG, its copyright,
