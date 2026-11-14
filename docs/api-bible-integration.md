@@ -43,8 +43,11 @@ results from one translation. No partial passage is shown after a failed request
 
 The preview displays the returned publisher copyright and API.Bible attribution,
 and offers a YouVersion passage link, including separate links for multipart
-references. ESV retains its required Crossway copyright link alongside the primary
-YouVersion action. Web displays report
+references. When ESV text is actually displayed, the primary button instead opens
+that passage on ESV.org and a smaller "More translations on YouVersion" link stays
+available. Crossway attribution and its copyright link remain visible. If ESV
+falls back to another translation, the primary button follows the displayed text
+on YouVersion and the ESV-only secondary link is hidden. Web displays report
 the returned FUMS tokens through the official tracker, loaded only when API.Bible
 text is displayed. No account ID or learner details are supplied to the tracker.
 The CSP permits only the additional tracker script and its reporting endpoint.

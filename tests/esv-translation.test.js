@@ -93,7 +93,8 @@ function previewUi(fetcher) {
     '[data-bible-version]': { value: 'ASV', textContent: '', hidden: false },
     '.bible-preview-version': { textContent: '' }, '.bible-preview-notice': { textContent: '' }, '.bible-preview-copyright': { textContent: '' },
     '.bible-preview-open': { href: '', textContent: 'Open passage on YouVersion' }, '.bible-preview-text': { textContent: '', hidden: true },
-    '.bible-preview-fallback': { textContent: '', hidden: false }, '.bible-preview-esv-link': { hidden: true }
+    '.bible-preview-fallback': { textContent: '', hidden: false }, '.bible-preview-esv-link': { hidden: true },
+    '.bible-preview-youversion-link': { href: '', hidden: true }
   };
   const preview = { querySelector: key => nodes[key] }, link = { textContent: 'John 3:16' };
   window.ui.activate(link, preview);
@@ -115,7 +116,7 @@ test('ESV is offered in the preview and Settings dropdown and can be saved as th
   assert.equal(h.ui.state.settings.bibleVersion, 'ESV');
 });
 
-test('choosing ESV keeps Crossway attribution and offers the primary passage link on YouVersion', async () => {
+test('displayed ESV has a primary ESV passage button and a secondary YouVersion link', async () => {
   const urls = [];
   const h = previewUi(async url => { urls.push(url); return response({ text: 'For God so loved the world. (ESV)' }); });
   h.change({ dataset: { bibleVersion: 'preview' }, value: 'ESV' });
@@ -127,8 +128,10 @@ test('choosing ESV keeps Crossway attribution and offers the primary passage lin
   assert.match(h.nodes['.bible-preview-copyright'].textContent, /ESV® Bible.*Crossway.*Used by permission/);
   assert.equal(h.nodes['.bible-preview-notice'].textContent, '');
   assert.equal(h.nodes['.bible-preview-esv-link'].hidden, false);
-  assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.bible.com/search/bible?q=John%203%3A16');
-  assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open passage on YouVersion');
+  assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.esv.org/John+3:16/');
+  assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open passage on ESV');
+  assert.equal(h.nodes['.bible-preview-youversion-link'].hidden, false);
+  assert.equal(h.nodes['.bible-preview-youversion-link'].href, 'https://www.bible.com/search/bible?q=John%203%3A16');
   assert.equal(h.ui.state.settings.bibleVersion, 'APIBIBLE_NKJV', 'a preview choice does not change the saved default');
 });
 
@@ -142,6 +145,19 @@ test('reopening an ESV passage uses the in-memory copy instead of another API re
   assert.equal(requests, 1);
   assert.equal(h.nodes['.bible-preview-text'].textContent, 'Fixture (ESV)');
   assert.equal(h.nodes['.bible-preview-esv-link'].hidden, false);
+});
+
+test('ESV external links follow the current reference, including books with spaces and verse ranges', async () => {
+  const h = previewUi(async () => response({ text: 'Synthetic ESV' }));
+  h.link.textContent = '1 Corinthians 13:4–7';
+  h.ui.load(h.link, h.preview, 'ESV');
+  await flush();
+  assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.esv.org/1+Corinthians+13:4-7/');
+  assert.equal(h.nodes['.bible-preview-youversion-link'].href, 'https://www.bible.com/search/bible?q=1%20Corinthians%2013%3A4%E2%80%937');
+  h.link.textContent = 'Jude 24–25';
+  h.ui.load(h.link, h.preview, 'ESV');
+  await flush();
+  assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.esv.org/Jude+24-25/');
 });
 
 test('legacy YouVersion ESV preferences use Crossway while keeping the saved ID', async () => {
@@ -236,6 +252,7 @@ for (const [label, esvReply] of [
     assert.equal(h.nodes['.bible-preview-notice'].textContent, 'ESV unavailable — showing ASV. Your saved default is unchanged.');
     assert.match(h.nodes['.bible-preview-copyright'].textContent, /Public domain\./);
     assert.equal(h.nodes['.bible-preview-esv-link'].hidden, true, 'the ESV notice is only shown with ESV text');
+    assert.equal(h.nodes['.bible-preview-youversion-link'].hidden, true, 'a fallback has just its actual translation link');
     assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/12/JHN.3.16');
     assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open passage on YouVersion');
     assert.equal(h.ui.state.settings.bibleVersion, 'APIBIBLE_NKJV');
@@ -249,6 +266,7 @@ test('if both ESV and the ASV fallback fail, the preview shows the unavailable m
   assert.equal(h.nodes['.bible-preview-version'].textContent, 'Unavailable');
   assert.match(h.nodes['.bible-preview-fallback'].textContent, /unavailable/i);
   assert.equal(h.nodes['.bible-preview-esv-link'].hidden, true);
+  assert.equal(h.nodes['.bible-preview-youversion-link'].hidden, true);
 });
 
 test('switching away from ESV restores the YouVersion link and hides the ESV notice', async () => {
@@ -258,9 +276,11 @@ test('switching away from ESV restores the YouVersion link and hides the ESV not
   h.ui.load(h.link, h.preview, 'ESV');
   await flush();
   assert.equal(h.nodes['.bible-preview-esv-link'].hidden, false);
+  assert.equal(h.nodes['.bible-preview-youversion-link'].hidden, false);
   h.ui.load(h.link, h.preview, '1');
   await flush();
   assert.equal(h.nodes['.bible-preview-esv-link'].hidden, true);
+  assert.equal(h.nodes['.bible-preview-youversion-link'].hidden, true);
   assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open passage on YouVersion');
   assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/1/JHN.3.16');
 });

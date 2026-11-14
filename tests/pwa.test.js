@@ -26,7 +26,7 @@ test('web app manifest declares standalone install metadata and valid icon asset
 test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
   const serviceWorker = read('service-worker.js');
   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v64'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v65'/);
   assert.match(serviceWorker, /decks\/manifest\.json/);
   assert.match(serviceWorker, /content\/devotionals\.json/);
   assert.match(serviceWorker, /content\/lesson-transcripts\.json/);
@@ -57,7 +57,8 @@ test('activation deletes previous app caches and deck assets absent from the cur
     [url('settings.json'), {}]
   ]);
   const cacheStore = new Map([
-    ['cci-study-pwa-v64', activeEntries],
+    ['cci-study-pwa-v65', activeEntries],
+    ['cci-study-pwa-v64', new Map()],
     ['cci-study-pwa-v63', new Map()],
     ['cci-study-pwa-v62', new Map()],
     ['cci-study-pwa-v61', new Map()],
@@ -108,7 +109,8 @@ test('activation deletes previous app caches and deck assets absent from the cur
 
   assert.equal(cacheStore.has('cci-study-pwa-v50'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v51'), false);
-  assert.equal(cacheStore.has('cci-study-pwa-v64'), true);
+  assert.equal(cacheStore.has('cci-study-pwa-v65'), true);
+  assert.equal(cacheStore.has('cci-study-pwa-v64'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v63'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v62'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v61'), false);
@@ -262,7 +264,7 @@ test('standalone dist package includes all PWA runtime assets', () => {
   assert.match(html, /<script src="js\/supabase\.bundle\.js"><\/script>/);
   assert.match(html, /rel="manifest" href="manifest\.webmanifest"/);
   const worker = fs.readFileSync(path.join(dist, 'service-worker.js'), 'utf8');
-  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v64'/);
+  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v65'/);
   const coreBlock = worker.match(/const CORE_FILES = \[([\s\S]*?)\];/);
   assert.ok(coreBlock, 'Service worker defines its core precache files');
   const coreFiles = Array.from(coreBlock[1].matchAll(/'([^']+)'/g), match => match[1]);

@@ -14,8 +14,10 @@ in the YouVersion portal yourself, then verify the catalog with your App Key.
 Settings saves a default per local learner profile, included in existing backups.
 NKJV is the initial preference. Settings and previews offer just AMP, NIV, NKJV,
 KJV, MSG and ESV, without a search field. A verse preview's selection resets on
-reopening and never changes the saved default. All primary external passage links
-open on YouVersion, where learners can select additional translations. The current
+reopening and never changes the saved default. Primary external passage links open
+on YouVersion, except for displayed ESV text: its main button opens the exact
+passage on ESV.org, with a smaller YouVersion link for additional translations.
+Fallbacks link to the translation actually displayed. The current
 client uses the catalog only for saved-ID metadata, not to add picker options.
 If the preference is absent or the passage returns 403/404, the service tries
 available alternatives, favoring NKJV, KJV, BSB, then WEBUS. It makes at most three

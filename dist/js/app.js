@@ -36,6 +36,7 @@
           '<a class="bible-preview-esv-link meta" href="https://www.esv.org/" target="_blank" rel="noopener noreferrer" hidden>ESV.org</a>' +
           '<span class="bible-preview-fallback" id="' + messageId + '" role="status"></span>' +
           '<a class="btn sm primary bible-preview-open" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">Open passage on YouVersion</a>' +
+          '<a class="bible-preview-youversion-link meta" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" hidden>More translations on YouVersion</a>' +
           '<span class="bible-preview-parts" hidden></span></span>' +
         '</span>' +
       '</span>';
@@ -167,6 +168,9 @@
   function apiBase() { return account ? account.apiBase : (window.CCI_API_BASE || (Account && Account.DEFAULT_API_BASE) || ''); }
   function bibleApiUrl() { return apiBase() + '/api/bible'; }
   function esvApiUrl() { return apiBase() + '/api/esv-passage'; }
+  function esvPassageLink(reference) {
+    return 'https://www.esv.org/' + encodeURIComponent(reference.replace(/[–—]/g, '-')).replace(/%20/g, '+').replace(/%3A/gi, ':') + '/';
+  }
   var ESV_COPYRIGHT = 'Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.';
   // ESV terms allow caching at most 500 verses. Keep a small per-session, in-memory copy
   // (never persisted) so reopening a passage does not spend ESV API quota.
@@ -336,11 +340,13 @@
     preview.querySelector('.bible-preview-notice').textContent = '';
     preview.querySelector('.bible-preview-copyright').textContent = '';
     var openLink = preview.querySelector('.bible-preview-open'), esvLink = preview.querySelector('.bible-preview-esv-link');
+    var youVersionLink = preview.querySelector('.bible-preview-youversion-link');
     var parts = preview.querySelector('.bible-preview-parts');
     if (parts) { parts.innerHTML = ''; parts.hidden = true; }
     if (esvLink) esvLink.hidden = true;
     openLink.href = 'https://www.bible.com/search/bible?q=' + encodeURIComponent(reference);
     openLink.textContent = 'Open passage on YouVersion';
+    if (youVersionLink) { youVersionLink.hidden = true; youVersionLink.href = openLink.href; }
     var controller = new AbortController();
     var request = { id: ++biblePreviewRequestSequence, controller: controller, link: link, preview: preview };
     biblePreviewRequest = request;
@@ -354,19 +360,24 @@
       if (result.provider === 'esv') {
         preview.querySelector('.bible-preview-copyright').textContent = result.version.copyright;
         if (esvLink) esvLink.hidden = false;
+        openLink.href = esvPassageLink(reference);
+        openLink.textContent = 'Open passage on ESV';
+        if (youVersionLink) youVersionLink.hidden = false;
       } else if (result.provider === 'api-bible') {
         preview.querySelector('.bible-preview-copyright').textContent = (result.version.coverage ? result.version.coverage + '. ' : '') + result.version.copyright + ' Provided by API.Bible.';
         reportApiBibleView(result.fumsTokens);
       } else {
         preview.querySelector('.bible-preview-copyright').textContent = result.version.title + '. ' + result.version.copyright + (result.version.publisher ? ' ' + result.version.publisher : '') + ' Provided by YouVersion.';
       }
-      if (/^https:\/\/www\.bible\.com\/bible\/[0-9]+\//.test(result.url || '')) openLink.href = result.url;
-      var links = (result.links || []).filter(function (part) { return /^https:\/\/www\.bible\.com\/bible\/[0-9]+\//.test(part.url || '') && part.label; });
-      if (links.length > 1 && parts) {
-        openLink.href = links[0].url;
-        openLink.textContent = 'Open ' + links[0].label + ' on YouVersion';
-        parts.innerHTML = links.slice(1).map(function (part) { return '<a class="btn sm primary" href="' + esc(part.url) + '" target="_blank" rel="noopener noreferrer">Open ' + esc(part.label) + ' on YouVersion</a>'; }).join('');
-        parts.hidden = false;
+      if (result.provider !== 'esv') {
+        if (/^https:\/\/www\.bible\.com\/bible\/[0-9]+\//.test(result.url || '')) openLink.href = result.url;
+        var links = (result.links || []).filter(function (part) { return /^https:\/\/www\.bible\.com\/bible\/[0-9]+\//.test(part.url || '') && part.label; });
+        if (links.length > 1 && parts) {
+          openLink.href = links[0].url;
+          openLink.textContent = 'Open ' + links[0].label + ' on YouVersion';
+          parts.innerHTML = links.slice(1).map(function (part) { return '<a class="btn sm primary" href="' + esc(part.url) + '" target="_blank" rel="noopener noreferrer">Open ' + esc(part.label) + ' on YouVersion</a>'; }).join('');
+          parts.hidden = false;
+        }
       }
       positionBiblePreview(link, preview);
     }).catch(function (error) {
