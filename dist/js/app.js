@@ -225,8 +225,8 @@
     if (requestedVersion && bibleTranslationKey(requestedVersion.abbreviation) === 'NKJV') {
       return fromApiBible('APIBIBLE_NKJV').catch(function (error) {
         if (signal && signal.aborted) throw error;
-        return fromApiBible('APIBIBLE_KJV').then(function (result) {
-          result.fallback = true;
+        return fromYouVersion('1588', true).then(function (result) {
+          if (bibleTranslationKey(result.version.abbreviation) !== 'AMP') throw biblePassageError({ status: 404 });
           return result;
         });
       });

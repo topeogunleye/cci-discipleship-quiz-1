@@ -268,7 +268,7 @@ test('saved profiles and backups retain old and new translation IDs and study pr
   }
 });
 
-test('NKJV failures request KJV once and never substitute a different translation', async () => {
+test('NKJV failures request Amplified once and never substitute a different translation', async () => {
   for (const outcome of [403, 404, 429, 503, 'network', 'empty', 'wrong-version']) {
     const urls = [];
     const { api } = ui(async url => {
@@ -278,28 +278,29 @@ test('NKJV failures request KJV once and never substitute a different translatio
         if (outcome === 'network') throw new TypeError('Offline');
         return json({ text: outcome === 'empty' ? '' : 'Synthetic ASV', provider: 'api-bible', version: { abbreviation: 'ASV' } });
       }
-      return json({ text: 'Synthetic KJV', provider: 'api-bible', version: { abbreviation: 'KJV' } });
+      return json({ text: 'Synthetic AMP', version: { id: '1588', abbreviation: 'AMP' } });
     });
     const result = await api.request('John 3:16', 'NKJV', new AbortController().signal);
-    assert.equal(result.version.abbreviation, 'KJV', String(outcome));
+    assert.equal(result.version.abbreviation, 'AMP', String(outcome));
     assert.equal(result.fallback, true);
     assert.equal(urls.length, 2);
-    assert.match(urls[1], /version=APIBIBLE_KJV/);
+    assert.match(urls[1], /\/api\/bible.*version=1588/);
     assert.equal(api.state.settings.bibleVersion, 'APIBIBLE_NKJV');
   }
 });
 
-test('failed KJV fallback leaves NKJV unavailable; cancellation never triggers a fallback', async () => {
+test('failed or substituted AMP fallback leaves NKJV unavailable; cancellation never triggers a fallback', async () => {
   for (const outcome of ['denied', 'wrong-version']) {
     const urls = [];
     const { api } = ui(async url => {
       urls.push(url);
       if (url.includes('version=APIBIBLE_NKJV') || outcome === 'denied') return new Response(null, { status: 403 });
-      return json({ text: 'Synthetic ASV', provider: 'api-bible', version: { abbreviation: 'ASV' } });
+      return json({ text: 'Synthetic BSB', fallback: true, version: { abbreviation: 'BSB' } });
     });
     await assert.rejects(api.request('John 3:16', 'APIBIBLE_NKJV', new AbortController().signal));
     assert.equal(urls.length, 2);
-    assert.ok(urls.every(url => url.includes('/api/api-bible')));
+    assert.match(urls[0], /\/api\/api-bible.*version=APIBIBLE_NKJV/);
+    assert.match(urls[1], /\/api\/bible.*version=1588/);
   }
   const controller = new AbortController();
   let calls = 0;
@@ -410,15 +411,15 @@ test('rendered preview shows API.Bible attribution, correct link and fallback la
 
 test('NKJV preview displays the actual translation, copyright, link and view tracking while keeping the saved preference', async () => {
   for (const savedId of ['APIBIBLE_NKJV', 'NKJV', '114']) {
-    let unavailable = false, kjvUnavailable = false;
+    let unavailable = false, ampUnavailable = false;
     const h = ui(async url => {
       const version = new URL(url, 'https://study.example').searchParams.get('version');
       if (!version) return json({ versions: [] });
-      if ((version === 'APIBIBLE_NKJV' && unavailable) || kjvUnavailable) return new Response(null, { status: 403 });
-      const abbreviation = version.slice(9);
-      return json({ text: 'Synthetic ' + abbreviation, provider: 'api-bible', fallback: false,
-        version: { abbreviation, copyright: abbreviation + ' publisher notice' }, fumsTokens: [abbreviation + '-view'],
-        url: 'https://www.bible.com/bible/' + (abbreviation === 'NKJV' ? '114' : '1') + '/JHN.3.16' });
+      if ((version === 'APIBIBLE_NKJV' && unavailable) || ampUnavailable) return new Response(null, { status: 403 });
+      const abbreviation = version === '1588' ? 'AMP' : version.slice(9);
+      return json({ text: 'Synthetic ' + abbreviation, provider: version === '1588' ? 'youversion' : 'api-bible', fallback: false,
+        version: { abbreviation, title: abbreviation === 'AMP' ? 'Amplified Bible' : 'New King James Version', copyright: abbreviation + ' publisher notice' }, fumsTokens: [abbreviation + '-view'],
+        url: 'https://www.bible.com/bible/' + (abbreviation === 'NKJV' ? '114' : '1588') + '/JHN.3.16' });
     });
     const nodes = Object.fromEntries(['[data-bible-version]', '.bible-preview-version', '.bible-preview-notice', '.bible-preview-copyright', '.bible-preview-open', '.bible-preview-text', '.bible-preview-fallback', '.bible-preview-esv-link', '.bible-preview-parts'].map(key => [key, { value: savedId, dataset: {}, textContent: '', innerHTML: '', hidden: false }]));
     const preview = { querySelector: key => nodes[key] }, link = { textContent: 'John 3:16' };
@@ -435,19 +436,19 @@ test('NKJV preview displays the actual translation, copyright, link and view tra
     unavailable = true;
     h.api.load(link, preview, savedId);
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(nodes['.bible-preview-version'].textContent, 'KJV');
-    assert.equal(nodes['.bible-preview-text'].textContent, 'Synthetic KJV');
-    assert.equal(nodes['.bible-preview-notice'].textContent, 'NKJV unavailable — showing KJV. Your saved default is unchanged.');
-    assert.equal(nodes['.bible-preview-copyright'].textContent, 'KJV publisher notice Provided by API.Bible.');
-    assert.equal(nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/1/JHN.3.16');
-    assert.equal(h.window.fumsData.length, 2);
-    kjvUnavailable = true;
+    assert.equal(nodes['.bible-preview-version'].textContent, 'AMP');
+    assert.equal(nodes['.bible-preview-text'].textContent, 'Synthetic AMP');
+    assert.equal(nodes['.bible-preview-notice'].textContent, 'NKJV unavailable — showing AMP. Your saved default is unchanged.');
+    assert.equal(nodes['.bible-preview-copyright'].textContent, 'Amplified Bible. AMP publisher notice Provided by YouVersion.');
+    assert.equal(nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/1588/JHN.3.16');
+    assert.equal(h.window.fumsData.length, 1, 'YouVersion fallback is not an API.Bible view');
+    ampUnavailable = true;
     h.api.load(link, preview, savedId);
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(nodes['.bible-preview-version'].textContent, 'Unavailable');
     assert.equal(nodes['.bible-preview-text'].textContent, '');
     assert.match(nodes['.bible-preview-fallback'].textContent, /cannot be previewed/);
-    assert.equal(h.window.fumsData.length, 2);
+    assert.equal(h.window.fumsData.length, 1);
     assert.equal(h.api.state.settings.bibleVersion, savedId);
     const switchPreview = { dataset: { bibleVersion: 'preview' }, value: 'APIBIBLE_MSG' };
     h.listeners.change.forEach(fn => fn({ target: switchPreview }));

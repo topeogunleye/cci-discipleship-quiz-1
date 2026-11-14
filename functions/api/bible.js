@@ -33,7 +33,9 @@ export async function onRequestGet({ request, env }) {
     }
     const result = await bible.passage(reference, version, catalog, env.YOUVERSION_APP_KEY, limitedFetch);
     const status = result.status || 200;
-    if (status === 200 && !result.error) {
+    const edition = String(result.version?.abbreviation || '').replace(/^eng/i, '').toUpperCase();
+    const freshTranslation = ['NKJV', '114', '1588'].includes(version) || ['NKJV', 'AMP'].includes(edition);
+    if (status === 200 && !result.error && !freshTranslation) {
       headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
     }
     return reply(result, status);

@@ -19,15 +19,22 @@ on YouVersion, except for displayed ESV text: its main button opens the exact
 passage on ESV.org, with a smaller YouVersion link for additional translations.
 Fallbacks link to the translation actually displayed. The current
 client uses the catalog only for saved-ID metadata, not to add picker options.
-If the preference is absent or the passage returns 403/404, the service tries
-available alternatives, favoring NKJV, KJV, BSB, then WEBUS. It makes at most three
-translation attempts. Every passage uses one translation throughout. The UI shows
+Other YouVersion requests retain bounded fallback attempts when the preference
+is absent or a passage returns 403/404. The special NKJV and AMP rules are below.
+Every passage uses one translation throughout. The UI shows
 the actual translation, publisher copyright, YouVersion link and an explicit
 fallback notice. Timeouts/rate limits do not trigger a catalog-wide request storm.
 Publisher attribution prefers `copyright`, then `promotional_content`, following
 YouVersion's SDK guidance. If both are absent from the catalog, the server reads
 the edition's detailed metadata through the existing rate limiter. Unattributed
 text is not displayed. Resolved metadata shares the existing one-hour catalog TTL.
+
+Legacy NKJV requests (`NKJV`, `114`, or a licensed NKJV catalog ID) fall back only
+to AMP. Direct AMP requests never substitute BSB or another edition. Missing AMP
+therefore returns unavailable. NKJV and AMP passage responses are `no-store` so
+temporary translation substitutions are not retained in the shared response cache.
+The current client also uses AMP when API.Bible NKJV fails, keeps the saved NKJV
+preference unchanged, and displays AMP's actual copyright and YouVersion link.
 
 Passage text uses textContent, never publisher-provided HTML. It is not persisted
 in local storage or cached by the service worker; responses have no-store headers.

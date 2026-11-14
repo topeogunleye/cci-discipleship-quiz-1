@@ -51,9 +51,9 @@ on YouVersion and the ESV-only secondary link is hidden. Web displays report
 the returned FUMS tokens through the official tracker, loaded only when API.Bible
 text is displayed. No account ID or learner details are supplied to the tracker.
 The CSP permits only the additional tracker script and its reporting endpoint.
-If NKJV fails, the preview requests API.Bible KJV once and displays
-"NKJV unavailable — showing KJV. Your saved default is unchanged."
-Both responses must match the requested translation. If KJV also fails, the preview
+If NKJV fails, the preview requests YouVersion AMP (Amplified Bible, ID 1588) once and displays
+"NKJV unavailable — showing AMP. Your saved default is unchanged."
+Both responses must match the requested translation. If AMP also fails, the preview
 shows an unavailable state; it does not silently substitute ASV or another version.
 Closing or superseding a request never starts a fallback. Other API.Bible editions
 retain the existing clearly labelled YouVersion ASV fallback. The saved preference
@@ -69,7 +69,7 @@ days for this deployment). API.Bible also enforces the account's monthly quota;
 other apps sharing the key consume that allowance independently.
 
 Before rollout, verify a real passage for each of KJV, NKJV and MSG, its copyright,
-the FUMS request, saved defaults after reload, legacy NKJV preferences, and KJV
+the FUMS request, saved defaults after reload, legacy NKJV preferences, and AMP
 fallback behavior (including both services failing). Automated
 tests use synthetic text and do not require or transmit a real API key.
 The local checkout has no provider key, so production NKJV access remains a

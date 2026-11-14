@@ -88,8 +88,12 @@ async function passage(reference, preferred, catalog, key, fetcher = fetch) {
   const ids = passageIds(reference);
   if (!ids) return { status: 400, error: 'This reference cannot be previewed. Open it on YouVersion.' };
   const requested = catalog.find(b => b.id === preferred || b.abbreviation.toUpperCase() === preferred.toUpperCase());
+  const abbreviation = bible => String(bible?.abbreviation || '').replace(/^eng/i, '').toUpperCase();
+  const nkjv = preferred.toUpperCase() === 'NKJV' || preferred === '114' || abbreviation(requested) === 'NKJV';
+  const amp = preferred === '1588' || abbreviation(requested) === 'AMP';
   const ranked = ['ASV', 'NKJV', 'KJV', 'BSB', 'WEBUS'];
-  const alternatives = catalog.filter(b => b !== requested).sort((a, b) => {
+  // Legacy NKJV clients get AMP only. AMP requests must never silently become BSB.
+  const alternatives = catalog.filter(b => b !== requested && (nkjv ? abbreviation(b) === 'AMP' : !amp)).sort((a, b) => {
     const rank = b => { const i = ranked.indexOf(b.abbreviation.toUpperCase()); return i < 0 ? 100 : i; };
     return rank(a) - rank(b);
   });

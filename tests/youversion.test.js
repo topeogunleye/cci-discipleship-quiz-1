@@ -4,7 +4,9 @@ const fs = require('node:fs');
 const bible = require('../functions/_lib/youversion.cjs');
 const loadFunction = require('./helpers/load-function.cjs');
 const response = data => new Response(JSON.stringify(data));
-const catalog = [{ id: '1', abbreviation: 'KJV', title: 'King James', copyright: 'fixture copyright' }, { id: '2', abbreviation: 'NKJV', title: 'New King James', copyright: 'fixture copyright' }];
+const catalog = [{ id: '1', abbreviation: 'KJV', title: 'King James', copyright: 'fixture copyright' }, { id: '2', abbreviation: 'NKJV', title: 'New King James', copyright: 'fixture copyright' },
+  { id: '1588', abbreviation: 'AMP', title: 'Amplified Bible', copyright: 'AMP fixture copyright' },
+  { id: '3034', abbreviation: 'BSB', title: 'Berean Standard Bible', copyright: 'BSB fixture copyright' }];
 
 test('references preserve chapter, verse ranges, comma selections and single-chapter books', () => {
   assert.deepEqual(bible.passageIds('John 3:16–18'), ['JHN.3.16-18']);
@@ -80,16 +82,56 @@ test('missing attribution is resolved from detailed metadata before text is serv
   assert.equal(textCalls, 0);
 });
 
-test('unlicensed or missing passages fall back with a label and no mixed translations', async () => {
+test('unlicensed or missing NKJV passages fall back to AMP with no mixed translations or BSB requests', async () => {
+  const urls = [];
   const result = await bible.passage('John 3:16,18', 'NKJV', catalog, 'key', async url => {
+    urls.push(url);
     if (url.includes('/2/') && url.includes('3.18')) return new Response('', { status: 403 });
-    return response({ content: url.includes('/1/') ? 'KJV fixture' : 'NKJV fixture' });
+    return response({ content: url.includes('/1588/') ? 'AMP fixture' : 'NKJV fixture' });
   });
   assert.equal(result.fallback, true);
-  assert.equal(result.version.abbreviation, 'KJV');
-  assert.equal(result.text, 'KJV fixture\n\nKJV fixture');
-  const absent = await bible.passage('John 3:16', 'NKJV', catalog.slice(0, 1), 'key', async () => response({ content: 'KJV fixture' }));
+  assert.equal(result.version.abbreviation, 'AMP');
+  assert.equal(result.text, 'AMP fixture\n\nAMP fixture');
+  assert.ok(urls.every(url => !url.includes('/bibles/3034/') && !url.includes('/bibles/1/')));
+  const absent = await bible.passage('John 3:16', 'NKJV', catalog.filter(b => b.abbreviation !== 'NKJV'), 'key', async () => response({ content: 'AMP fixture' }));
   assert.equal(absent.fallback, true);
+  assert.equal(absent.version.abbreviation, 'AMP');
+});
+
+test('NKJV and AMP never fall through to BSB when Amplified is unavailable', async () => {
+  for (const preferred of ['NKJV', '114', '1588']) {
+    const urls = [];
+    const missing = await bible.passage('John 3:16', preferred, catalog, 'key', async url => {
+      urls.push(url); return new Response(null, { status: 403 });
+    });
+    assert.equal(missing.status, 404);
+    assert.ok(urls.every(url => !url.includes('/bibles/3034/') && !url.includes('/bibles/1/')));
+    const absent = await bible.passage('John 3:16', preferred, catalog.filter(b => b.abbreviation !== 'NKJV' && b.abbreviation !== 'AMP'), 'key', async () => {
+      assert.fail('A missing Amplified license must not request BSB');
+    });
+    assert.equal(absent.status, 404);
+  }
+});
+
+test('legacy NKJV endpoints return AMP with fresh headers instead of caching BSB substitutions', async () => {
+  for (const preferred of ['NKJV', '114']) {
+    const urls = [];
+    const handler = loadFunction('functions/api/bible.js', { fetch: async url => {
+      urls.push(url);
+      if (url.includes('/bibles?')) return response({ data: catalog.filter(b => b.abbreviation !== 'NKJV').map(b => ({ ...b, id: Number(b.id), language_tag: 'en' })) });
+      assert.match(url, /\/bibles\/1588\/passages\//);
+      return response({ content: 'Synthetic AMP' });
+    } }).onRequestGet;
+    const result = await handler({ request: new Request('https://study.example/api/bible?q=John%203:16&version=' + preferred, { headers: { 'CF-Connecting-IP': '192.0.2.5' } }),
+      env: { YOUVERSION_APP_KEY: 'legacy-nkjv-' + preferred, ESV_RATE_LIMITER: { fetch: async () => new Response(null, { status: 204 }) } } });
+    assert.equal(result.status, 200);
+    assert.equal(result.headers.get('Cache-Control'), 'no-store');
+    const body = await result.json();
+    assert.equal(body.version.abbreviation, 'AMP');
+    assert.equal(body.fallback, true);
+    assert.equal(body.url, 'https://www.bible.com/bible/1588/JHN.3.16');
+    assert.equal(urls.length, 2);
+  }
 });
 
 test('outages and rate limits do not fan out through the translation catalog', async () => {
