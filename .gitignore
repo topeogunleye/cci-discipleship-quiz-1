@@ -19,6 +19,8 @@ ios/**/*.xcuserdatad/
 # Local audit evidence and temporary capture helpers
 /audit/account-transcript-verification-2026-11-05/
 /audit/video-experience-2026-11-06/
+/audit/bible-e2e-2026-11-13
+/audit/bible-fixes-2026-11-13
 /scripts/capture-video-audit.js
 /scripts/capture-video-after.js
 
