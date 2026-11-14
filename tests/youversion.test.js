@@ -182,7 +182,7 @@ test('preview switching does not save preference; Settings does, and fallback te
   });
   harness.change({ dataset: { bibleVersion: 'preview' }, value: '1' });
   await flush();
-  assert.equal(harness.ui.state.settings.bibleVersion, 'ASV');
+  assert.equal(harness.ui.state.settings.bibleVersion, 'APIBIBLE_KJV');
   assert.equal(harness.nodes['.bible-preview-version'].textContent, 'KJV');
   assert.match(harness.nodes['.bible-preview-copyright'].textContent, /fixture copyright/);
   harness.change({ dataset: { bibleVersion: 'default' }, value: '1' });
@@ -191,7 +191,7 @@ test('preview switching does not save preference; Settings does, and fallback te
   fallback.ui.load(fallback.link, fallback.preview);
   await flush();
   assert.match(fallback.nodes['.bible-preview-notice'].textContent, /ASV unavailable — showing KJV/);
-  assert.equal(fallback.ui.state.settings.bibleVersion, 'ASV');
+  assert.equal(fallback.ui.state.settings.bibleVersion, 'APIBIBLE_KJV');
 });
 
 test('a slower earlier translation response cannot replace the latest selection', async () => {

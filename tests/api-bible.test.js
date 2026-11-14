@@ -267,7 +267,7 @@ test('rendered preview shows API.Bible attribution, correct link and fallback la
   assert.equal(nodes['.bible-preview-copyright'].textContent, 'Publisher copyright Provided by API.Bible.');
   assert.match(nodes['.bible-preview-open'].href, /biblegateway.com.*version=MSG/);
   assert.equal(h.window.fumsData.length, 1);
-  assert.equal(h.api.state.settings.bibleVersion, 'ASV');
+  assert.equal(h.api.state.settings.bibleVersion, 'APIBIBLE_KJV');
   fail = true;
   h.api.load(link, preview, 'APIBIBLE_MSG');
   await new Promise(resolve => setImmediate(resolve));

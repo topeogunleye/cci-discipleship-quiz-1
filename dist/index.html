@@ -11641,7 +11641,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
   'use strict';
   var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, ProgressSync = window.CCIProgressSync, Account = window.CCIAccount, TranscriptTools = window.CCITranscripts, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 14;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
-  function defaultStudyState() { return { decks: [], progress: {}, settings: { theme: 'auto', bibleVersion: 'ASV', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, cloudSyncDeviceId: null, seeded: false, dataVersion: 0, pausedSession: null }; }
+  function defaultStudyState() { return { decks: [], progress: {}, settings: { theme: 'auto', bibleVersion: 'APIBIBLE_KJV', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, cloudSyncDeviceId: null, seeded: false, dataVersion: 0, pausedSession: null }; }
   var S = defaultStudyState();
   var STARTER_DECKS = [], DEVOTIONALS = [], LESSON_VIDEOS = [];
   var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, suppressBiblePreviewFocus = null, suppressBiblePreviewHover = null;
@@ -11758,11 +11758,11 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     }
   }
   var bibleVersions = [], bibleVersionsRequest = null, bibleCatalogIncomplete = false;
-  var builtinBibleVersions = [{ id: 'ASV', abbreviation: 'ASV', title: 'Preferred default (when available)' }, { id: 'ESV', abbreviation: 'ESV', title: 'English Standard Version (Crossway)' },
+  var builtinBibleVersions = [{ id: 'ASV', abbreviation: 'ASV', title: 'American Standard Version' }, { id: 'ESV', abbreviation: 'ESV', title: 'English Standard Version (Crossway)' },
     { id: 'APIBIBLE_KJV', abbreviation: 'KJV', title: 'King James Version' },
     { id: 'APIBIBLE_MSG', abbreviation: 'MSG', title: 'The Message' },
     { id: 'APIBIBLE_GNT', abbreviation: 'GNT', title: 'Good News Translation' }];
-  function validBibleVersion(value) { return /^(?:[1-9]\d{0,9}|NKJV|ASV|ESV|APIBIBLE_(?:KJV|MSG|GNT|RV|DRA|T4T|LXXUP|OJPS|OKE))$/.test(String(value || '')) ? String(value) : 'ASV'; }
+  function validBibleVersion(value) { return /^(?:[1-9]\d{0,9}|NKJV|ASV|ESV|APIBIBLE_(?:KJV|MSG|GNT|RV|DRA|T4T|LXXUP|OJPS|OKE))$/.test(String(value || '')) ? String(value) : 'APIBIBLE_KJV'; }
   function bibleTranslationKey(abbreviation) { return String(abbreviation || '').replace(/^eng/i, '').toUpperCase(); }
   function allBibleVersions(selected) {
     var unique = [], positions = {};

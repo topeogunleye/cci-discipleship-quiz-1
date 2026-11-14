@@ -3,7 +3,9 @@
 KJV (King James Version), MSG (The Message), and GNT (Good News Translation)
 are built-in choices in Settings and Bible previews. Their stable preference IDs
 are `APIBIBLE_KJV`, `APIBIBLE_MSG`, and `APIBIBLE_GNT`; backups and profile settings
-preserve these IDs. Preview changes remain temporary.
+preserve these IDs. KJV is the initial default for new profiles and for missing
+or invalid preferences; existing valid saved choices are preserved. Preview
+changes remain temporary.
 
 Set `API_BIBLE_KEY` as an encrypted Cloudflare Pages secret in Production and any
 Preview environment that needs this integration. For local testing, put it in the
