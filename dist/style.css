@@ -987,23 +987,45 @@ a:hover { color: var(--link-hover); }
 
 .bible-reference-wrap.is-open > .bible-reference-preview {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: var(--space-sm);
 }
 
 .bible-reference-preview.is-open {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
   gap: var(--space-sm);
 }
 
 .bible-preview-content {
   display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
   gap: var(--space-sm);
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  touch-action: pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bible-preview-content:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: -2px;
+}
+
+.bible-preview-actions {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--line);
+}
+
+.bible-preview-actions a {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .bible-preview-parts {

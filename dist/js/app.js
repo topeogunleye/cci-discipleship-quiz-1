@@ -29,15 +29,17 @@
         '<a class="bible-reference-link" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" data-bible-reference-link="true" aria-haspopup="dialog" aria-controls="' + previewId + '" aria-describedby="' + messageId + '" aria-expanded="false">' + esc(reference) + '</a>' +
         '<span class="bible-reference-preview" id="' + previewId + '" role="dialog" aria-labelledby="' + titleId + '">' +
           '<span class="bible-preview-heading"><strong id="' + titleId + '">' + esc(reference) + '</strong><span class="bible-preview-version">Bible</span><button class="bible-preview-close" type="button" data-bible-preview-close aria-label="Close Bible passage preview">×</button></span>' +
-          '<span class="bible-preview-content">' + bibleVersionPicker(false) +
+          '<span class="bible-preview-content" tabindex="0" role="region" aria-label="Bible passage and translation">' + bibleVersionPicker(false) +
           '<span class="bible-preview-notice" role="status"></span>' +
           '<span class="bible-preview-text" hidden></span>' +
           '<span class="bible-preview-copyright meta"></span>' +
           '<a class="bible-preview-esv-link meta" href="https://www.esv.org/" target="_blank" rel="noopener noreferrer" hidden>ESV.org</a>' +
           '<span class="bible-preview-fallback" id="' + messageId + '" role="status"></span>' +
+          '<span class="bible-preview-parts" hidden></span></span>' +
+          '<span class="bible-preview-actions">' +
           '<a class="btn sm primary bible-preview-open" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">Open passage on YouVersion</a>' +
           '<a class="bible-preview-youversion-link meta" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" hidden>More translations on YouVersion</a>' +
-          '<span class="bible-preview-parts" hidden></span></span>' +
+          '</span>' +
         '</span>' +
       '</span>';
     }
@@ -89,7 +91,8 @@
     var best = null;
     regions.forEach(function (r) {
       var width = Math.min(340, r.right - r.left), height = Math.min(panel.height, r.bottom - r.top);
-      if (width <= 0 || height <= 0) return;
+      // Leave room for the heading, persistent links and a usable passage area.
+      if (width < Math.min(240, maxWidth) || height < Math.min(panel.height, 280, viewportHeight - margin * 2)) return;
       var left = Math.max(r.left, Math.min(anchor.left, r.right - width));
       var top = Math.max(r.top, Math.min(anchor.bottom + gap, r.bottom - height));
       var above = Math.max(r.top, Math.min(anchor.top - height - gap, r.bottom - height));
@@ -98,7 +101,9 @@
       var distance = Math.abs(top - anchor.bottom) + Math.abs(left - anchor.left);
       if (!best || score > best.score || (score === best.score && distance < best.distance)) best = { left: left, top: top, width: width, height: height, score: score, distance: distance };
     });
-    if (!best) { closeBiblePreview(true, true); return; }
+    // On very short screens the underlying study controls may leave no usable
+    // region. Let the dismissible preview use the viewport rather than clip it.
+    if (!best) best = { width: Math.min(340, maxWidth), height: Math.max(1, viewportHeight - margin * 2), left: leftEdge + margin, top: topEdge + margin };
     preview.style.width = best.width + 'px';
     preview.style.maxHeight = best.height + 'px';
     preview.style.left = best.left + 'px';
@@ -434,8 +439,11 @@
   function isWithinActiveBiblePreview(target) {
     return !!(activeBiblePreview && target && (activeBiblePreview.wrapper.contains(target) || activeBiblePreview.preview.contains(target)));
   }
-  function repositionActiveBiblePreview() {
+  function repositionActiveBiblePreview(event) {
     if (!activeBiblePreview) return;
+    // Captured scroll events also come from the passage itself. Moving/resizing
+    // its scroll container during that gesture can interrupt mobile scrolling.
+    if (event && event.type === 'scroll' && event.target && activeBiblePreview.preview.contains(event.target)) return;
     if (!activeBiblePreview.link.isConnected) { closeBiblePreview(false); return; }
     var rect = activeBiblePreview.link.getBoundingClientRect();
     if (rect.bottom < 0 || rect.top > window.innerHeight) { closeBiblePreview(false); return; }
@@ -4263,6 +4271,10 @@
   if (typeof window.addEventListener === 'function') {
     window.addEventListener('resize', repositionActiveBiblePreview);
     window.addEventListener('scroll', repositionActiveBiblePreview, true);
+    if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
+      window.visualViewport.addEventListener('resize', repositionActiveBiblePreview);
+      window.visualViewport.addEventListener('scroll', repositionActiveBiblePreview);
+    }
   }
 
   document.addEventListener('click', function (e) {
