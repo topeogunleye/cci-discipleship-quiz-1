@@ -79,18 +79,21 @@ test('live Function cache hits avoid upstream quota and retain no-store client r
     caches: { default: cache },
     fetch: async target => {
       upstream++;
-      return Response.json(target.includes('?language=eng') ? { data: [{ id: 'cache-kjv', abbreviationLocal: 'KJV', language: { id: 'eng' } }] } : CONTENT);
+      return Response.json(target.includes('?language=eng') ? { data: [{ id: 'cache-nkjv', abbreviationLocal: 'NKJV', language: { id: 'eng' } }] } : CONTENT);
     }
   }).onRequestGet;
   const env = { API_BIBLE_KEY: 'integration-cache-secret', ESV_RATE_LIMITER: { fetch: async () => { reservations++; return new Response(null, { status: 204 }); } } };
-  const request = () => new Request('https://study.example/api/api-bible?q=John%203:16&version=APIBIBLE_KJV', { headers: { 'CF-Connecting-IP': '127.0.0.1' } });
+  const request = () => new Request('https://study.example/api/api-bible?q=John%203:16&version=APIBIBLE_NKJV', { headers: { 'CF-Connecting-IP': '127.0.0.1' } });
   const first = await handler({ request: request(), env });
   assert.equal(first.status, 200);
   assert.equal(first.headers.get('X-Bible-Cache'), 'MISS');
   const second = await handler({ request: request(), env });
   assert.equal(second.headers.get('X-Bible-Cache'), 'HIT');
   assert.equal(second.headers.get('Cache-Control'), 'no-store');
-  assert.deepEqual((await second.json()).fumsTokens, ['view-token']);
+  const body = await second.json();
+  assert.deepEqual(body.fumsTokens, ['view-token']);
+  assert.equal(body.version.abbreviation, 'NKJV');
+  assert.equal(body.version.copyright, CONTENT.data.copyright);
   assert.equal(upstream, 2, 'one catalog request and one passage request');
   assert.equal(reservations, upstream);
 });

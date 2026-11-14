@@ -7,6 +7,7 @@ const bible = require('../functions/_lib/api-bible.cjs');
 const json = data => new Response(JSON.stringify(data));
 const fixture = [
   { id: 'fixture-kjv', abbreviation: 'engKJV', language: { id: 'eng' } },
+  { id: 'fixture-nkjv', abbreviation: 'engNKJV', language: { id: 'eng' } },
   { id: 'fixture-msg', abbreviationLocal: 'MSG', language: { id: 'eng' } },
   { id: 'fixture-gnt', abbreviation: 'GNT', language: { id: 'eng' } },
   { id: 'other', abbreviation: 'NIV', language: { id: 'eng' } },
@@ -23,9 +24,9 @@ test('API.Bible discovers only selected English translations, caches metadata an
     return json({ data: { content: 'Synthetic passage', copyright: 'Publisher copyright' }, meta: { fumsToken: 'view-token' } });
   };
   const [catalog] = await Promise.all([bible.versions('fixture-key', fetcher), bible.versions('fixture-key', fetcher)]);
-  assert.deepEqual(catalog.map(v => v.id), ['APIBIBLE_KJV', 'APIBIBLE_MSG', 'APIBIBLE_GNT']);
+  assert.deepEqual(catalog.map(v => v.id), ['APIBIBLE_KJV', 'APIBIBLE_NKJV', 'APIBIBLE_MSG', 'APIBIBLE_GNT']);
   assert.equal(paths.length, 1);
-  for (const abbreviation of ['KJV', 'MSG', 'GNT']) {
+  for (const abbreviation of ['KJV', 'NKJV', 'MSG', 'GNT']) {
     const result = await bible.passage('John 3:16–18,20', 'APIBIBLE_' + abbreviation, 'fixture-key', fetcher);
     assert.equal(result.version.abbreviation, abbreviation);
     assert.equal(result.version.copyright, 'Publisher copyright');
@@ -50,6 +51,25 @@ test('unlicensed API.Bible versions and invalid references never fetch passage t
   assert.equal((await bible.passage('bad', 'APIBIBLE_MSG', 'unlicensed-key', fetcher)).status, 400);
   assert.equal((await bible.passage('John 3:16', 'APIBIBLE_NIV', 'unlicensed-key', fetcher)).status, 400);
   assert.equal(calls, 1);
+  assert.equal((await bible.passage('John 3:16', 'APIBIBLE_NKJV', 'unlicensed-key', fetcher)).status, 404);
+  assert.equal(calls, 1, 'NKJV is never requested when absent from the accessible catalog');
+});
+
+test('NKJV rejects unattributed passages and never returns partial multipart text', async () => {
+  const calls = [];
+  const result = await bible.passage('John 3:16,18', 'APIBIBLE_NKJV', 'multipart-nkjv', async url => {
+    calls.push(url);
+    if (url.includes('?language=eng')) return json({ data: fixture });
+    if (url.includes('3.18')) return json({ data: { content: '' } });
+    return json({ data: { content: 'Synthetic first segment', copyright: 'Publisher notice' } });
+  });
+  assert.equal(result.status, 404);
+  assert.equal(result.text, undefined);
+  assert.equal(calls.length, 3);
+  const unattributed = await bible.passage('John 3:16', 'APIBIBLE_NKJV', 'unattributed-nkjv', async url =>
+    json(url.includes('?language=eng') ? { data: fixture } : { data: { content: 'Synthetic text' } }));
+  assert.equal(unattributed.status, 404);
+  assert.equal(unattributed.text, undefined);
 });
 
 const additional = ['RV', 'DRA', 'T4T', 'LXXup', 'OJPS', 'OKE'].map(abbreviation => ({ id: 'fixture-' + abbreviation, abbreviationLocal: abbreviation, language: { id: 'eng' } }));
@@ -65,13 +85,13 @@ test('new catalog checks real passage access before exposing curated editions, d
   };
   const [catalog, concurrent] = await Promise.all([bible.verifiedVersions('verified-key', fetcher), bible.verifiedVersions('verified-key', fetcher)]);
   assert.deepEqual(catalog, concurrent);
-  assert.equal(calls.length, 7, 'one metadata request plus six sample passages');
-  assert.deepEqual(catalog.map(v => v.abbreviation), ['RV', 'T4T', 'LXXUP', 'OJPS', 'OKE']);
+  assert.equal(calls.length, 8, 'one metadata request plus six editions and GNT sample passages');
+  assert.deepEqual(catalog.map(v => v.abbreviation), ['RV', 'T4T', 'LXXUP', 'OJPS', 'OKE', 'GNT']);
   assert.equal(catalog.find(v => v.abbreviation === 'OKE').group, 'Additional editions');
   assert.match(catalog.find(v => v.abbreviation === 'OKE').coverage, /Torah/);
   assert.doesNotMatch(JSON.stringify(catalog), /probe-only-token|upstreamId/);
   await bible.verifiedVersions('verified-key', fetcher);
-  assert.equal(calls.length, 7, 'verified availability is cached for a day');
+  assert.equal(calls.length, 8, 'verified availability is cached for a day');
 });
 
 test('specialist editions reject books outside their coverage without requesting unrelated text', async () => {
@@ -86,6 +106,14 @@ test('specialist editions reject books outside their coverage without requesting
   }
   assert.equal((await bible.passage('Psalms 1:1', 'APIBIBLE_OKE', 'coverage-key', fetcher)).status, 404);
   assert.equal(calls, 1);
+});
+
+test('GNT is omitted from the picker catalog when its passage license is unavailable', async () => {
+  const catalog = await bible.verifiedVersions('gnt-unlicensed', async url => {
+    if (url.includes('?language=eng')) return json({ data: fixture });
+    return new Response(null, { status: 403 });
+  });
+  assert.deepEqual(catalog, []);
 });
 
 test('API.Bible endpoint validates, protects quota, hides secrets and prevents client passage caching', async () => {
@@ -130,13 +158,14 @@ test('successful endpoint reserves each upstream call and returns only public te
   const env = { API_BIBLE_KEY: 'success-secret', ESV_RATE_LIMITER: { fetch: async () => {
     reservations++; return new Response(null, { status: 204 });
   } } };
-  const result = await handler({ request: new Request('https://study.example/api/api-bible?q=John%203:16,18&version=APIBIBLE_MSG', { headers: { 'CF-Connecting-IP': '127.0.0.1' } }), env });
+  const result = await handler({ request: new Request('https://study.example/api/api-bible?q=John%203:16,18&version=APIBIBLE_NKJV', { headers: { 'CF-Connecting-IP': '127.0.0.1' } }), env });
   assert.equal(result.status, 200);
   assert.equal(result.headers.get('Cache-Control'), 'no-store');
   const body = await result.text();
   assert.doesNotMatch(body, /success-secret|upstreamId/);
   assert.match(body, /Publisher notice/);
   assert.equal(JSON.parse(body).fumsTokens.length, 2);
+  assert.equal(JSON.parse(body).version.abbreviation, 'NKJV');
   assert.equal(calls, 3);
   assert.equal(reservations, calls);
 });
@@ -144,6 +173,7 @@ test('successful endpoint reserves each upstream call and returns only public te
 function ui(fetcher) {
   const scripts = [], listeners = {};
   const window = { DeckParser: require('../js/parser.js'), StudyStorage: require('../js/storage.js'),
+    StudyLogic: require('../js/study.js'), MobileStudy: require('../js/mobile-study.js'),
     setTimeout, clearTimeout, location: { protocol: 'https:', origin: 'https://study.example' } };
   const document = { getElementById: () => ({}), querySelectorAll: () => [],
     addEventListener: (name, fn) => { (listeners[name] ||= []).push(fn); },
@@ -154,19 +184,21 @@ function ui(fetcher) {
     window.testApi = { request: requestBiblePassage, options: bibleVersionOptions, valid: validBibleVersion,
       report: reportApiBibleView, state: S, load: loadBiblePreviewText, catalog: loadBibleVersions,
       clearCatalog: function() { bibleVersions = []; },
+      setCatalog: function(versions) { bibleVersions = versions; },
+      restore: function(raw) { loadSavedState(raw); return S; }, backup: validateBackup,
       activate: function(link, preview) { activeBiblePreview = {link:link, preview:preview}; } };
   `);
   vm.runInNewContext(source, { window, document, URL, AbortController, fetch: fetcher });
   return { api: window.testApi, window, scripts, listeners };
 }
 
-test('dropdown contains all three versions, preserves saved selection, and routes each to API.Bible', async () => {
+test('dropdown contains the three licensed choices, preserves saved selection, and routes each to API.Bible', async () => {
   const urls = [];
   const { api, listeners } = ui(async url => {
     urls.push(url);
-    return json({ text: 'Synthetic text', provider: 'api-bible', version: { abbreviation: 'MSG' } });
+    return json({ text: 'Synthetic text', provider: 'api-bible', version: { abbreviation: new URL(url, 'https://study.example').searchParams.get('version').slice(9) } });
   });
-  for (const abbreviation of ['KJV', 'MSG', 'GNT']) {
+  for (const abbreviation of ['KJV', 'NKJV', 'MSG']) {
     const id = 'APIBIBLE_' + abbreviation;
     assert.equal(api.valid(id), id);
     assert.match(api.options(id, abbreviation), new RegExp('value="' + id + '" selected'));
@@ -175,6 +207,91 @@ test('dropdown contains all three versions, preserves saved selection, and route
     await api.request('John 3:16', id, new AbortController().signal);
     assert.match(urls.at(-1), new RegExp('/api/api-bible.*version=' + id));
   }
+});
+
+test('new and legacy NKJV preferences use API.Bible without rewriting saved IDs or adding duplicate choices', async () => {
+  for (const id of ['APIBIBLE_NKJV', 'NKJV', '114', '2']) {
+    const urls = [];
+    const { api, listeners } = ui(async url => {
+      urls.push(url);
+      return json({ text: 'Synthetic NKJV', provider: 'api-bible', fallback: false, version: { abbreviation: 'NKJV' } });
+    });
+    if (id === '2') api.setCatalog([{ id: '2', abbreviation: 'engNKJV', title: 'New King James Version' }]);
+    listeners.change.forEach(fn => fn({ target: { dataset: { bibleVersion: 'default' }, value: id } }));
+    const result = await api.request('John 3:16', id, new AbortController().signal);
+    assert.equal(result.version.abbreviation, 'NKJV');
+    assert.equal(result.fallback, false);
+    assert.equal(api.state.settings.bibleVersion, id);
+    assert.equal(api.valid(id), id);
+    assert.equal(urls.length, 1);
+    assert.match(urls[0], /\/api\/api-bible.*version=APIBIBLE_NKJV/);
+    const html = api.options(id, '');
+    assert.match(html, new RegExp('value="' + id + '" selected'));
+    assert.equal((html.match(/New King James Version/g) || []).length, 1);
+  }
+});
+
+test('unverified GNT is not offered to new selections but existing saved GNT remains intact', async () => {
+  const { api, listeners } = ui(async () => json({ versions: [] }));
+  assert.doesNotMatch(api.options('ASV', ''), /APIBIBLE_GNT/);
+  listeners.change.forEach(fn => fn({ target: { dataset: { bibleVersion: 'default' }, value: 'APIBIBLE_GNT' } }));
+  assert.equal(api.state.settings.bibleVersion, 'APIBIBLE_GNT');
+  assert.match(api.options('APIBIBLE_GNT', ''), /value="APIBIBLE_GNT" selected>GNT — Good News Translation \(currently unavailable\)/);
+});
+
+test('saved profiles and backups retain old and new translation IDs and study progress', () => {
+  const { api } = ui(async () => json({}));
+  for (const id of ['APIBIBLE_NKJV', 'NKJV', '114', 'APIBIBLE_GNT', 'APIBIBLE_MSG', '3034', 'ESV']) {
+    const data = { settings: { bibleVersion: id }, seeded: true,
+      decks: [{ id: 'd1', title: 'Study', cards: [{ id: 'q1', question: 'Question', options: ['A', 'B', 'C', 'D'], answer: 'A' }] }],
+      progress: { d1: { cards: { q1: { attempts: 3, misses: 1 } }, best: { pct: 80 } } } };
+    const state = api.restore(JSON.stringify(data));
+    assert.equal(state.settings.bibleVersion, id);
+    assert.equal(state.progress.d1.cards.q1.attempts, 3);
+    const restored = api.backup(JSON.stringify({ format: 'cci-discipleship-quiz-backup', version: 1, data }));
+    assert.equal(restored.settings.bibleVersion, id);
+    assert.equal(restored.progress.d1.cards.q1.attempts, 3);
+  }
+});
+
+test('NKJV failures request KJV once and never substitute a different translation', async () => {
+  for (const outcome of [403, 404, 429, 503, 'network', 'empty', 'wrong-version']) {
+    const urls = [];
+    const { api } = ui(async url => {
+      urls.push(url);
+      if (url.includes('version=APIBIBLE_NKJV')) {
+        if (typeof outcome === 'number') return new Response(null, { status: outcome });
+        if (outcome === 'network') throw new TypeError('Offline');
+        return json({ text: outcome === 'empty' ? '' : 'Synthetic ASV', provider: 'api-bible', version: { abbreviation: 'ASV' } });
+      }
+      return json({ text: 'Synthetic KJV', provider: 'api-bible', version: { abbreviation: 'KJV' } });
+    });
+    const result = await api.request('John 3:16', 'NKJV', new AbortController().signal);
+    assert.equal(result.version.abbreviation, 'KJV', String(outcome));
+    assert.equal(result.fallback, true);
+    assert.equal(urls.length, 2);
+    assert.match(urls[1], /version=APIBIBLE_KJV/);
+    assert.equal(api.state.settings.bibleVersion, 'APIBIBLE_KJV');
+  }
+});
+
+test('failed KJV fallback leaves NKJV unavailable; cancellation never triggers a fallback', async () => {
+  for (const outcome of ['denied', 'wrong-version']) {
+    const urls = [];
+    const { api } = ui(async url => {
+      urls.push(url);
+      if (url.includes('version=APIBIBLE_NKJV') || outcome === 'denied') return new Response(null, { status: 403 });
+      return json({ text: 'Synthetic ASV', provider: 'api-bible', version: { abbreviation: 'ASV' } });
+    });
+    await assert.rejects(api.request('John 3:16', 'APIBIBLE_NKJV', new AbortController().signal));
+    assert.equal(urls.length, 2);
+    assert.ok(urls.every(url => url.includes('/api/api-bible')));
+  }
+  const controller = new AbortController();
+  let calls = 0;
+  const { api } = ui(async () => { calls++; controller.abort(); throw new Error('aborted'); });
+  await assert.rejects(api.request('John 3:16', 'NKJV', controller.signal));
+  assert.equal(calls, 1);
 });
 
 test('API.Bible failure uses a labelled fallback; aborted requests do not issue fallback requests', async () => {
@@ -215,6 +332,7 @@ test('catalog combines providers, admits only verified curated API editions and 
     urls.push(url);
     if (url.endsWith('/api/api-bible')) return unavailable ? new Response(null, { status: 503 }) : json({ versions: [
       { id: 'APIBIBLE_RV', abbreviation: 'RV', title: 'Revised Version 1885' },
+      { id: 'APIBIBLE_GNT', abbreviation: 'GNT', title: 'Good News Translation' },
       { id: 'APIBIBLE_OJPS', abbreviation: 'OJPS', title: 'JPS Tanakh 1917', group: 'Additional editions', coverage: 'Old Testament' },
       { id: 'APIBIBLE_NIV', abbreviation: 'NIV', title: 'Uncurated version' }
     ] });
@@ -227,6 +345,7 @@ test('catalog combines providers, admits only verified curated API editions and 
   await h.api.catalog();
   const html = h.api.options('ASV', '');
   assert.match(html, /APIBIBLE_RV/);
+  assert.match(html, /APIBIBLE_GNT/);
   assert.match(html, /<optgroup label="Additional editions">/);
   assert.doesNotMatch(html, /APIBIBLE_NIV/);
   assert.equal((html.match(/>ASV —/g) || []).length, 1);
@@ -275,4 +394,51 @@ test('rendered preview shows API.Bible attribution, correct link and fallback la
   assert.match(nodes['.bible-preview-copyright'].textContent, /Provided by YouVersion/);
   assert.match(nodes['.bible-preview-open'].href, /www.bible.com/);
   assert.equal(h.window.fumsData.length, 1, 'fallback text is not counted as an API.Bible view');
+});
+
+test('NKJV preview displays the actual translation, copyright, link and view tracking while keeping the saved preference', async () => {
+  for (const savedId of ['APIBIBLE_NKJV', 'NKJV', '114']) {
+    let unavailable = false, kjvUnavailable = false;
+    const h = ui(async url => {
+      const version = new URL(url, 'https://study.example').searchParams.get('version');
+      if (!version) return json({ versions: [] });
+      if ((version === 'APIBIBLE_NKJV' && unavailable) || kjvUnavailable) return new Response(null, { status: 403 });
+      const abbreviation = version.slice(9);
+      return json({ text: 'Synthetic ' + abbreviation, provider: 'api-bible', fallback: false,
+        version: { abbreviation, copyright: abbreviation + ' publisher notice' }, fumsTokens: [abbreviation + '-view'] });
+    });
+    const nodes = Object.fromEntries(['[data-bible-version]', '.bible-preview-version', '.bible-preview-notice', '.bible-preview-copyright', '.bible-preview-open', '.bible-preview-text', '.bible-preview-fallback', '.bible-preview-esv-link', '.bible-preview-parts'].map(key => [key, { value: savedId, dataset: {}, textContent: '', innerHTML: '', hidden: false }]));
+    const preview = { querySelector: key => nodes[key] }, link = { textContent: 'John 3:16' };
+    h.api.state.settings.bibleVersion = savedId;
+    h.api.activate(link, preview);
+    h.api.load(link, preview, savedId);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(nodes['.bible-preview-version'].textContent, 'NKJV');
+    assert.equal(nodes['.bible-preview-text'].textContent, 'Synthetic NKJV');
+    assert.equal(nodes['.bible-preview-notice'].textContent, '');
+    assert.equal(nodes['.bible-preview-copyright'].textContent, 'NKJV publisher notice Provided by API.Bible.');
+    assert.match(nodes['.bible-preview-open'].href, /version=NKJV$/);
+    assert.equal(h.window.fumsData.length, 1);
+    unavailable = true;
+    h.api.load(link, preview, savedId);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(nodes['.bible-preview-version'].textContent, 'KJV');
+    assert.equal(nodes['.bible-preview-text'].textContent, 'Synthetic KJV');
+    assert.equal(nodes['.bible-preview-notice'].textContent, 'NKJV unavailable — showing KJV. Your saved default is unchanged.');
+    assert.equal(nodes['.bible-preview-copyright'].textContent, 'KJV publisher notice Provided by API.Bible.');
+    assert.match(nodes['.bible-preview-open'].href, /version=KJV$/);
+    assert.equal(h.window.fumsData.length, 2);
+    kjvUnavailable = true;
+    h.api.load(link, preview, savedId);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(nodes['.bible-preview-version'].textContent, 'Unavailable');
+    assert.equal(nodes['.bible-preview-text'].textContent, '');
+    assert.match(nodes['.bible-preview-fallback'].textContent, /cannot be previewed/);
+    assert.equal(h.window.fumsData.length, 2);
+    assert.equal(h.api.state.settings.bibleVersion, savedId);
+    const switchPreview = { dataset: { bibleVersion: 'preview' }, value: 'APIBIBLE_MSG' };
+    h.listeners.change.forEach(fn => fn({ target: switchPreview }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(h.api.state.settings.bibleVersion, savedId, 'preview choices do not save a new default');
+  }
 });

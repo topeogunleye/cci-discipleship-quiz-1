@@ -121,13 +121,22 @@
   var bibleVersions = [], bibleVersionsRequest = null, bibleCatalogIncomplete = false;
   var builtinBibleVersions = [{ id: 'ASV', abbreviation: 'ASV', title: 'American Standard Version' }, { id: 'ESV', abbreviation: 'ESV', title: 'English Standard Version (Crossway)' },
     { id: 'APIBIBLE_KJV', abbreviation: 'KJV', title: 'King James Version' },
-    { id: 'APIBIBLE_MSG', abbreviation: 'MSG', title: 'The Message' },
-    { id: 'APIBIBLE_GNT', abbreviation: 'GNT', title: 'Good News Translation' }];
-  function validBibleVersion(value) { return /^(?:[1-9]\d{0,9}|NKJV|ASV|ESV|APIBIBLE_(?:KJV|MSG|GNT|RV|DRA|T4T|LXXUP|OJPS|OKE))$/.test(String(value || '')) ? String(value) : 'APIBIBLE_KJV'; }
+    { id: 'APIBIBLE_NKJV', abbreviation: 'NKJV', title: 'New King James Version' },
+    { id: 'APIBIBLE_MSG', abbreviation: 'MSG', title: 'The Message' }];
+  function validBibleVersion(value) { return /^(?:[1-9]\d{0,9}|NKJV|ASV|ESV|APIBIBLE_(?:KJV|NKJV|MSG|GNT|RV|DRA|T4T|LXXUP|OJPS|OKE))$/.test(String(value || '')) ? String(value) : 'APIBIBLE_KJV'; }
   function bibleTranslationKey(abbreviation) { return String(abbreviation || '').replace(/^eng/i, '').toUpperCase(); }
+  function bibleVersionInfo(id) {
+    var found = builtinBibleVersions.concat(bibleVersions).find(function (version) { return version.id === id; });
+    if (found) return found;
+    // Keep legacy preferences intact even when YouVersion's licensed catalog omits NKJV.
+    // YouVersion identifies NKJV as 114: https://www.bible.com/versions/114-nkjv-new-king-james-version
+    if (id === 'NKJV' || id === '114') return { id: id, abbreviation: 'NKJV', title: 'New King James Version' };
+    if (id === 'APIBIBLE_GNT') return { id: id, abbreviation: 'GNT', title: 'Good News Translation (currently unavailable)' };
+    return null;
+  }
   function allBibleVersions(selected) {
     var unique = [], positions = {};
-    builtinBibleVersions.concat(bibleVersions).forEach(function (version) {
+    builtinBibleVersions.concat(bibleVersions, bibleVersionInfo(selected) || []).forEach(function (version) {
       var key = bibleTranslationKey(version.abbreviation);
       key = ({ NIVUK11: 'NIV11', WMBBE: 'WMB', WEBBE: 'WEBUS' })[key] || key;
       if (!Object.prototype.hasOwnProperty.call(positions, key)) { positions[key] = unique.length; unique.push(version); }
@@ -194,14 +203,24 @@
         if (!response.ok) throw biblePassageError(response);
         return response.json();
       }).then(function (result) {
-        if (typeof result.text !== 'string' || !result.text.trim() || !result.version || result.provider !== 'api-bible') throw biblePassageError({ status: 404 });
+        if (typeof result.text !== 'string' || !result.text.trim() || !result.version || result.provider !== 'api-bible' || bibleTranslationKey(result.version.abbreviation) !== requested.slice(9)) throw biblePassageError({ status: 404 });
         return result;
       });
     }
     function equivalentApiVersion(requested) {
-      var entry = builtinBibleVersions.concat(bibleVersions).find(function (v) { return v.id === requested; });
+      var entry = bibleVersionInfo(requested);
       var key = bibleTranslationKey(entry ? entry.abbreviation : requested);
       return /^(ASV|BSB|FBV|GNV|LSV|TCENT|TOJB2011|WEBUS|WMB|WMBBE|KJV|MSG|GNT|RV|DRA|T4T)$/.test(key) ? 'APIBIBLE_' + key : '';
+    }
+    var requestedVersion = bibleVersionInfo(version);
+    if (requestedVersion && bibleTranslationKey(requestedVersion.abbreviation) === 'NKJV') {
+      return fromApiBible('APIBIBLE_NKJV').catch(function (error) {
+        if (signal && signal.aborted) throw error;
+        return fromApiBible('APIBIBLE_KJV').then(function (result) {
+          result.fallback = true;
+          return result;
+        });
+      });
     }
     function fromYouVersion(requested, markFallback) {
       return fetch(bibleApiUrl() + '?q=' + encodeURIComponent(reference) + '&version=' + encodeURIComponent(requested), init).then(function (response) {
@@ -336,7 +355,7 @@
       results.forEach(function (result, provider) {
         if (result.status !== 'fulfilled') return;
         bibleVersions = bibleVersions.concat((result.value.versions || []).filter(function (v) {
-          return provider === 0 ? /^[1-9]\d*$/.test(v.id) : /^APIBIBLE_(RV|DRA|T4T|LXXUP|OJPS|OKE)$/.test(v.id);
+          return provider === 0 ? /^[1-9]\d*$/.test(v.id) : /^APIBIBLE_(GNT|RV|DRA|T4T|LXXUP|OJPS|OKE)$/.test(v.id);
         }));
       });
       document.querySelectorAll('.bible-version-picker').forEach(function (picker) {
@@ -348,7 +367,7 @@
         var picker = el.closest('.bible-version-picker');
         var searchInput = picker ? picker.querySelector('[data-bible-version-search]') : null;
         if (!searchInput || !searchInput.value) {
-          el.textContent = bibleCatalogIncomplete ? 'Some translations could not load. Reopen the selector to retry.' : bibleVersions.length ? 'Choose a translation for Bible passages.' : 'Additional translations could not load. You can still select ASV, ESV, KJV, MSG, or GNT.';
+          el.textContent = bibleCatalogIncomplete ? 'Some translations could not load. Reopen the selector to retry.' : bibleVersions.length ? 'Choose a translation for Bible passages.' : 'You can select ASV, ESV, KJV, NKJV, or MSG. No additional translations are available.';
         }
       });
     }).catch(function () {
@@ -383,14 +402,14 @@
       if (biblePreviewRequest !== request || !activeBiblePreview || activeBiblePreview.link !== link) return;
       updateBiblePreviewText(preview, result.text);
       preview.querySelector('.bible-preview-version').textContent = result.version.abbreviation;
-      var selectedLabel = builtinBibleVersions.concat(bibleVersions).find(function (v) { return v.id === version; });
+      var selectedLabel = bibleVersionInfo(version);
       preview.querySelector('.bible-preview-notice').textContent = result.fallback ? (selectedLabel ? selectedLabel.abbreviation : (version === 'ASV' || version === 'NKJV' || version === 'ESV') ? version : 'Selected translation') + ' unavailable — showing ' + result.version.abbreviation + '. Your saved default is unchanged.' : '';
       if (result.provider === 'esv') {
         preview.querySelector('.bible-preview-copyright').textContent = result.version.copyright;
         if (esvLink) esvLink.hidden = false;
       } else if (result.provider === 'api-bible') {
         preview.querySelector('.bible-preview-copyright').textContent = (result.version.coverage ? result.version.coverage + '. ' : '') + result.version.copyright + ' Provided by API.Bible.';
-        var gatewayVersion = /^(KJV|MSG|GNT|DRA)$/.test(result.version.abbreviation) ? result.version.abbreviation : '';
+        var gatewayVersion = /^(KJV|NKJV|MSG|GNT|DRA)$/.test(result.version.abbreviation) ? result.version.abbreviation : '';
         openLink.href = gatewayVersion ? 'https://www.biblegateway.com/passage/?search=' + encodeURIComponent(reference) + '&version=' + gatewayVersion : 'https://www.bible.com/search/bible?q=' + encodeURIComponent(reference);
         openLink.textContent = gatewayVersion ? 'Open passage on BibleGateway' : 'Search passage on YouVersion';
         reportApiBibleView(result.fumsTokens);

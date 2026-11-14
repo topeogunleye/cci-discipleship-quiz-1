@@ -1,11 +1,26 @@
 # API.Bible translations
 
-KJV (King James Version), MSG (The Message), and GNT (Good News Translation)
+KJV (King James Version), NKJV (New King James Version), and MSG (The Message)
 are built-in choices in Settings and Bible previews. Their stable preference IDs
-are `APIBIBLE_KJV`, `APIBIBLE_MSG`, and `APIBIBLE_GNT`; backups and profile settings
+are `APIBIBLE_KJV`, `APIBIBLE_NKJV`, and `APIBIBLE_MSG`; backups and profile settings
 preserve these IDs. KJV is the initial default for new profiles and for missing
 or invalid preferences; existing valid saved choices are preserved. Preview
 changes remain temporary.
+
+The owner confirmed these three API.Bible license selections after setting the
+application's monthly user range to no more than 5,000. This is account-reported
+license selection, not a successful production passage check. Keep the declared
+user range accurate and review NKJV licensing before exceeding 5,000 monthly users.
+No new key or subscription change is required by this implementation.
+
+Legacy `NKJV` and YouVersion NKJV ID `114` preferences resolve through API.Bible
+without rewriting the saved value. Other catalog IDs identified as NKJV also use
+API.Bible. Duplicate provider entries remain a single picker row, retaining the
+selected ID. New profiles still default to KJV; other saved translations stay intact.
+GNT is no longer an unconditional choice: it appears only after a successful
+catalog passage check (or through the independently licensed YouVersion catalog).
+An existing `APIBIBLE_GNT` preference remains valid and visible with an unavailable
+label when absent from the catalog; backups and profiles never silently reset it.
 
 Set `API_BIBLE_KEY` as an encrypted Cloudflare Pages secret in Production and any
 Preview environment that needs this integration. For local testing, put it in the
@@ -27,8 +42,14 @@ otherwise a clearly labelled YouVersion passage search. Web displays report
 the returned FUMS tokens through the official tracker, loaded only when API.Bible
 text is displayed. No account ID or learner details are supplied to the tracker.
 The CSP permits only the additional tracker script and its reporting endpoint.
-If a request fails, the existing YouVersion ASV fallback is clearly labelled and
-the saved preference remains unchanged.
+If NKJV fails, the preview requests API.Bible KJV once and displays
+"NKJV unavailable — showing KJV. Your saved default is unchanged."
+Both responses must match the requested translation. If KJV also fails, the preview
+shows an unavailable state; it does not silently substitute ASV or another version.
+Closing or superseding a request never starts a fallback. Other API.Bible editions
+retain the existing clearly labelled YouVersion ASV fallback. The saved preference
+remains unchanged in every case. Passage responses without publisher attribution
+are rejected rather than displayed.
 
 Deploy the private rate-limiter Worker before the Pages Function. The existing
 main deployment workflow already uses that order. The new `/check/apibible` scope
@@ -38,9 +59,12 @@ budget is 150 calls per rolling day and 30 per hour (at most 4,650 calls over 31
 days for this deployment). API.Bible also enforces the account's monthly quota;
 other apps sharing the key consume that allowance independently.
 
-Before rollout, verify a real passage for each of KJV, MSG and GNT, its copyright,
-the FUMS request, saved defaults after reload, and fallback behavior. Automated
+Before rollout, verify a real passage for each of KJV, NKJV and MSG, its copyright,
+the FUMS request, saved defaults after reload, legacy NKJV preferences, and KJV
+fallback behavior (including both services failing). Automated
 tests use synthetic text and do not require or transmit a real API key.
+The local checkout has no provider key, so production NKJV access remains a
+rollout check. No deployment or account changes are performed by the implementation.
 
 Provider references:
 - https://docs.api.bible/quick-start/working-with-bibles/
@@ -72,8 +96,8 @@ seven-day expiry stays below the recommended 14-day refresh interval).
 
 ## Curated additional translations
 
-The catalog route (`GET /api/api-bible` without query parameters) considers only
-Revised Version 1885 (RV), Douay-Rheims American 1899 (DRA), Translation for
+The catalog route (`GET /api/api-bible` without query parameters) considers
+Good News Translation (GNT), Revised Version 1885 (RV), Douay-Rheims American 1899 (DRA), Translation for
 Translators (T4T), updated Brenton Septuagint (LXXUP), JPS Tanakh 1917 (OJPS), and
 Targum Onkelos Etheridge (OKE). Before returning each option, it verifies a
 Genesis 1:1 passage and a publisher copyright notice with the configured key.

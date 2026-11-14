@@ -1,7 +1,8 @@
 const { passageIds } = require('./youversion.cjs');
 const API = 'https://rest.api.bible/v1';
 const EDITIONS = {
-  KJV: { title: 'King James Version' }, MSG: { title: 'The Message' }, GNT: { title: 'Good News Translation' },
+  KJV: { title: 'King James Version' }, NKJV: { title: 'New King James Version' },
+  MSG: { title: 'The Message' }, GNT: { title: 'Good News Translation', discover: true },
   RV: { title: 'Revised Version 1885', discover: true },
   DRA: { title: 'Douay-Rheims American 1899', discover: true },
   T4T: { title: 'Translation for Translators', discover: true },
@@ -82,6 +83,7 @@ async function passage(reference, preferred, key, fetcher = fetch) {
   }
   const { upstreamId, ...publicVersion } = version;
   publicVersion.copyright = [...new Set(parts.map(p => p.data.copyright || version.copyright).filter(Boolean))].join('\n');
+  if (!publicVersion.copyright.trim()) return { status: 404, error: 'Publisher attribution is unavailable.' };
   return { text: parts.map(p => p.data.content.trim()).join('\n\n'), version: publicVersion,
     provider: 'api-bible', fallback: false, reference,
     fumsTokens: parts.map(p => p.meta?.fumsToken).filter(t => typeof t === 'string' && t.length < 4096) };
