@@ -119,7 +119,7 @@ test('Enter explicitly accepts the first search result but not the disabled no-m
   listeners.keydown.forEach(fn => fn({ key: 'Enter', target, preventDefault() {} }));
   assert.equal(select.value, '1588');
   assert.equal(changes, 1);
-  assert.equal(testApi.state.settings.bibleVersion, 'APIBIBLE_KJV');
+  assert.equal(testApi.state.settings.bibleVersion, 'APIBIBLE_NKJV');
   select.value = 'ASV'; select.options = [{ disabled: true, value: 'ASV' }];
   listeners.keydown.forEach(fn => fn({ key: 'Enter', target, preventDefault() {} }));
   assert.equal(changes, 1);

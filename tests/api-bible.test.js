@@ -239,9 +239,17 @@ test('unverified GNT is not offered to new selections but existing saved GNT rem
   assert.match(api.options('APIBIBLE_GNT', ''), /value="APIBIBLE_GNT" selected>GNT — Good News Translation \(currently unavailable\)/);
 });
 
+test('NKJV is the initial default and is used when no valid preference is saved', () => {
+  const { api } = ui(async () => json({}));
+  assert.equal(api.state.settings.bibleVersion, 'APIBIBLE_NKJV');
+  for (const raw of [null, '{}', '{"settings":{}}', '{"settings":{"bibleVersion":"invalid"}}']) {
+    assert.equal(api.restore(raw).settings.bibleVersion, 'APIBIBLE_NKJV');
+  }
+});
+
 test('saved profiles and backups retain old and new translation IDs and study progress', () => {
   const { api } = ui(async () => json({}));
-  for (const id of ['APIBIBLE_NKJV', 'NKJV', '114', 'APIBIBLE_GNT', 'APIBIBLE_MSG', '3034', 'ESV']) {
+  for (const id of ['APIBIBLE_KJV', 'APIBIBLE_NKJV', 'NKJV', '114', 'APIBIBLE_GNT', 'APIBIBLE_MSG', '3034', 'ESV']) {
     const data = { settings: { bibleVersion: id }, seeded: true,
       decks: [{ id: 'd1', title: 'Study', cards: [{ id: 'q1', question: 'Question', options: ['A', 'B', 'C', 'D'], answer: 'A' }] }],
       progress: { d1: { cards: { q1: { attempts: 3, misses: 1 } }, best: { pct: 80 } } } };
@@ -271,7 +279,7 @@ test('NKJV failures request KJV once and never substitute a different translatio
     assert.equal(result.fallback, true);
     assert.equal(urls.length, 2);
     assert.match(urls[1], /version=APIBIBLE_KJV/);
-    assert.equal(api.state.settings.bibleVersion, 'APIBIBLE_KJV');
+    assert.equal(api.state.settings.bibleVersion, 'APIBIBLE_NKJV');
   }
 });
 
@@ -386,7 +394,7 @@ test('rendered preview shows API.Bible attribution, correct link and fallback la
   assert.equal(nodes['.bible-preview-copyright'].textContent, 'Publisher copyright Provided by API.Bible.');
   assert.match(nodes['.bible-preview-open'].href, /biblegateway.com.*version=MSG/);
   assert.equal(h.window.fumsData.length, 1);
-  assert.equal(h.api.state.settings.bibleVersion, 'APIBIBLE_KJV');
+  assert.equal(h.api.state.settings.bibleVersion, 'APIBIBLE_NKJV');
   fail = true;
   h.api.load(link, preview, 'APIBIBLE_MSG');
   await new Promise(resolve => setImmediate(resolve));

@@ -3,7 +3,7 @@
 KJV (King James Version), NKJV (New King James Version), and MSG (The Message)
 are built-in choices in Settings and Bible previews. Their stable preference IDs
 are `APIBIBLE_KJV`, `APIBIBLE_NKJV`, and `APIBIBLE_MSG`; backups and profile settings
-preserve these IDs. KJV is the initial default for new profiles and for missing
+preserve these IDs. NKJV is the initial default for new profiles and for missing
 or invalid preferences; existing valid saved choices are preserved. Preview
 changes remain temporary.
 
@@ -16,7 +16,7 @@ No new key or subscription change is required by this implementation.
 Legacy `NKJV` and YouVersion NKJV ID `114` preferences resolve through API.Bible
 without rewriting the saved value. Other catalog IDs identified as NKJV also use
 API.Bible. Duplicate provider entries remain a single picker row, retaining the
-selected ID. New profiles still default to KJV; other saved translations stay intact.
+selected ID. New profiles default to NKJV; other saved translations stay intact.
 GNT is no longer an unconditional choice: it appears only after a successful
 catalog passage check (or through the independently licensed YouVersion catalog).
 An existing `APIBIBLE_GNT` preference remains valid and visible with an unavailable

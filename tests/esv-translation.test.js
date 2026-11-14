@@ -103,7 +103,7 @@ function previewUi(fetcher) {
 test('ESV is offered in the preview and Settings dropdown and can be saved as the default', () => {
   const h = previewUi(async () => response({}));
   assert.equal(h.ui.valid('ESV'), 'ESV');
-  assert.equal(h.ui.valid('esv'), 'APIBIBLE_KJV');
+  assert.equal(h.ui.valid('esv'), 'APIBIBLE_NKJV');
   const options = h.ui.options('ASV', '');
   assert.match(options, /<option value="ESV">ESV — English Standard Version \(Crossway\)<\/option>/);
   assert.ok(options.indexOf('value="ASV"') < options.indexOf('value="ESV"') && options.indexOf('value="ESV"') < options.indexOf('value="APIBIBLE_KJV"'));
@@ -111,7 +111,7 @@ test('ESV is offered in the preview and Settings dropdown and can be saved as th
   assert.match(h.ui.options('ASV', 'crossway'), /value="ESV"/);
   assert.doesNotMatch(h.ui.options('ASV', 'crossway'), /King James/);
   assert.match(h.ui.options('ESV', ''), /value="ESV" selected/);
-  assert.equal(h.ui.state.settings.bibleVersion, 'APIBIBLE_KJV', 'KJV is the initial default');
+  assert.equal(h.ui.state.settings.bibleVersion, 'APIBIBLE_NKJV', 'NKJV is the initial default');
   h.change({ dataset: { bibleVersion: 'default' }, value: 'ESV' });
   assert.equal(h.ui.state.settings.bibleVersion, 'ESV');
 });
@@ -130,7 +130,7 @@ test('choosing ESV loads text from /api/esv-passage with the ESV notice and a li
   assert.equal(h.nodes['.bible-preview-esv-link'].hidden, false);
   assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.esv.org/John+3:16/');
   assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open passage on ESV.org');
-  assert.equal(h.ui.state.settings.bibleVersion, 'APIBIBLE_KJV', 'a preview choice does not change the saved default');
+  assert.equal(h.ui.state.settings.bibleVersion, 'APIBIBLE_NKJV', 'a preview choice does not change the saved default');
 });
 
 test('reopening an ESV passage uses the in-memory copy instead of another API request', async () => {
@@ -227,7 +227,7 @@ for (const [label, esvReply] of [
     assert.equal(h.nodes['.bible-preview-esv-link'].hidden, true, 'the ESV notice is only shown with ESV text');
     assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/12/JHN.3.16');
     assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open passage on YouVersion');
-    assert.equal(h.ui.state.settings.bibleVersion, 'APIBIBLE_KJV');
+    assert.equal(h.ui.state.settings.bibleVersion, 'APIBIBLE_NKJV');
   });
 }
 

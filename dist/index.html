@@ -11641,7 +11641,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
   'use strict';
   var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, ProgressSync = window.CCIProgressSync, Account = window.CCIAccount, TranscriptTools = window.CCITranscripts, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 14;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
-  function defaultStudyState() { return { decks: [], progress: {}, settings: { theme: 'auto', bibleVersion: 'APIBIBLE_KJV', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, cloudSyncDeviceId: null, seeded: false, dataVersion: 0, pausedSession: null }; }
+  function defaultStudyState() { return { decks: [], progress: {}, settings: { theme: 'auto', bibleVersion: 'APIBIBLE_NKJV', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, cloudSyncDeviceId: null, seeded: false, dataVersion: 0, pausedSession: null }; }
   var S = defaultStudyState();
   var STARTER_DECKS = [], DEVOTIONALS = [], LESSON_VIDEOS = [];
   var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, suppressBiblePreviewFocus = null, suppressBiblePreviewHover = null;
@@ -11762,7 +11762,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     { id: 'APIBIBLE_KJV', abbreviation: 'KJV', title: 'King James Version' },
     { id: 'APIBIBLE_NKJV', abbreviation: 'NKJV', title: 'New King James Version' },
     { id: 'APIBIBLE_MSG', abbreviation: 'MSG', title: 'The Message' }];
-  function validBibleVersion(value) { return /^(?:[1-9]\d{0,9}|NKJV|ASV|ESV|APIBIBLE_(?:KJV|NKJV|MSG|GNT|RV|DRA|T4T|LXXUP|OJPS|OKE))$/.test(String(value || '')) ? String(value) : 'APIBIBLE_KJV'; }
+  function validBibleVersion(value) { return /^(?:[1-9]\d{0,9}|NKJV|ASV|ESV|APIBIBLE_(?:KJV|NKJV|MSG|GNT|RV|DRA|T4T|LXXUP|OJPS|OKE))$/.test(String(value || '')) ? String(value) : 'APIBIBLE_NKJV'; }
   function bibleTranslationKey(abbreviation) { return String(abbreviation || '').replace(/^eng/i, '').toUpperCase(); }
   function bibleVersionInfo(id) {
     var found = builtinBibleVersions.concat(bibleVersions).find(function (version) { return version.id === id; });
