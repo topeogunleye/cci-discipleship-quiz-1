@@ -31,6 +31,9 @@ async function upstream(path, key, fetcher) {
   return response.json();
 }
 const CATALOG_TTL_MS = 60 * 60 * 1000;
+function attribution(bible) {
+  return [bible.copyright, bible.promotional_content].find(value => typeof value === 'string' && value.trim()) || '';
+}
 let cachedCatalog = null;
 let cachedCatalogKey = '';
 let cachedCatalogTime = 0;
@@ -62,7 +65,7 @@ async function versions(key, fetcher = fetch, force = false) {
       if (!Array.isArray(page.data)) throw new Error('Invalid Bible catalog');
       for (const bible of page.data) {
         if (!Number.isSafeInteger(bible.id) || !/^en(?:-|$)/i.test(bible.language_tag || '')) continue;
-        result.push({ id: String(bible.id), abbreviation: String(bible.abbreviation || ''), title: String(bible.title || bible.localized_title || ''), copyright: String(bible.copyright || ''), publisher: String(bible.publisher_name || '') });
+        result.push({ id: String(bible.id), abbreviation: String(bible.abbreviation || ''), title: String(bible.title || bible.localized_title || ''), copyright: attribution(bible), publisher: String(bible.publisher_name || '') });
       }
       token = page.next_page_token || '';
       if (token && tokens.has(token)) throw new Error('Repeated catalog page');
@@ -93,6 +96,13 @@ async function passage(reference, preferred, catalog, key, fetcher = fetch) {
   // Bounded retries avoid amplifying outages. Never combine different translations.
   for (const bible of [requested, ...alternatives].filter(Boolean).slice(0, 3)) {
     try {
+      // Some licensed editions expose attribution only in their detailed metadata.
+      // These reads use the same quota-protected fetcher as every passage request.
+      if (!String(bible.copyright || '').trim()) {
+        const details = await upstream('/bibles/' + bible.id, key, fetcher);
+        bible.copyright = attribution(details.data || details);
+      }
+      if (!String(bible.copyright || '').trim()) continue;
       const parts = await Promise.all(ids.map(id => upstream('/bibles/' + bible.id + '/passages/' + encodeURIComponent(id) + '?format=text', key, fetcher)));
       if (parts.some(p => typeof p.content !== 'string' || !p.content.trim())) continue;
       const book = reference.trim().match(/^([1-3]?\s*[A-Za-z ]+?)\s+\d/)[1];

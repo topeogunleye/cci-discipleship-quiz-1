@@ -1,7 +1,11 @@
 # API.Bible translations
 
-KJV (King James Version), NKJV (New King James Version), and MSG (The Message)
-are built-in choices in Settings and Bible previews. Their stable preference IDs
+Settings and Bible previews offer exactly AMP, NIV, NKJV, KJV, MSG and ESV, in that
+order, with no translation search field. AMP and NIV use YouVersion; NKJV, KJV and
+MSG use API.Bible; ESV uses Crossway. Other editions are available by opening the
+passage on YouVersion and changing its translation there.
+
+The stable API.Bible preference IDs
 are `APIBIBLE_KJV`, `APIBIBLE_NKJV`, and `APIBIBLE_MSG`; backups and profile settings
 preserve these IDs. NKJV is the initial default for new profiles and for missing
 or invalid preferences; existing valid saved choices are preserved. Preview
@@ -17,10 +21,11 @@ Legacy `NKJV` and YouVersion NKJV ID `114` preferences resolve through API.Bible
 without rewriting the saved value. Other catalog IDs identified as NKJV also use
 API.Bible. Duplicate provider entries remain a single picker row, retaining the
 selected ID. New profiles default to NKJV; other saved translations stay intact.
-GNT is no longer an unconditional choice: it appears only after a successful
-catalog passage check (or through the independently licensed YouVersion catalog).
-An existing `APIBIBLE_GNT` preference remains valid and visible with an unavailable
-label when absent from the catalog; backups and profiles never silently reset it.
+Saved IDs for the six retained translations are preserved, including equivalent
+YouVersion IDs and the NIV UK edition. Preferences for removed editions remain in
+profiles and backups, but the picker and new previews use NKJV until the learner
+chooses another translation. The picker explains this rather than appending a
+seventh option or silently overwriting the saved preference.
 
 Set `API_BIBLE_KEY` as an encrypted Cloudflare Pages secret in Production and any
 Preview environment that needs this integration. For local testing, put it in the
@@ -37,8 +42,9 @@ chapter endpoints for whole chapters. Multipart references return only complete
 results from one translation. No partial passage is shown after a failed request.
 
 The preview displays the returned publisher copyright and API.Bible attribution,
-and offers a BibleGateway link where an exact supported translation is known,
-otherwise a clearly labelled YouVersion passage search. Web displays report
+and offers a YouVersion passage link, including separate links for multipart
+references. ESV retains its required Crossway copyright link alongside the primary
+YouVersion action. Web displays report
 the returned FUMS tokens through the official tracker, loaded only when API.Bible
 text is displayed. No account ID or learner details are supplied to the tracker.
 The CSP permits only the additional tracker script and its reporting endpoint.
@@ -94,7 +100,11 @@ text. This adds no offline Bible downloads or ESV server caching.
 Policy: https://care.api.bible/article/401-caching-content (refresh within 30 days;
 seven-day expiry stays below the recommended 14-day refresh interval).
 
-## Curated additional translations
+## Legacy catalog compatibility
+
+Additional editions no longer appear in the current client. Its fixed picker
+does not request the API.Bible catalog route or spend quota probing those editions.
+The following endpoint remains for previously installed clients.
 
 The catalog route (`GET /api/api-bible` without query parameters) considers
 Good News Translation (GNT), Revised Version 1885 (RV), Douay-Rheims American 1899 (DRA), Translation for
@@ -106,16 +116,14 @@ requests; probe text and FUMS tokens are never returned. Permission-denied,
 missing, empty or unattributed samples are omitted. Temporary failures remain
 retryable. Only actual displayed passages are reported as FUMS views.
 
-The final three choices appear in an “Additional editions” group with coverage
-labels: the Septuagint and Tanakh cover the Old Testament; Onkelos covers the
+In older clients the final three choices appeared in an “Additional editions” group
+with coverage labels: the Septuagint and Tanakh cover the Old Testament; Onkelos covers the
 Torah (Genesis–Deuteronomy). Requests outside those books return unavailable,
 allowing the existing clearly labelled fallback rather than mislabelling text.
 
-Both catalogs load independently, so a provider outage does not hide the other's
-versions. A partially loaded catalog retries on the next selector interaction.
-Duplicate abbreviations (including the English `eng` prefix) and regional NIV,
-WEB and WMB editions share one picker row; an existing saved provider ID is
-preserved when it matches that row. ASV, BSB, FBV, Geneva, LSV, TCENT, Orthodox
+The current client optionally loads YouVersion metadata to recognize legacy saved
+IDs; a failed metadata request can retry on the next selector interaction and never
+hides the six fixed choices. ASV, BSB, FBV, Geneva, LSV, TCENT, Orthodox
 Jewish Bible, WEBUS and WMB translations have API.Bible backup routes when the
 YouVersion request is unavailable or substitutes another translation. A successful
 equivalent-provider response keeps the requested translation and displays the

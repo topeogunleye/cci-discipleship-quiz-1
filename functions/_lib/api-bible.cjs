@@ -84,8 +84,16 @@ async function passage(reference, preferred, key, fetcher = fetch) {
   const { upstreamId, ...publicVersion } = version;
   publicVersion.copyright = [...new Set(parts.map(p => p.data.copyright || version.copyright).filter(Boolean))].join('\n');
   if (!publicVersion.copyright.trim()) return { status: 404, error: 'Publisher attribution is unavailable.' };
+  const youVersionId = { KJV: 1, NKJV: 114, MSG: 97 }[version.abbreviation];
+  const bookName = reference.trim().match(/^([1-3]?\s*[A-Za-z ]+?)\s+\d/)[1];
+  const links = youVersionId ? ids.map(id => {
+    const [, chapter, verses] = id.split('.');
+    return { label: bookName + ' ' + chapter + (verses ? ':' + verses.replace(/-/g, '–') : ''),
+      url: 'https://www.bible.com/bible/' + youVersionId + '/' + id };
+  }) : [];
   return { text: parts.map(p => p.data.content.trim()).join('\n\n'), version: publicVersion,
     provider: 'api-bible', fallback: false, reference,
+    ...(links.length ? { url: links[0].url, links } : {}),
     fumsTokens: parts.map(p => p.meta?.fumsToken).filter(t => typeof t === 'string' && t.length < 4096) };
 }
 

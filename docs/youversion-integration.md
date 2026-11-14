@@ -6,19 +6,26 @@ environment (Production and, if desired, Preview). Do not put it in frontend
 code, a committed environment file, or a screenshot. A new deployment is needed
 to use the Function and secret together. No deployment is performed by this change.
 
-The catalog follows every page of licensed English translations returned by
+The server catalog follows every page of licensed English translations returned by
 YouVersion (`language_ranges[]=en`, without `all_available=true`). It does not
 assume the NKJV license has been granted. Accept any required publisher licenses
 in the YouVersion portal yourself, then verify the catalog with your App Key.
 
 Settings saves a default per local learner profile, included in existing backups.
-NKJV is the initial preference. A verse preview has its own searchable translation
-selector; its choice resets on reopening and never changes the saved default.
+NKJV is the initial preference. Settings and previews offer just AMP, NIV, NKJV,
+KJV, MSG and ESV, without a search field. A verse preview's selection resets on
+reopening and never changes the saved default. All primary external passage links
+open on YouVersion, where learners can select additional translations. The current
+client uses the catalog only for saved-ID metadata, not to add picker options.
 If the preference is absent or the passage returns 403/404, the service tries
 available alternatives, favoring NKJV, KJV, BSB, then WEBUS. It makes at most three
 translation attempts. Every passage uses one translation throughout. The UI shows
 the actual translation, publisher copyright, YouVersion link and an explicit
 fallback notice. Timeouts/rate limits do not trigger a catalog-wide request storm.
+Publisher attribution prefers `copyright`, then `promotional_content`, following
+YouVersion's SDK guidance. If both are absent from the catalog, the server reads
+the edition's detailed metadata through the existing rate limiter. Unattributed
+text is not displayed. Resolved metadata shares the existing one-hour catalog TTL.
 
 Passage text uses textContent, never publisher-provided HTML. It is not persisted
 in local storage or cached by the service worker; responses have no-store headers.

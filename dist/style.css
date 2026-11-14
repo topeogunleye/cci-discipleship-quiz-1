@@ -9433,7 +9433,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 /* Bible translation controls stay usable inside narrow verse previews. */
 .bible-version-picker { display: grid; gap: 8px; width: 100%; min-width: 0; }
 .bible-version-picker label { display: grid; gap: 4px; font-size: 13px; }
-.bible-version-picker input, .bible-version-picker select { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.bible-version-picker select { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
 .bible-preview-notice, .bible-preview-copyright { display: block; margin-top: 8px; font-size: 12px; }
 .bible-preview-notice:empty, .bible-preview-copyright:empty { display: none; }
 .bible-preview-esv-link { display: inline-block; margin-top: 4px; font-size: 12px; }

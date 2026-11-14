@@ -50,6 +50,36 @@ test('NKJV is preferred and returns actual version, copyright and passage link',
   assert.equal(result.url, 'https://www.bible.com/bible/2/JHN.3.16');
 });
 
+test('publisher promotional attribution is retained when the catalog copyright is empty', async () => {
+  bible.__test.clearCatalogCache();
+  const versions = await bible.versions('promotional-notice', async () => response({ data: [{
+    id: 1588, abbreviation: 'AMP', language_tag: 'en', copyright: ' ', promotional_content: 'Synthetic AMP publisher notice'
+  }] }));
+  assert.equal(versions[0].copyright, 'Synthetic AMP publisher notice');
+  bible.__test.clearCatalogCache();
+});
+
+test('missing attribution is resolved from detailed metadata before text is served', async () => {
+  const versions = [{ id: '111', abbreviation: 'NIV11', copyright: '' }], urls = [];
+  const fetcher = async url => {
+    urls.push(url);
+    return response(url.endsWith('/bibles/111') ? { promotional_content: 'Synthetic NIV publisher notice' } : { content: 'Synthetic verse' });
+  };
+  const result = await bible.passage('John 3:16', '111', versions, 'details-key', fetcher);
+  assert.equal(result.version.copyright, 'Synthetic NIV publisher notice');
+  assert.equal(result.fallback, false);
+  assert.match(urls[0], /\/bibles\/111$/);
+  await bible.passage('John 3:16', '111', versions, 'details-key', fetcher);
+  assert.equal(urls.length, 3, 'resolved attribution is reused with the catalog metadata');
+  let textCalls = 0;
+  const unavailable = await bible.passage('John 3:16', '111', [{ id: '111', abbreviation: 'NIV11', copyright: '' }], 'no-notice', async url => {
+    if (url.includes('/passages/')) textCalls++;
+    return response({});
+  });
+  assert.equal(unavailable.status, 404);
+  assert.equal(textCalls, 0);
+});
+
 test('unlicensed or missing passages fall back with a label and no mixed translations', async () => {
   const result = await bible.passage('John 3:16,18', 'NKJV', catalog, 'key', async url => {
     if (url.includes('/2/') && url.includes('3.18')) return new Response('', { status: 403 });

@@ -33,6 +33,11 @@ test('API.Bible discovers only selected English translations, caches metadata an
     assert.equal(result.provider, 'api-bible');
     assert.deepEqual(result.fumsTokens, ['view-token', 'view-token']);
     assert.equal(result.version.upstreamId, undefined);
+    const youVersionId = { KJV: 1, NKJV: 114, MSG: 97 }[abbreviation];
+    if (youVersionId) assert.deepEqual(result.links.map(link => link.url), [
+      'https://www.bible.com/bible/' + youVersionId + '/JHN.3.16-18',
+      'https://www.bible.com/bible/' + youVersionId + '/JHN.3.20'
+    ]);
     assert.match(paths.at(-2), /\/passages\/JHN.3.16-JHN.3.18\?/);
     assert.match(paths.at(-1), /\/passages\/JHN.3.20\?/);
   }
@@ -183,7 +188,7 @@ function ui(fetcher) {
     bibleVersions = [{id:'12', abbreviation:'ASV', title:'American Standard Version'}];
     window.testApi = { request: requestBiblePassage, options: bibleVersionOptions, valid: validBibleVersion,
       report: reportApiBibleView, state: S, load: loadBiblePreviewText, catalog: loadBibleVersions,
-      clearCatalog: function() { bibleVersions = []; },
+      clearCatalog: function() { bibleVersions = []; bibleVersionsLoaded = false; },
       setCatalog: function(versions) { bibleVersions = versions; },
       restore: function(raw) { loadSavedState(raw); return S; }, backup: validateBackup,
       activate: function(link, preview) { activeBiblePreview = {link:link, preview:preview}; } };
@@ -231,12 +236,13 @@ test('new and legacy NKJV preferences use API.Bible without rewriting saved IDs 
   }
 });
 
-test('unverified GNT is not offered to new selections but existing saved GNT remains intact', async () => {
+test('removed GNT is not offered while its saved preference remains intact', async () => {
   const { api, listeners } = ui(async () => json({ versions: [] }));
   assert.doesNotMatch(api.options('ASV', ''), /APIBIBLE_GNT/);
   listeners.change.forEach(fn => fn({ target: { dataset: { bibleVersion: 'default' }, value: 'APIBIBLE_GNT' } }));
   assert.equal(api.state.settings.bibleVersion, 'APIBIBLE_GNT');
-  assert.match(api.options('APIBIBLE_GNT', ''), /value="APIBIBLE_GNT" selected>GNT — Good News Translation \(currently unavailable\)/);
+  assert.doesNotMatch(api.options('APIBIBLE_GNT', ''), /APIBIBLE_GNT/);
+  assert.match(api.options('APIBIBLE_GNT', ''), /value="APIBIBLE_NKJV" selected/);
 });
 
 test('NKJV is the initial default and is used when no valid preference is saved', () => {
@@ -333,18 +339,18 @@ test('same-translation backup uses API.Bible before accepting another YouVersion
   }
 });
 
-test('catalog combines providers, admits only verified curated API editions and retries a failed provider', async () => {
+test('catalog retries unavailable YouVersion metadata without adding editions or spending API.Bible quota', async () => {
   let unavailable = true;
   const urls = [];
   const h = ui(async url => {
     urls.push(url);
-    if (url.endsWith('/api/api-bible')) return unavailable ? new Response(null, { status: 503 }) : json({ versions: [
+    assert.ok(url.endsWith('/api/bible'));
+    return unavailable ? new Response(null, { status: 503 }) : json({ versions: [
       { id: 'APIBIBLE_RV', abbreviation: 'RV', title: 'Revised Version 1885' },
       { id: 'APIBIBLE_GNT', abbreviation: 'GNT', title: 'Good News Translation' },
       { id: 'APIBIBLE_OJPS', abbreviation: 'OJPS', title: 'JPS Tanakh 1917', group: 'Additional editions', coverage: 'Old Testament' },
       { id: 'APIBIBLE_NIV', abbreviation: 'NIV', title: 'Uncurated version' }
     ] });
-    return json({ versions: [{ id: '12', abbreviation: 'ASV', title: 'American Standard Version' }] });
   });
   h.api.clearCatalog();
   await h.api.catalog();
@@ -352,14 +358,11 @@ test('catalog combines providers, admits only verified curated API editions and 
   unavailable = false;
   await h.api.catalog();
   const html = h.api.options('ASV', '');
-  assert.match(html, /APIBIBLE_RV/);
-  assert.match(html, /APIBIBLE_GNT/);
-  assert.match(html, /<optgroup label="Additional editions">/);
-  assert.doesNotMatch(html, /APIBIBLE_NIV/);
-  assert.equal((html.match(/>ASV —/g) || []).length, 1);
-  assert.equal(urls.length, 4);
+  assert.doesNotMatch(html, /APIBIBLE_RV|APIBIBLE_GNT|APIBIBLE_NIV|optgroup|>ASV —/);
+  assert.equal((html.match(/<option /g) || []).length, 6);
+  assert.equal(urls.length, 2);
   await h.api.catalog();
-  assert.equal(urls.length, 4, 'complete catalogs do not fetch again during this session');
+  assert.equal(urls.length, 2, 'complete catalogs do not fetch again during this session');
   for (const abbreviation of ['RV', 'DRA', 'T4T', 'LXXUP', 'OJPS', 'OKE']) {
     assert.equal(h.api.valid('APIBIBLE_' + abbreviation), 'APIBIBLE_' + abbreviation);
   }
@@ -381,7 +384,7 @@ test('rendered preview shows API.Bible attribution, correct link and fallback la
   let fail = false;
   const h = ui(async url => {
     if (url.includes('/api/api-bible')) return fail ? new Response(null, { status: 403 }) : json({
-      text: 'Synthetic MSG text', provider: 'api-bible', version: { abbreviation: 'MSG', copyright: 'Publisher copyright' }, fumsTokens: ['displayed-token']
+      text: 'Synthetic MSG text', provider: 'api-bible', version: { abbreviation: 'MSG', copyright: 'Publisher copyright' }, fumsTokens: ['displayed-token'], url: 'https://www.bible.com/bible/97/JHN.3.16'
     });
     return json({ text: 'Synthetic ASV text', fallback: false, version: { abbreviation: 'ASV', copyright: 'ASV notice' } });
   });
@@ -392,7 +395,8 @@ test('rendered preview shows API.Bible attribution, correct link and fallback la
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(nodes['.bible-preview-text'].textContent, 'Synthetic MSG text');
   assert.equal(nodes['.bible-preview-copyright'].textContent, 'Publisher copyright Provided by API.Bible.');
-  assert.match(nodes['.bible-preview-open'].href, /biblegateway.com.*version=MSG/);
+  assert.equal(nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/97/JHN.3.16');
+  assert.equal(nodes['.bible-preview-open'].textContent, 'Open passage on YouVersion');
   assert.equal(h.window.fumsData.length, 1);
   assert.equal(h.api.state.settings.bibleVersion, 'APIBIBLE_NKJV');
   fail = true;
@@ -413,7 +417,8 @@ test('NKJV preview displays the actual translation, copyright, link and view tra
       if ((version === 'APIBIBLE_NKJV' && unavailable) || kjvUnavailable) return new Response(null, { status: 403 });
       const abbreviation = version.slice(9);
       return json({ text: 'Synthetic ' + abbreviation, provider: 'api-bible', fallback: false,
-        version: { abbreviation, copyright: abbreviation + ' publisher notice' }, fumsTokens: [abbreviation + '-view'] });
+        version: { abbreviation, copyright: abbreviation + ' publisher notice' }, fumsTokens: [abbreviation + '-view'],
+        url: 'https://www.bible.com/bible/' + (abbreviation === 'NKJV' ? '114' : '1') + '/JHN.3.16' });
     });
     const nodes = Object.fromEntries(['[data-bible-version]', '.bible-preview-version', '.bible-preview-notice', '.bible-preview-copyright', '.bible-preview-open', '.bible-preview-text', '.bible-preview-fallback', '.bible-preview-esv-link', '.bible-preview-parts'].map(key => [key, { value: savedId, dataset: {}, textContent: '', innerHTML: '', hidden: false }]));
     const preview = { querySelector: key => nodes[key] }, link = { textContent: 'John 3:16' };
@@ -425,7 +430,7 @@ test('NKJV preview displays the actual translation, copyright, link and view tra
     assert.equal(nodes['.bible-preview-text'].textContent, 'Synthetic NKJV');
     assert.equal(nodes['.bible-preview-notice'].textContent, '');
     assert.equal(nodes['.bible-preview-copyright'].textContent, 'NKJV publisher notice Provided by API.Bible.');
-    assert.match(nodes['.bible-preview-open'].href, /version=NKJV$/);
+    assert.equal(nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/114/JHN.3.16');
     assert.equal(h.window.fumsData.length, 1);
     unavailable = true;
     h.api.load(link, preview, savedId);
@@ -434,7 +439,7 @@ test('NKJV preview displays the actual translation, copyright, link and view tra
     assert.equal(nodes['.bible-preview-text'].textContent, 'Synthetic KJV');
     assert.equal(nodes['.bible-preview-notice'].textContent, 'NKJV unavailable — showing KJV. Your saved default is unchanged.');
     assert.equal(nodes['.bible-preview-copyright'].textContent, 'KJV publisher notice Provided by API.Bible.');
-    assert.match(nodes['.bible-preview-open'].href, /version=KJV$/);
+    assert.equal(nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/1/JHN.3.16');
     assert.equal(h.window.fumsData.length, 2);
     kjvUnavailable = true;
     h.api.load(link, preview, savedId);

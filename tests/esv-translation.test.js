@@ -106,17 +106,16 @@ test('ESV is offered in the preview and Settings dropdown and can be saved as th
   assert.equal(h.ui.valid('esv'), 'APIBIBLE_NKJV');
   const options = h.ui.options('ASV', '');
   assert.match(options, /<option value="ESV">ESV — English Standard Version \(Crossway\)<\/option>/);
-  assert.ok(options.indexOf('value="ASV"') < options.indexOf('value="ESV"') && options.indexOf('value="ESV"') < options.indexOf('value="APIBIBLE_KJV"'));
+  assert.equal((options.match(/<option /g) || []).length, 6);
+  assert.doesNotMatch(options, /value="ASV"/);
   assert.doesNotMatch(options, /value="1"/, 'duplicate KJV provider row is hidden');
-  assert.match(h.ui.options('ASV', 'crossway'), /value="ESV"/);
-  assert.doesNotMatch(h.ui.options('ASV', 'crossway'), /King James/);
   assert.match(h.ui.options('ESV', ''), /value="ESV" selected/);
   assert.equal(h.ui.state.settings.bibleVersion, 'APIBIBLE_NKJV', 'NKJV is the initial default');
   h.change({ dataset: { bibleVersion: 'default' }, value: 'ESV' });
   assert.equal(h.ui.state.settings.bibleVersion, 'ESV');
 });
 
-test('choosing ESV loads text from /api/esv-passage with the ESV notice and a link to esv.org', async () => {
+test('choosing ESV keeps Crossway attribution and offers the primary passage link on YouVersion', async () => {
   const urls = [];
   const h = previewUi(async url => { urls.push(url); return response({ text: 'For God so loved the world. (ESV)' }); });
   h.change({ dataset: { bibleVersion: 'preview' }, value: 'ESV' });
@@ -128,8 +127,8 @@ test('choosing ESV loads text from /api/esv-passage with the ESV notice and a li
   assert.match(h.nodes['.bible-preview-copyright'].textContent, /ESV® Bible.*Crossway.*Used by permission/);
   assert.equal(h.nodes['.bible-preview-notice'].textContent, '');
   assert.equal(h.nodes['.bible-preview-esv-link'].hidden, false);
-  assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.esv.org/John+3:16/');
-  assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open passage on ESV.org');
+  assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.bible.com/search/bible?q=John%203%3A16');
+  assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open passage on YouVersion');
   assert.equal(h.ui.state.settings.bibleVersion, 'APIBIBLE_NKJV', 'a preview choice does not change the saved default');
 });
 
@@ -143,6 +142,18 @@ test('reopening an ESV passage uses the in-memory copy instead of another API re
   assert.equal(requests, 1);
   assert.equal(h.nodes['.bible-preview-text'].textContent, 'Fixture (ESV)');
   assert.equal(h.nodes['.bible-preview-esv-link'].hidden, false);
+});
+
+test('legacy YouVersion ESV preferences use Crossway while keeping the saved ID', async () => {
+  const urls = [];
+  const h = previewUi(async url => { urls.push(url); return response({ text: 'Synthetic ESV' }); });
+  h.ui.state.settings.bibleVersion = '59';
+  h.ui.load(h.link, h.preview, '59');
+  await flush();
+  assert.equal(urls.length, 1);
+  assert.match(urls[0], /\/api\/esv-passage/);
+  assert.equal(h.nodes['.bible-preview-version'].textContent, 'ESV');
+  assert.equal(h.ui.state.settings.bibleVersion, '59');
 });
 
 test('the in-memory ESV copy is bounded', async () => {
