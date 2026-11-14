@@ -88,7 +88,7 @@ test('specialist editions reject books outside their coverage without requesting
   assert.equal(calls, 1);
 });
 
-test('API.Bible endpoint validates, protects quota, hides secrets and never caches passages', async () => {
+test('API.Bible endpoint validates, protects quota, hides secrets and prevents client passage caching', async () => {
   let calls = 0, reservations = 0;
   const handler = loadFunction('functions/api/api-bible.js', { fetch: async () => {
     calls++;

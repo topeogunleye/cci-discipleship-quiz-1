@@ -14,8 +14,9 @@ ignored `.dev.vars` file. The key is never sent to the browser. Existing
 
 The `/api/api-bible` Function discovers English translations in the key's
 accessible `/bibles` catalog without hardcoding publisher-specific IDs. Metadata
-is cached in memory for one hour; passage
-text and tracking tokens use `no-store` and never enter the offline asset cache.
+is cached in memory for one hour. Client passage responses use `no-store` and
+never enter the offline asset cache; the server keeps successful API.Bible
+Scripture responses in the Cloudflare edge cache for seven days as described below.
 References reuse the existing parser, with full API.Bible verse-range IDs and
 chapter endpoints for whole chapters. Multipart references return only complete
 results from one translation. No partial passage is shown after a failed request.
@@ -46,6 +47,28 @@ Provider references:
 - https://docs.api.bible/guides/passages/
 - https://docs.api.bible/resources/fair-use/
 - https://docs.api.bible/quick-start/rate-limiting/
+
+## Seven-day Scripture cache
+
+API.Bible chapter and passage responses are cached with the Cloudflare Cache API
+for 604,800 seconds. Cache keys hash the provider key and complete upstream URL,
+isolating credentials, editions, references and formatting without storing the
+raw key in the cache URL. The current key's accessible translation catalog is
+still checked before passage lookup. Only successful, nonempty text with publisher
+attribution is cached. Metadata and errors bypass storage. Cache read/write
+failures fall back to normal quota-protected requests; expired text is never
+served after a failed refresh. Concurrent misses share an upstream fetch within
+each running Function instance. Edge cache entries are shared within a Cloudflare
+location, may be evicted early, and do not guarantee one upstream request globally.
+
+Cache hits occur before upstream quota reservation. The public response remains
+`no-store`, includes the publisher copyright and original FUMS tokens, and reports
+`X-Bible-Cache: HIT`, `MISS`, `MIXED`, or `BYPASS` for diagnostics. Each displayed
+passage still triggers the existing FUMS report, including repeat views of cached
+text. This adds no offline Bible downloads or ESV server caching.
+
+Policy: https://care.api.bible/article/401-caching-content (refresh within 30 days;
+seven-day expiry stays below the recommended 14-day refresh interval).
 
 ## Curated additional translations
 

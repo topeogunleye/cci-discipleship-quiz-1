@@ -86,4 +86,13 @@ verses, well under the 500-verse / half-a-book limit), and no more than 500 vers
 may be stored. For that reason ESV text is never written to a shared server cache
 (Cache API, KV or R2); `/api/esv-passage` responses are `no-store`. The app keeps at
 most eight recently opened passages (about 40,000 characters) in memory for the
-current session only, which avoids repeat requests without persisting text.
+current session only. It additionally counts verses using metadata returned by
+Crossway, evicting old entries to stay within 500 cached verses and strictly below
+half of each book across all entries. Overlapping passages count separately,
+conservatively. Responses without trustworthy verse metadata are not cached.
+The server checks returned ranges against the single-chapter and book limits
+before supplying cache metadata; ESV passage responses remain `no-store`.
+
+Book totals follow the canonical versification table at
+https://gist.github.com/rmcguire/421ed209649bd0b62c9e3a8ed6cac177,
+conservatively excluding its listed omitted New Testament verse numbers.

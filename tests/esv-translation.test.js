@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const loadFunction = require('./helpers/load-function.cjs');
 
 const root = path.join(__dirname, '..');
-const response = (data, status) => new Response(JSON.stringify(data), { status: status || 200 });
+const response = (data, status) => new Response(JSON.stringify(data.text && !data.version ? { cache: { book: 43, verseCount: 1, bookLimit: 438 }, ...data } : data), { status: status || 200 });
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
 /* ---------- server: /api/esv-passage limits and quota scope ---------- */
@@ -85,6 +85,7 @@ function previewUi(fetcher) {
     save = function () {}; toast = function () {}; positionBiblePreview = function () {};
     bibleVersions = [{id:'1', abbreviation:'KJV', title:'King James'}];
     window.ui = { state: S, load: loadBiblePreviewText, picker: bibleVersionPicker, options: bibleVersionOptions, valid: validBibleVersion,
+      cacheGet: esvCacheGet, cachePut: esvCachePut, cacheEntries: function () { return esvPassageCache; },
       activate: function(link, preview) { activeBiblePreview = {link:link,preview:preview}; } };
   `);
   vm.runInNewContext(source, { window, document, URL, AbortController, fetch: fetcher });
@@ -161,6 +162,45 @@ test('the in-memory ESV copy is bounded', async () => {
   h.ui.load(h.link, h.preview, 'ESV');
   await flush();
   assert.equal(requests, 11);
+});
+
+test('ESV cache evicts by 500 verses even when fewer than eight passages are stored', () => {
+  const h = previewUi(async () => response({}));
+  for (let chapter = 1; chapter <= 3; chapter++) h.ui.cachePut('Psalms ' + chapter, 'Synthetic chapter', { book: 19, verseCount: 176, bookLimit: 1230 });
+  assert.equal(h.ui.cacheGet('Psalms 1'), null);
+  assert.equal(h.ui.cacheEntries().length, 2);
+  assert.equal(h.ui.cacheEntries().reduce((sum, entry) => sum + entry.verseCount, 0), 352);
+});
+
+test('ESV cache enforces per-book limits across passages and refuses unknown or oversized counts', () => {
+  const h = previewUi(async () => response({}));
+  h.ui.cachePut('2 John 1:1-4', 'Synthetic text', { book: 63, verseCount: 4, bookLimit: 6 });
+  h.ui.cachePut('2 John 1:5-8', 'Synthetic text', { book: 63, verseCount: 4, bookLimit: 6 });
+  assert.equal(h.ui.cacheGet('2 John 1:1-4'), null);
+  assert.equal(h.ui.cacheEntries().length, 1);
+  h.ui.cachePut('2 John 1', 'Full book', { book: 63, verseCount: 13, bookLimit: 6 });
+  h.ui.cachePut('Unknown', 'Synthetic text');
+  assert.equal(h.ui.cacheEntries().length, 1);
+  h.ui.cachePut('John 3:16', 'Other book', { book: 43, verseCount: 1, bookLimit: 438 });
+  assert.equal(h.ui.cacheEntries().length, 2);
+});
+
+test('ESV server uses returned verse ranges to provide safe cache accounting and rejects excessive book coverage', async () => {
+  let parsed;
+  const handler = esvHandler(async () => response({ passages: ['Synthetic text'], parsed }));
+  const env = { ESV_API_KEY: 'key', ESV_RATE_LIMITER: { fetch: async () => new Response(null, { status: 204 }) } };
+  // Crossway encodes book*1,000,000 + chapter*1,000 + verse.
+  parsed = [[19119001, 19119176]];
+  let result = await esvRequest('Psalm 119', env, handler);
+  assert.equal(result.status, 200);
+  assert.deepEqual((await result.json()).cache, { book: 19, verseCount: 176, bookLimit: 1230 });
+  parsed = [[43003016, 43003018], [43003020, 43003020]];
+  result = await esvRequest('John 3:16-18,20', env, handler);
+  assert.deepEqual((await result.json()).cache, { book: 43, verseCount: 4, bookLimit: 438 });
+  parsed = [[63001001, 63001013]];
+  assert.equal((await esvRequest('2 John 1:1-13', env, handler)).status, 400);
+  parsed = [[43003001, 43004001]];
+  assert.equal((await esvRequest('John 3', env, handler)).status, 400);
 });
 
 for (const [label, esvReply] of [

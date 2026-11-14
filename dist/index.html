@@ -11795,7 +11795,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
   var ESV_COPYRIGHT = 'Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.';
   // ESV terms allow caching at most 500 verses. Keep a small per-session, in-memory copy
   // (never persisted) so reopening a passage does not spend ESV API quota.
-  var ESV_CACHE_MAX_ENTRIES = 8, ESV_CACHE_MAX_CHARS = 40000, esvPassageCache = [];
+  var ESV_CACHE_MAX_ENTRIES = 8, ESV_CACHE_MAX_CHARS = 40000, ESV_CACHE_MAX_VERSES = 500, esvPassageCache = [];
   function esvCacheKey(reference) { return String(reference).toLowerCase().replace(/\s+/g, ' ').trim(); }
   function esvCacheGet(reference) {
     var key = esvCacheKey(reference), index = esvPassageCache.findIndex(function (entry) { return entry.key === key; });
@@ -11804,13 +11804,23 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     esvPassageCache.push(entry);
     return entry.text;
   }
-  function esvCachePut(reference, text) {
+  function esvCachePut(reference, text, metadata) {
     if (typeof text !== 'string' || !text || text.length > ESV_CACHE_MAX_CHARS) return;
+    if (!metadata || !Number.isSafeInteger(metadata.book) || metadata.book < 1 || metadata.book > 66 || !Number.isSafeInteger(metadata.verseCount) || metadata.verseCount < 1 || metadata.verseCount > ESV_CACHE_MAX_VERSES || !Number.isSafeInteger(metadata.bookLimit) || metadata.bookLimit < metadata.verseCount) return;
     var key = esvCacheKey(reference);
     esvPassageCache = esvPassageCache.filter(function (entry) { return entry.key !== key; });
-    esvPassageCache.push({ key: key, text: text });
+    esvPassageCache.push({ key: key, text: text, book: metadata.book, verseCount: metadata.verseCount, bookLimit: metadata.bookLimit });
     function total() { return esvPassageCache.reduce(function (sum, entry) { return sum + entry.text.length; }, 0); }
-    while (esvPassageCache.length > ESV_CACHE_MAX_ENTRIES || total() > ESV_CACHE_MAX_CHARS) esvPassageCache.shift();
+    function overVerseLimit() {
+      var totalVerses = 0, byBook = {}, limits = {};
+      esvPassageCache.forEach(function (entry) {
+        totalVerses += entry.verseCount;
+        byBook[entry.book] = (byBook[entry.book] || 0) + entry.verseCount;
+        limits[entry.book] = Math.min(limits[entry.book] || entry.bookLimit, entry.bookLimit);
+      });
+      return totalVerses > ESV_CACHE_MAX_VERSES || Object.keys(byBook).some(function (book) { return byBook[book] > limits[book]; });
+    }
+    while (esvPassageCache.length > ESV_CACHE_MAX_ENTRIES || total() > ESV_CACHE_MAX_CHARS || overVerseLimit()) esvPassageCache.shift();
   }
   function esvPassageLink(reference) { return 'https://www.esv.org/' + encodeURIComponent(reference).replace(/%20/g, '+').replace(/%3A/gi, ':') + '/'; }
   // Resolves to a normalised passage result. ESV is fetched through /api/esv-passage; if it
@@ -11865,7 +11875,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     }).then(function (result) {
       var passage = result && typeof result.text === 'string' ? result.text.trim() : '';
       if (!passage) throw biblePassageError({ status: 404 });
-      esvCachePut(reference, passage);
+      esvCachePut(reference, passage, result.cache);
       return passage;
     });
     return text.then(function (passage) {

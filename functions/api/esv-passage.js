@@ -8,15 +8,38 @@ const MAX_CHAPTER = 150;
 const MAX_VERSE = 176;
 const MAX_VERSES_PER_REQUEST = 176;
 // Crossway's ESV API terms allow up to 500 verses per query/page and no more than half of
-// any book. Requests here are limited to a single chapter (at most 176 verses), and no
-// chapter of a book with three or more chapters reaches half of that book, so the
-// published limits hold by construction. Do not raise MAX_VERSES_PER_REQUEST above 500 or
-// accept multi-chapter references without adding an explicit half-of-book check.
+// any book. Limit requests to one chapter, then validate the actual returned verse
+// ranges and book size before displaying or caching them.
 //
 // The ESV terms also cap locally stored text at 500 verses in total, so passage text is
 // never written to a shared server cache (Cache API, KV or R2). Responses are no-store;
 // the app keeps a small in-memory copy per browser session.
 const UPSTREAM_TIMEOUT_MS = 5000;
+
+// Canonical verse totals in Crossway book order. NT totals conservatively
+// exclude omitted verse numbers. Only counts are stored here, never ESV text.
+// Versification data: https://gist.github.com/rmcguire/421ed209649bd0b62c9e3a8ed6cac177
+const BOOK_VERSES = [0, 1533,1213,859,1288,959,658,618,85,810,695,816,719,942,822,280,406,167,1070,2461,915,222,117,1292,1364,154,1273,357,197,73,146,21,48,105,47,56,53,38,211,55,1067,673,1149,878,1003,432,437,257,149,155,104,95,89,47,113,83,46,25,303,108,105,61,105,13,15,25,404];
+
+function cacheMetadata(parsed) {
+  if (!Array.isArray(parsed) || !parsed.length) return null;
+  let book = null, chapter = null, verseCount = 0;
+  for (const range of parsed) {
+    if (!Array.isArray(range) || range.length !== 2) return null;
+    const [start, end] = range;
+    const currentBook = Math.floor(start / 1000000);
+    const currentChapter = Math.floor(start / 1000);
+    // All returned ranges must stay inside the single requested chapter.
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start || Math.floor(start / 1000) !== Math.floor(end / 1000) || !BOOK_VERSES[currentBook] || start % 1000 < 1 || end % 1000 > MAX_VERSE) return null;
+    if ((book !== null && book !== currentBook) || (chapter !== null && chapter !== currentChapter)) return null;
+    book = currentBook;
+    chapter = currentChapter;
+    verseCount += end - start + 1;
+  }
+  const bookLimit = Math.floor((BOOK_VERSES[book] - 1) / 2);
+  if (verseCount > MAX_VERSES_PER_REQUEST || verseCount > bookLimit) return null;
+  return { book, verseCount, bookLimit };
+}
 
 function normalizeSingleChapterReference(reference) {
   return reference.replace(/^(Obadiah|Philemon|2\s+John|3\s+John|Jude)\s+(\d[\d\s,–—-]*)$/i, '$1 1:$2');
@@ -155,7 +178,10 @@ export async function onRequestGet(context) {
       : '';
     if (!text) return jsonResponse({ error: 'The ESV passage could not be found.' }, 404);
 
-    return jsonResponse({ text: text }, 200);
+    const cache = cacheMetadata(data.parsed);
+    if (data.parsed !== undefined && !cache) return jsonResponse({ error: 'This ESV passage exceeds the supported verse or book limit.' }, 400);
+    // Missing metadata may still be displayed, but must never enter the client cache.
+    return jsonResponse(cache ? { text: text, cache } : { text: text }, 200);
   } catch (error) {
     return jsonResponse({ error: 'The ESV passage service is temporarily unavailable.' }, 502);
   } finally {
