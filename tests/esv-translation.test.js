@@ -86,7 +86,8 @@ function previewUi(fetcher) {
     bibleVersions = [{id:'1', abbreviation:'KJV', title:'King James'}];
     window.ui = { state: S, load: loadBiblePreviewText, picker: bibleVersionPicker, options: bibleVersionOptions, valid: validBibleVersion,
       cacheGet: esvCacheGet, cachePut: esvCachePut, cacheEntries: function () { return esvPassageCache; },
-      activate: function(link, preview) { activeBiblePreview = {link:link,preview:preview}; } };
+      activate: function(link, preview) { activeBiblePreview = {link:link,preview:preview}; },
+      cancel: function() { biblePreviewRequest.controller.abort(); biblePreviewRequest = null; activeBiblePreview = null; } };
   `);
   vm.runInNewContext(source, { window, document, URL, AbortController, fetch: fetcher });
   const nodes = {
@@ -236,35 +237,37 @@ for (const [label, esvReply] of [
   ['an empty body', () => response({})],
   ['a network failure', () => { throw new TypeError('network'); }]
 ]) {
-  test('ESV falls back to ASV with a clear notice when the ESV API returns ' + label, async () => {
+  test('ESV falls back to AMP with a clear notice when the ESV API returns ' + label, async () => {
     const urls = [];
     const h = previewUi(async url => {
       urls.push(url);
       if (/\/api\/esv-passage/.test(url)) return esvReply();
-      return response({ text: 'ASV fixture', version: { id: '12', abbreviation: 'ASV', title: 'American Standard Version', copyright: 'Public domain.', publisher: '' }, fallback: false, url: 'https://www.bible.com/bible/12/JHN.3.16' });
+      return response({ text: 'AMP fixture', version: { id: '1588', abbreviation: 'AMP', title: 'Amplified Bible', copyright: 'AMP publisher notice', publisher: '' }, fallback: false, url: 'https://www.bible.com/bible/1588/JHN.3.16' });
     });
     h.ui.load(h.link, h.preview, 'ESV');
     await flush();
     assert.match(urls[0], /\/api\/esv-passage/);
-    assert.match(urls[1], /\/api\/bible\?q=John%203%3A16&version=ASV$/);
-    assert.equal(h.nodes['.bible-preview-text'].textContent, 'ASV fixture');
-    assert.equal(h.nodes['.bible-preview-version'].textContent, 'ASV');
-    assert.equal(h.nodes['.bible-preview-notice'].textContent, 'ESV unavailable — showing ASV. Your saved default is unchanged.');
-    assert.match(h.nodes['.bible-preview-copyright'].textContent, /Public domain\./);
+    assert.match(urls[1], /\/api\/bible\?q=John%203%3A16&version=1588&fallback=none$/);
+    assert.equal(h.nodes['.bible-preview-text'].textContent, 'AMP fixture');
+    assert.equal(h.nodes['.bible-preview-version'].textContent, 'AMP');
+    assert.equal(h.nodes['.bible-preview-notice'].textContent, 'ESV unavailable — showing Amplified (AMP). Your saved default is unchanged.');
+    assert.match(h.nodes['.bible-preview-copyright'].textContent, /AMP publisher notice/);
     assert.equal(h.nodes['.bible-preview-esv-link'].hidden, true, 'the ESV notice is only shown with ESV text');
     assert.equal(h.nodes['.bible-preview-youversion-link'].hidden, true, 'a fallback has just its actual translation link');
-    assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/12/JHN.3.16');
+    assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/1588/JHN.3.16');
     assert.equal(h.nodes['.bible-preview-open'].textContent, 'Open passage on YouVersion');
     assert.equal(h.ui.state.settings.bibleVersion, 'APIBIBLE_NKJV');
   });
 }
 
-test('if both ESV and the ASV fallback fail, the preview shows the unavailable message', async () => {
+test('if both ESV and the AMP fallback fail, the preview shows the unavailable message', async () => {
   const h = previewUi(async () => response({ error: 'down' }, 503));
   h.ui.load(h.link, h.preview, 'ESV');
   await flush();
   assert.equal(h.nodes['.bible-preview-version'].textContent, 'Unavailable');
   assert.match(h.nodes['.bible-preview-fallback'].textContent, /unavailable/i);
+  assert.match(h.nodes['.bible-preview-notice'].textContent, /ESV and Amplified \(AMP\) are unavailable/);
+  assert.match(h.nodes['.bible-preview-open'].href, /www.bible.com/);
   assert.equal(h.nodes['.bible-preview-esv-link'].hidden, true);
   assert.equal(h.nodes['.bible-preview-youversion-link'].hidden, true);
 });
@@ -285,15 +288,37 @@ test('switching away from ESV restores the YouVersion link and hides the ESV not
   assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/1/JHN.3.16');
 });
 
-test('closing a preview during an ESV request does not trigger the ASV fallback', async () => {
+test('closing a preview during an ESV request does not trigger the AMP fallback', async () => {
   const urls = [];
   const h = previewUi((url, options) => new Promise((resolve, reject) => {
     urls.push(url);
     options.signal.addEventListener('abort', () => reject(new Error('aborted')));
   }));
   h.ui.load(h.link, h.preview, 'ESV');
-  h.timers.get(20000)(); // request timeout aborts the in-flight ESV request
+  h.ui.cancel();
   await flush();
   assert.equal(urls.length, 1, 'no second request after an abort');
-  assert.match(h.nodes['.bible-preview-fallback'].textContent, /took too long/);
+  assert.equal(h.nodes['.bible-preview-fallback'].textContent, 'Loading Bible passage…', 'closing does not update the dismissed preview');
+});
+
+test('a slower AMP fallback cannot overwrite a newer successful translation or its links', async () => {
+  let finishAmp;
+  const h = previewUi(async url => {
+    if (url.includes('esv-passage')) return new Response(null, { status: 503 });
+    if (url.includes('version=1588')) return new Promise(resolve => { finishAmp = resolve; });
+    return response({ text: 'KJV fixture', version: { id: '1', abbreviation: 'KJV', copyright: 'KJV notice' }, url: 'https://www.bible.com/bible/1/JHN.3.16' });
+  });
+  h.ui.load(h.link, h.preview, 'ESV');
+  await flush();
+  assert.equal(typeof finishAmp, 'function');
+  h.ui.load(h.link, h.preview, '1');
+  await flush();
+  finishAmp(response({ text: 'Late AMP fixture', version: { id: '1588', abbreviation: 'AMP', copyright: 'AMP notice' }, url: 'https://www.bible.com/bible/1588/JHN.3.16' }));
+  await flush();
+  assert.equal(h.nodes['.bible-preview-version'].textContent, 'KJV');
+  assert.equal(h.nodes['.bible-preview-text'].textContent, 'KJV fixture');
+  assert.match(h.nodes['.bible-preview-copyright'].textContent, /KJV notice/);
+  assert.equal(h.nodes['.bible-preview-notice'].textContent, '');
+  assert.equal(h.nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/1/JHN.3.16');
+  assert.equal(h.nodes['.bible-preview-youversion-link'].hidden, true);
 });

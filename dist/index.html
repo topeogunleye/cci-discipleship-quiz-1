@@ -11867,77 +11867,70 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     }
     while (esvPassageCache.length > ESV_CACHE_MAX_ENTRIES || total() > ESV_CACHE_MAX_CHARS || overVerseLimit()) esvPassageCache.shift();
   }
-  // Resolves to a normalised passage result. ESV is fetched through /api/esv-passage; if it
-  // fails for any reason other than the user closing the preview, ASV is loaded from
-  // /api/bible and marked as a fallback so the UI can say which translation is shown.
+  // Each selected translation gets one loading attempt, followed only by AMP.
+  // Timeouts apply per attempt; closing/switching aborts both without a retry.
   function requestBiblePassage(reference, version, signal) {
-    var init = { cache: 'no-store', headers: { Accept: 'application/json' }, signal: signal };
-    function fromApiBible(requested) {
-      return fetch(apiBase() + '/api/api-bible?q=' + encodeURIComponent(reference) + '&version=' + encodeURIComponent(requested), init).then(function (response) {
+    function jsonPassage(url) {
+      var controller = new AbortController(), timedOut = false;
+      var abort = function () { controller.abort(); };
+      if (signal) {
+        signal.addEventListener('abort', abort, { once: true });
+        if (signal.aborted) abort();
+      }
+      var timeout = window.setTimeout(function () { timedOut = true; controller.abort(); }, 20000);
+      return fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' }, signal: controller.signal }).then(function (response) {
         if (!response.ok) throw biblePassageError(response);
         return response.json();
-      }).then(function (result) {
+      }).catch(function (error) {
+        if (timedOut) { var timeoutError = new Error('Bible passage timed out'); timeoutError.timedOut = true; throw timeoutError; }
+        throw error;
+      }).finally(function () {
+        window.clearTimeout(timeout);
+        if (signal) signal.removeEventListener('abort', abort);
+      });
+    }
+    function fromApiBible(requested) {
+      return jsonPassage(apiBase() + '/api/api-bible?q=' + encodeURIComponent(reference) + '&version=' + encodeURIComponent(requested)).then(function (result) {
         if (typeof result.text !== 'string' || !result.text.trim() || !result.version || result.provider !== 'api-bible' || bibleTranslationKey(result.version.abbreviation) !== requested.slice(9)) throw biblePassageError({ status: 404 });
         return result;
       });
     }
-    function equivalentApiVersion(requested) {
-      var entry = bibleVersionInfo(requested);
-      var key = bibleTranslationKey(entry ? entry.abbreviation : requested);
-      return /^(ASV|BSB|FBV|GNV|LSV|TCENT|TOJB2011|WEBUS|WMB|WMBBE|KJV|MSG|GNT|RV|DRA|T4T)$/.test(key) ? 'APIBIBLE_' + key : '';
-    }
     var requestedVersion = bibleVersionInfo(version);
-    if (requestedVersion && bibleTranslationKey(requestedVersion.abbreviation) === 'ESV') version = 'ESV';
-    if (requestedVersion && bibleTranslationKey(requestedVersion.abbreviation) === 'NKJV') {
-      return fromApiBible('APIBIBLE_NKJV').catch(function (error) {
-        if (signal && signal.aborted) throw error;
-        return fromYouVersion('1588', true).then(function (result) {
-          if (bibleTranslationKey(result.version.abbreviation) !== 'AMP') throw biblePassageError({ status: 404 });
-          return result;
-        });
-      });
-    }
-    function fromYouVersion(requested, markFallback) {
-      return fetch(bibleApiUrl() + '?q=' + encodeURIComponent(reference) + '&version=' + encodeURIComponent(requested), init).then(function (response) {
-        if (!response.ok) throw biblePassageError(response);
-        return response.json();
-      }).then(function (result) {
+    var requestedKey = bibleTranslationKey(requestedVersion ? requestedVersion.abbreviation : version.replace(/^APIBIBLE_/, ''));
+    function fromYouVersion(requested, expectedKey) {
+      // A distinct URL also bypasses previously cached ASV/BSB substitutions.
+      return jsonPassage(bibleApiUrl() + '?q=' + encodeURIComponent(reference) + '&version=' + encodeURIComponent(requested) + '&fallback=none').then(function (result) {
         if (typeof result.text !== 'string' || !result.text.trim() || !result.version) throw biblePassageError({ status: 404 });
-        var equivalent = !markFallback && result.fallback && equivalentApiVersion(requested);
-        if (equivalent) return fromApiBible(equivalent).catch(function (error) {
-          if (signal && signal.aborted) throw error;
-          return result;
-        });
-        if (markFallback) result.fallback = true;
+        var actualKey = bibleTranslationKey(result.version.abbreviation);
+        if (/^\d+$/.test(expectedKey) ? String(result.version.id) !== requested : actualKey !== expectedKey) throw biblePassageError({ status: 404 });
+        if (result.fallback) throw biblePassageError({ status: 404 });
         return result;
-      }, function (error) {
-        var equivalent = !markFallback && equivalentApiVersion(requested);
-        if (!equivalent || (signal && signal.aborted)) throw error;
-        return fromApiBible(equivalent).catch(function () { throw error; });
       });
     }
-    if (/^APIBIBLE_(KJV|MSG|GNT|RV|DRA|T4T|LXXUP|OJPS|OKE)$/.test(version)) {
-      return fromApiBible(version).catch(function (error) {
-        if (signal && signal.aborted) throw error;
-        return fromYouVersion('ASV', true);
+    function selectedPassage() {
+      if (requestedKey === 'NKJV') return fromApiBible('APIBIBLE_NKJV');
+      if (/^APIBIBLE_(KJV|MSG|GNT|RV|DRA|T4T|LXXUP|OJPS|OKE)$/.test(version)) return fromApiBible(version);
+      if (requestedKey !== 'ESV') return fromYouVersion(version, requestedKey);
+      var cached = esvCacheGet(reference);
+      var text = cached ? Promise.resolve(cached) : jsonPassage(esvApiUrl() + '?q=' + encodeURIComponent(reference)).then(function (result) {
+        var passage = result && typeof result.text === 'string' ? result.text.trim() : '';
+        if (!passage) throw biblePassageError({ status: 404 });
+        esvCachePut(reference, passage, result.cache);
+        return passage;
+      });
+      return text.then(function (passage) {
+        return { text: passage, provider: 'esv', fallback: false, version: { id: 'ESV', abbreviation: 'ESV', title: 'English Standard Version', copyright: ESV_COPYRIGHT, publisher: '' } };
       });
     }
-    if (version !== 'ESV') return fromYouVersion(version, false);
-    var cached = esvCacheGet(reference);
-    var text = cached ? Promise.resolve(cached) : fetch(esvApiUrl() + '?q=' + encodeURIComponent(reference), init).then(function (response) {
-      if (!response.ok) throw biblePassageError(response);
-      return response.json();
-    }).then(function (result) {
-      var passage = result && typeof result.text === 'string' ? result.text.trim() : '';
-      if (!passage) throw biblePassageError({ status: 404 });
-      esvCachePut(reference, passage, result.cache);
-      return passage;
-    });
-    return text.then(function (passage) {
-      return { text: passage, provider: 'esv', fallback: false, version: { id: 'ESV', abbreviation: 'ESV', title: 'English Standard Version', copyright: ESV_COPYRIGHT, publisher: '' } };
-    }, function (error) {
-      if (signal && signal.aborted) throw error;
-      return fromYouVersion('ASV', true);
+    return selectedPassage().catch(function (error) {
+      if ((signal && signal.aborted) || requestedKey === 'AMP' || version === '1588') throw error;
+      return fromYouVersion('1588', 'AMP').then(function (result) {
+        result.fallback = true;
+        return result;
+      }).catch(function (ampError) {
+        ampError.ampFallbackFailed = true;
+        throw ampError;
+      });
     });
   }
   function biblePassageError(response) {
@@ -12030,7 +12023,6 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     var controller = new AbortController();
     var request = { id: ++biblePreviewRequestSequence, controller: controller, link: link, preview: preview };
     biblePreviewRequest = request;
-    var timeout = window.setTimeout(function () { request.timedOut = true; controller.abort(); }, 20000);
     requestBiblePassage(reference, version, controller.signal).then(function (result) {
       if (biblePreviewRequest !== request || !activeBiblePreview || activeBiblePreview.link !== link) return;
       updateBiblePreviewText(preview, result.text);
@@ -12062,12 +12054,15 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       }
       positionBiblePreview(link, preview);
     }).catch(function (error) {
-      if ((controller.signal.aborted && !request.timedOut) || biblePreviewRequest !== request) return;
+      if (controller.signal.aborted || biblePreviewRequest !== request) return;
       preview.querySelector('.bible-preview-version').textContent = 'Unavailable';
-      updateBiblePreviewText(preview, '', request.timedOut ? 'The Bible service took too long. Change translation or reopen this preview to retry.' : biblePassageErrorMessage(error));
+      if (error.ampFallbackFailed) {
+        var selectedLabel = bibleVersionInfo(version);
+        preview.querySelector('.bible-preview-notice').textContent = (selectedLabel ? selectedLabel.abbreviation : 'Selected translation') + ' and Amplified (AMP) are unavailable. Your saved default is unchanged.';
+      }
+      updateBiblePreviewText(preview, '', error.timedOut ? 'The Bible service took too long. Change translation or reopen this preview to retry.' : biblePassageErrorMessage(error));
       positionBiblePreview(link, preview);
     }).finally(function () {
-      window.clearTimeout(timeout);
       if (biblePreviewRequest === request) biblePreviewRequest = null;
     });
   }

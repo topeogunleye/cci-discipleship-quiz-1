@@ -134,10 +134,60 @@ test('legacy NKJV endpoints return AMP with fresh headers instead of caching BSB
   }
 });
 
-test('outages and rate limits do not fan out through the translation catalog', async () => {
+test('outages and rate limits try only AMP and never fan out through the translation catalog', async () => {
   let requests = 0;
   await assert.rejects(() => bible.passage('John 3:16', 'NKJV', catalog, 'key', async () => { requests++; return new Response('', { status: 429 }); }));
-  assert.equal(requests, 1);
+  assert.equal(requests, 2);
+});
+
+test('legacy YouVersion callers use only AMP after missing text, outages, or rate limits in any other edition', async () => {
+  const versions = [...catalog, { id: '111', abbreviation: 'NIV11', copyright: 'NIV fixture notice' }];
+  for (const version of ['1', '111', 'NKJV', '97']) {
+    for (const outcome of [403, 404, 429, 503, 'network', 'empty']) {
+      const urls = [];
+      const result = await bible.passage('John 3:16,18', version, versions, 'fixture', async url => {
+        urls.push(url);
+        if (url.includes('/bibles/1588/')) return response({ content: 'AMP fixture' });
+        if (typeof outcome === 'number') return new Response(null, { status: outcome });
+        if (outcome === 'network') throw new TypeError('network');
+        return response({ content: '' });
+      });
+      assert.equal(result.version.abbreviation, 'AMP', version + ': ' + outcome);
+      assert.equal(result.fallback, true);
+      assert.equal(result.text, 'AMP fixture\n\nAMP fixture');
+      assert.ok(result.links.every(part => part.url.includes('/bible/1588/')));
+      assert.ok(urls.every(url => !url.includes('/bibles/3034/')));
+    }
+  }
+});
+
+test('strict YouVersion passage requests leave the single AMP retry to the client', async () => {
+  const urls = [];
+  const result = await bible.passage('John 3:16', '1', catalog, 'fixture', async url => {
+    urls.push(url); return new Response(null, { status: 404 });
+  }, { fallback: false });
+  assert.equal(result.status, 404);
+  assert.equal(urls.length, 1);
+  assert.match(urls[0], /\/bibles\/1\//);
+});
+
+test('the Function accepts strict requests without caching or silently substituting another edition', async () => {
+  const urls = [];
+  const handler = loadFunction('functions/api/bible.js', { fetch: async url => {
+    urls.push(url);
+    if (url.includes('/bibles?')) return response({ data: catalog.map(b => ({ ...b, id: Number(b.id), language_tag: 'en' })) });
+    return new Response(null, { status: 404 });
+  } }).onRequestGet;
+  const env = { YOUVERSION_APP_KEY: 'strict-policy-fixture', ESV_RATE_LIMITER: { fetch: async () => new Response(null, { status: 204 }) } };
+  const result = await handler({ request: new Request('https://study.example/api/bible?q=John%203:16&version=1&fallback=none', { headers: { 'CF-Connecting-IP': '192.0.2.5' } }), env });
+  assert.equal(result.status, 404);
+  assert.equal(result.headers.get('Cache-Control'), 'no-store');
+  assert.equal(urls.length, 2, 'one catalog read and one selected-translation passage read');
+  assert.ok(!urls.some(url => url.includes('/bibles/1588/')));
+  for (const query of ['fallback=none&fallback=none', 'fallback=BSB']) {
+    const invalid = await handler({ request: new Request('https://study.example/api/bible?q=John%203:16&version=1&' + query), env });
+    assert.equal(invalid.status, 400);
+  }
 });
 
 test('every authored multipart citation retains a translated link for every resolved segment', async () => {
@@ -259,10 +309,10 @@ test('preview switching does not save preference; Settings does, and fallback te
   assert.match(harness.nodes['.bible-preview-copyright'].textContent, /fixture copyright/);
   harness.change({ dataset: { bibleVersion: 'default' }, value: '1' });
   assert.equal(harness.ui.state.settings.bibleVersion, '1');
-  const fallback = previewUi(async () => response({ text: 'Fixture', version: catalog[0], fallback: true }));
-  fallback.ui.load(fallback.link, fallback.preview);
+  const fallback = previewUi(async url => url.includes('version=1588') ? response({ text: 'Fixture', version: catalog[2], fallback: false }) : new Response(null, { status: 503 }));
+  fallback.ui.load(fallback.link, fallback.preview, '111');
   await flush();
-  assert.match(fallback.nodes['.bible-preview-notice'].textContent, /ASV unavailable — showing KJV/);
+  assert.match(fallback.nodes['.bible-preview-notice'].textContent, /NIV unavailable — showing Amplified \(AMP\)/);
   assert.equal(fallback.ui.state.settings.bibleVersion, 'APIBIBLE_NKJV');
 });
 
@@ -283,6 +333,8 @@ test('preview timeout replaces the loading state with a retry message', async ()
   h.ui.load(h.link, h.preview);
   h.timers.get(20000)();
   await flush();
+  h.timers.get(20000)();
+  await flush();
   assert.match(h.nodes['.bible-preview-fallback'].textContent, /took too long/);
 });
 
@@ -292,7 +344,7 @@ test('successful text clears the hidden loading description and renders all exte
     { label: 'Hebrews 1:5–6', url: 'https://www.bible.com/bible/1/HEB.1.5-6' },
     { label: 'Hebrews 1:13–14', url: 'https://www.bible.com/bible/1/HEB.1.13-14' }
   ] }));
-  h.ui.load(h.link, h.preview);
+  h.ui.load(h.link, h.preview, '1');
   await flush();
   assert.equal(h.nodes['.bible-preview-fallback'].textContent, '');
   assert.equal(h.nodes['.bible-preview-fallback'].hidden, true);

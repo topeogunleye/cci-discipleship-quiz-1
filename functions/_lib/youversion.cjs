@@ -84,21 +84,18 @@ async function versions(key, fetcher = fetch, force = false) {
     if (cachedCatalogInflight === loadPromise) cachedCatalogInflight = null;
   }
 }
-async function passage(reference, preferred, catalog, key, fetcher = fetch) {
+async function passage(reference, preferred, catalog, key, fetcher = fetch, { fallback = true } = {}) {
   const ids = passageIds(reference);
   if (!ids) return { status: 400, error: 'This reference cannot be previewed. Open it on YouVersion.' };
   const requested = catalog.find(b => b.id === preferred || b.abbreviation.toUpperCase() === preferred.toUpperCase());
   const abbreviation = bible => String(bible?.abbreviation || '').replace(/^eng/i, '').toUpperCase();
-  const nkjv = preferred.toUpperCase() === 'NKJV' || preferred === '114' || abbreviation(requested) === 'NKJV';
   const amp = preferred === '1588' || abbreviation(requested) === 'AMP';
-  const ranked = ['ASV', 'NKJV', 'KJV', 'BSB', 'WEBUS'];
-  // Legacy NKJV clients get AMP only. AMP requests must never silently become BSB.
-  const alternatives = catalog.filter(b => b !== requested && (nkjv ? abbreviation(b) === 'AMP' : !amp)).sort((a, b) => {
-    const rank = b => { const i = ranked.indexOf(b.abbreviation.toUpperCase()); return i < 0 ? 100 : i; };
-    return rank(a) - rank(b);
-  });
-  // Bounded retries avoid amplifying outages. Never combine different translations.
-  for (const bible of [requested, ...alternatives].filter(Boolean).slice(0, 3)) {
+  const amplified = catalog.find(b => b.id === '1588' && abbreviation(b) === 'AMP') || catalog.find(b => abbreviation(b) === 'AMP');
+  // AMP is the only alternative. Current clients own retries across providers;
+  // legacy callers retain the same bounded fallback here. Never mix editions.
+  const alternative = fallback && !amp && amplified !== requested ? amplified : null;
+  let lastError;
+  for (const bible of [requested, alternative].filter(Boolean)) {
     try {
       // Some licensed editions expose attribution only in their detailed metadata.
       // These reads use the same quota-protected fetcher as every passage request.
@@ -106,9 +103,9 @@ async function passage(reference, preferred, catalog, key, fetcher = fetch) {
         const details = await upstream('/bibles/' + bible.id, key, fetcher);
         bible.copyright = attribution(details.data || details);
       }
-      if (!String(bible.copyright || '').trim()) continue;
+      if (!String(bible.copyright || '').trim()) { lastError = null; continue; }
       const parts = await Promise.all(ids.map(id => upstream('/bibles/' + bible.id + '/passages/' + encodeURIComponent(id) + '?format=text', key, fetcher)));
-      if (parts.some(p => typeof p.content !== 'string' || !p.content.trim())) continue;
+      if (parts.some(p => typeof p.content !== 'string' || !p.content.trim())) { lastError = null; continue; }
       const book = reference.trim().match(/^([1-3]?\s*[A-Za-z ]+?)\s+\d/)[1];
       const links = ids.map(id => {
         const [, chapter, verses] = id.split('.');
@@ -118,9 +115,10 @@ async function passage(reference, preferred, catalog, key, fetcher = fetch) {
       return { text: parts.map(p => p.content.trim()).join('\n\n'), version: bible, fallback: bible !== requested,
         url: links[0].url, links, reference };
     } catch (error) {
-      if (![403, 404].includes(error.status)) throw error;
+      lastError = error;
     }
   }
+  if (lastError && ![403, 404].includes(lastError.status)) throw lastError;
   return { status: 404, error: 'Passage text is not available in the supported translations. Open the passage on YouVersion.' };
 }
 module.exports = { passageIds, versions, passage, __test: { clearCatalogCache } };

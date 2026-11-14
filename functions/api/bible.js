@@ -6,9 +6,10 @@ export async function onRequestGet({ request, env }) {
   const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers });
   if (!auth.originAllowed(request, env)) return reply({ error: 'Origin not allowed.' }, 403);
   const params = new URL(request.url).searchParams;
-  if (params.getAll('q').length > 1 || params.getAll('version').length > 1) return reply({ error: 'Duplicate query parameters are not supported.' }, 400);
+  if (['q', 'version', 'fallback'].some(name => params.getAll(name).length > 1)) return reply({ error: 'Duplicate query parameters are not supported.' }, 400);
   const reference = params.get('q'), version = params.get('version') || 'ASV';
   if ((reference !== null && !bible.passageIds(reference)) || !/^(?:[1-9]\d{0,9}|NKJV|ASV)$/.test(version)) return reply({ error: 'Enter a supported Bible reference and translation.' }, 400);
+  if (params.has('fallback') && params.get('fallback') !== 'none') return reply({ error: 'Unsupported fallback policy.' }, 400);
   if (!env.YOUVERSION_APP_KEY) return reply({ error: 'Bible previews are not configured yet.' }, 503);
   try {
     // Reuse the deployed private limiter. Each upstream call reserves quota,
@@ -31,10 +32,10 @@ export async function onRequestGet({ request, env }) {
       headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
       return reply({ versions: catalog });
     }
-    const result = await bible.passage(reference, version, catalog, env.YOUVERSION_APP_KEY, limitedFetch);
+    const result = await bible.passage(reference, version, catalog, env.YOUVERSION_APP_KEY, limitedFetch, { fallback: params.get('fallback') !== 'none' });
     const status = result.status || 200;
     const edition = String(result.version?.abbreviation || '').replace(/^eng/i, '').toUpperCase();
-    const freshTranslation = ['NKJV', '114', '1588'].includes(version) || ['NKJV', 'AMP'].includes(edition);
+    const freshTranslation = params.has('fallback') || result.fallback || ['NKJV', '114', '1588'].includes(version) || ['NKJV', 'AMP'].includes(edition);
     if (status === 200 && !result.error && !freshTranslation) {
       headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
     }

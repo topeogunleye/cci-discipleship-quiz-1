@@ -19,8 +19,9 @@ on YouVersion, except for displayed ESV text: its main button opens the exact
 passage on ESV.org, with a smaller YouVersion link for additional translations.
 Fallbacks link to the translation actually displayed. The current
 client uses the catalog only for saved-ID metadata, not to add picker options.
-Other YouVersion requests retain bounded fallback attempts when the preference
-is absent or a passage returns 403/404. The special NKJV and AMP rules are below.
+Every non-AMP choice (NIV, NKJV, KJV, MSG and ESV) uses AMP as its only fallback
+for any loading failure, including missing text, provider errors, rate limits,
+network failures and timeouts.
 Every passage uses one translation throughout. The UI shows
 the actual translation, publisher copyright, YouVersion link and an explicit
 fallback notice. Timeouts/rate limits do not trigger a catalog-wide request storm.
@@ -29,12 +30,15 @@ YouVersion's SDK guidance. If both are absent from the catalog, the server reads
 the edition's detailed metadata through the existing rate limiter. Unattributed
 text is not displayed. Resolved metadata shares the existing one-hour catalog TTL.
 
-Legacy NKJV requests (`NKJV`, `114`, or a licensed NKJV catalog ID) fall back only
-to AMP. Direct AMP requests never substitute BSB or another edition. Missing AMP
-therefore returns unavailable. NKJV and AMP passage responses are `no-store` so
-temporary translation substitutions are not retained in the shared response cache.
-The current client also uses AMP when API.Bible NKJV fails, keeps the saved NKJV
-preference unchanged, and displays AMP's actual copyright and YouVersion link.
+The client requests `/api/bible` with `fallback=none` so the selected edition and
+the single AMP retry are controlled in one place across all three providers.
+Each attempt has a 20-second deadline; closing or switching cancels it without
+starting a fallback. Legacy callers without this parameter also get AMP as the
+only alternative. Direct AMP requests never substitute BSB, ASV, KJV or another
+edition. If AMP fails, the preview shows an unavailable notice and retains an
+external YouVersion reference link. Saved defaults remain unchanged. AMP text
+uses its own copyright and passage links. Strict, fallback, NKJV and AMP passage
+responses are `no-store`, including URLs distinct from older cached substitutions.
 
 Passage text uses textContent, never publisher-provided HTML. It is not persisted
 in local storage or cached by the service worker; responses have no-store headers.
@@ -90,11 +94,11 @@ for the limiter, and no existing security control is disabled.
 
 ## ESV translation
 
-ESV is a built-in option in the translation dropdown (Settings and verse previews)
-next to ASV, which remains the default. Selecting it loads text from
+ESV is one of the six fixed options in Settings and verse previews; NKJV remains
+the initial default. Selecting ESV loads text from
 `/api/esv-passage`; if that request fails, is rate limited, or the daily budget is
-spent, the preview shows ASV from `/api/bible` with the notice "ESV unavailable —
-showing ASV. Your saved default is unchanged."
+spent, the preview tries AMP from `/api/bible` with the notice "ESV unavailable —
+showing Amplified (AMP). Your saved default is unchanged."
 
 Crossway's ESV API terms apply: the ESV copyright notice and a link to esv.org are
 shown with every ESV passage, a request is limited to one chapter (at most 176

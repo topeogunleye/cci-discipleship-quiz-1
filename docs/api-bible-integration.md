@@ -58,13 +58,16 @@ on YouVersion and the ESV-only secondary link is hidden. Web displays report
 the returned FUMS tokens through the official tracker, loaded only when API.Bible
 text is displayed. No account ID or learner details are supplied to the tracker.
 The CSP permits only the additional tracker script and its reporting endpoint.
-If NKJV fails, the preview requests YouVersion AMP (Amplified Bible, ID 1588) once and displays
-"NKJV unavailable — showing Amplified (AMP). Your saved default is unchanged."
+If any non-AMP selection fails, the preview requests YouVersion AMP (Amplified
+Bible, ID 1588) once and names the selected version in the notice, for example:
+"MSG unavailable — showing Amplified (AMP). Your saved default is unchanged."
 Both responses must match the requested translation. If AMP also fails, the preview
 shows an unavailable state; it does not silently substitute ASV or another version.
-Closing or superseding a request never starts a fallback. Other API.Bible editions
-retain the existing clearly labelled YouVersion ASV fallback. The saved preference
-remains unchanged in every case. Passage responses without publisher attribution
+Each attempt has its own 20-second timeout, so a timeout also allows the AMP retry.
+Closing or superseding a request never starts a fallback. The same AMP-only rule
+applies to NKJV, KJV, MSG, NIV and ESV; if AMP fails the unavailable preview retains
+its external YouVersion reference link. The saved preference remains unchanged
+in every case. Passage responses without publisher attribution
 are rejected rather than displayed.
 
 Deploy the private rate-limiter Worker before the Pages Function. The existing
