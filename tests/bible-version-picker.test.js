@@ -24,7 +24,7 @@ function setup(catalog = []) {
 }
 
 function fakePicker(kind) {
-  const notice = { textContent: 'Your saved translation is no longer offered here. Previews use NKJV until you choose another translation. More translations are available on YouVersion.' };
+  const notice = { textContent: 'Your saved translation is no longer offered. Choose a translation from the list.', hidden: false };
   const select = { dataset: { bibleVersion: kind, currentVersion: 'APIBIBLE_NKJV' }, value: 'APIBIBLE_NKJV', innerHTML: '' };
   const picker = { querySelector: selector => selector === '[data-bible-version]' ? select : selector === '[data-bible-picker-notice]' ? notice : null };
   select.closest = () => picker;
@@ -63,7 +63,9 @@ test('removed saved preferences stay intact while the picker selects NKJV', () =
     api.state.settings.bibleVersion = id;
     const html = api.picker(true);
     assert.match(html, /value="APIBIBLE_NKJV" selected/);
-    assert.match(html, /Your saved translation is no longer offered here/);
+    assert.match(html, /Your saved translation is no longer offered\. Choose a translation from the list\./);
+    assert.doesNotMatch(html, /Previews use NKJV/);
+    assert.match(html, /Choose a translation from the list\.<\/span><span class="meta">More translations/);
     assert.equal((html.match(/<option /g) || []).length, 6);
     assert.equal(api.state.settings.bibleVersion, id);
   }
@@ -87,7 +89,8 @@ test('choosing a supported Settings default immediately clears the stale removed
   select.value = '1588';
   listeners.change.forEach(fn => fn({ target: select }));
   assert.equal(api.state.settings.bibleVersion, '1588');
-  assert.equal(notice.textContent, 'More translations are available on YouVersion.');
+  assert.equal(notice.textContent, '');
+  assert.equal(notice.hidden, true);
   assert.doesNotMatch(api.picker(true), /no longer offered/);
 });
 
@@ -100,12 +103,14 @@ test('a supported temporary preview choice clears the warning across catalog ref
     select.value = id;
     listeners.change.forEach(fn => fn({ target: select }));
     api.update(picker);
-    assert.equal(notice.textContent, 'More translations are available on YouVersion.');
+    assert.equal(notice.textContent, '');
+    assert.equal(notice.hidden, true);
     assert.equal(api.state.settings.bibleVersion, '3034');
   }
   select.dataset.userSelected = 'false';
   api.update(picker);
   assert.match(notice.textContent, /no longer offered/, 'reopening reflects the still-unchanged saved preference');
+  assert.equal(notice.hidden, false);
 });
 
 test('catalog refresh also clears a stale warning when a retained legacy ID is recognized', () => {
@@ -113,6 +118,7 @@ test('catalog refresh also clears a stale warning when a retained legacy ID is r
   api.state.settings.bibleVersion = '888';
   const { picker, notice } = fakePicker('default');
   api.update(picker);
-  assert.equal(notice.textContent, 'More translations are available on YouVersion.');
+  assert.equal(notice.textContent, '');
+  assert.equal(notice.hidden, true);
   assert.equal(api.state.settings.bibleVersion, '888');
 });

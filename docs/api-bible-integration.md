@@ -29,6 +29,10 @@ seventh option or silently overwriting the saved preference.
 The warning updates immediately after choosing a supported Settings default or a
 temporary preview translation, and after metadata refresh. Reopening a preview
 reflects the saved default again; a temporary selection never overwrites it.
+The saved-preference warning says "Your saved translation is no longer offered.
+Choose a translation from the list." It does not name the default or passage
+fallback. The general YouVersion hint is displayed separately, and only the
+passage notice identifies a translation substituted because of availability.
 
 Set `API_BIBLE_KEY` as an encrypted Cloudflare Pages secret in Production and any
 Preview environment that needs this integration. For local testing, put it in the
@@ -55,7 +59,7 @@ the returned FUMS tokens through the official tracker, loaded only when API.Bibl
 text is displayed. No account ID or learner details are supplied to the tracker.
 The CSP permits only the additional tracker script and its reporting endpoint.
 If NKJV fails, the preview requests YouVersion AMP (Amplified Bible, ID 1588) once and displays
-"NKJV unavailable — showing AMP. Your saved default is unchanged."
+"NKJV unavailable — showing Amplified (AMP). Your saved default is unchanged."
 Both responses must match the requested translation. If AMP also fails, the preview
 shows an unavailable state; it does not silently substitute ASV or another version.
 Closing or superseding a request never starts a fallback. Other API.Bible editions

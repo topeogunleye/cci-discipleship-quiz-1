@@ -11935,7 +11935,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     }).join('');
   }
   function biblePickerNoticeText(saved, temporaryChoice) {
-    return (pickerBibleVersion(saved) !== saved && !temporaryChoice ? 'Your saved translation is no longer offered here. Previews use NKJV until you choose another translation. ' : '') + 'More translations are available on YouVersion.';
+    return pickerBibleVersion(saved) !== saved && !temporaryChoice ? 'Your saved translation is no longer offered. Choose a translation from the list.' : '';
   }
   function updateBiblePickerNotice(picker) {
     if (!picker) return;
@@ -11943,6 +11943,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     if (!select || !notice) return;
     var ds = select.dataset || {};
     notice.textContent = biblePickerNoticeText(validBibleVersion(S.settings.bibleVersion), ds.bibleVersion === 'preview' && ds.userSelected === 'true');
+    notice.hidden = !notice.textContent;
   }
   function updateBiblePickerSelect(picker) {
     if (!picker) return;
@@ -11957,9 +11958,11 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
   }
   function bibleVersionPicker(settings) {
     var saved = validBibleVersion(S.settings.bibleVersion), selected = pickerBibleVersion(saved);
+    var notice = biblePickerNoticeText(saved, false);
     return '<span class="bible-version-picker">' +
       '<label class="bible-version-select-label">' + (settings ? 'Default Bible translation' : 'Translation for this preview') + '<select data-bible-version="' + (settings ? 'default' : 'preview') + '" data-current-version="' + esc(selected) + '">' + bibleVersionOptions(selected) + '</select></label>' +
-      '<span class="meta" data-bible-picker-notice role="status">' + biblePickerNoticeText(saved, false) + '</span></span>';
+      '<span class="meta" data-bible-picker-notice role="status"' + (notice ? '' : ' hidden') + '>' + esc(notice) + '</span>' +
+      '<span class="meta">More translations are available on YouVersion.</span></span>';
   }
   function loadBibleVersions() {
     if (bibleVersionsLoaded || bibleVersions.length) return Promise.resolve();
@@ -12006,7 +12009,8 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
       updateBiblePreviewText(preview, result.text);
       preview.querySelector('.bible-preview-version').textContent = result.version.abbreviation;
       var selectedLabel = bibleVersionInfo(version);
-      preview.querySelector('.bible-preview-notice').textContent = result.fallback ? (selectedLabel ? selectedLabel.abbreviation : (version === 'ASV' || version === 'NKJV' || version === 'ESV') ? version : 'Selected translation') + ' unavailable — showing ' + result.version.abbreviation + '. Your saved default is unchanged.' : '';
+      var actualLabel = bibleTranslationKey(result.version.abbreviation) === 'AMP' ? 'Amplified (AMP)' : result.version.abbreviation;
+      preview.querySelector('.bible-preview-notice').textContent = result.fallback ? (selectedLabel ? selectedLabel.abbreviation : (version === 'ASV' || version === 'NKJV' || version === 'ESV') ? version : 'Selected translation') + ' unavailable — showing ' + actualLabel + '. Your saved default is unchanged.' : '';
       if (result.provider === 'esv') {
         preview.querySelector('.bible-preview-copyright').textContent = result.version.copyright;
         if (esvLink) esvLink.hidden = false;

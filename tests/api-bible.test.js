@@ -438,7 +438,7 @@ test('NKJV preview displays the actual translation, copyright, link and view tra
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(nodes['.bible-preview-version'].textContent, 'AMP');
     assert.equal(nodes['.bible-preview-text'].textContent, 'Synthetic AMP');
-    assert.equal(nodes['.bible-preview-notice'].textContent, 'NKJV unavailable — showing AMP. Your saved default is unchanged.');
+    assert.equal(nodes['.bible-preview-notice'].textContent, 'NKJV unavailable — showing Amplified (AMP). Your saved default is unchanged.');
     assert.equal(nodes['.bible-preview-copyright'].textContent, 'Amplified Bible. AMP publisher notice Provided by YouVersion.');
     assert.equal(nodes['.bible-preview-open'].href, 'https://www.bible.com/bible/1588/JHN.3.16');
     assert.equal(h.window.fumsData.length, 1, 'YouVersion fallback is not an API.Bible view');
