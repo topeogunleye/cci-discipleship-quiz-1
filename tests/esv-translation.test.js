@@ -105,7 +105,8 @@ test('ESV is offered in the preview and Settings dropdown and can be saved as th
   assert.equal(h.ui.valid('esv'), 'ASV');
   const options = h.ui.options('ASV', '');
   assert.match(options, /<option value="ESV">ESV — English Standard Version \(Crossway\)<\/option>/);
-  assert.ok(options.indexOf('value="ASV"') < options.indexOf('value="ESV"') && options.indexOf('value="ESV"') < options.indexOf('value="1"'));
+  assert.ok(options.indexOf('value="ASV"') < options.indexOf('value="ESV"') && options.indexOf('value="ESV"') < options.indexOf('value="APIBIBLE_KJV"'));
+  assert.doesNotMatch(options, /value="1"/, 'duplicate KJV provider row is hidden');
   assert.match(h.ui.options('ASV', 'crossway'), /value="ESV"/);
   assert.doesNotMatch(h.ui.options('ASV', 'crossway'), /King James/);
   assert.match(h.ui.options('ESV', ''), /value="ESV" selected/);

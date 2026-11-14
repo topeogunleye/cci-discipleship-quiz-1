@@ -52,6 +52,42 @@ test('unlicensed API.Bible versions and invalid references never fetch passage t
   assert.equal(calls, 1);
 });
 
+const additional = ['RV', 'DRA', 'T4T', 'LXXup', 'OJPS', 'OKE'].map(abbreviation => ({ id: 'fixture-' + abbreviation, abbreviationLocal: abbreviation, language: { id: 'eng' } }));
+
+test('new catalog checks real passage access before exposing curated editions, deduplicates checks and keeps tokens private', async () => {
+  const calls = [];
+  const fetcher = async url => {
+    calls.push(url);
+    if (url.includes('?language=eng')) return json({ data: [...additional, ...fixture] });
+    assert.match(url, /\/passages\/GEN.1.1\?/);
+    if (url.includes('fixture-DRA')) return new Response(null, { status: 403 });
+    return json({ data: { content: 'Synthetic access check', copyright: 'Publisher notice' }, meta: { fumsToken: 'probe-only-token' } });
+  };
+  const [catalog, concurrent] = await Promise.all([bible.verifiedVersions('verified-key', fetcher), bible.verifiedVersions('verified-key', fetcher)]);
+  assert.deepEqual(catalog, concurrent);
+  assert.equal(calls.length, 7, 'one metadata request plus six sample passages');
+  assert.deepEqual(catalog.map(v => v.abbreviation), ['RV', 'T4T', 'LXXUP', 'OJPS', 'OKE']);
+  assert.equal(catalog.find(v => v.abbreviation === 'OKE').group, 'Additional editions');
+  assert.match(catalog.find(v => v.abbreviation === 'OKE').coverage, /Torah/);
+  assert.doesNotMatch(JSON.stringify(catalog), /probe-only-token|upstreamId/);
+  await bible.verifiedVersions('verified-key', fetcher);
+  assert.equal(calls.length, 7, 'verified availability is cached for a day');
+});
+
+test('specialist editions reject books outside their coverage without requesting unrelated text', async () => {
+  let calls = 0;
+  const fetcher = async url => {
+    calls++;
+    assert.match(url, /\?language=eng$/);
+    return json({ data: additional });
+  };
+  for (const version of ['LXXUP', 'OJPS', 'OKE']) {
+    assert.equal((await bible.passage('John 3:16', 'APIBIBLE_' + version, 'coverage-key', fetcher)).status, 404);
+  }
+  assert.equal((await bible.passage('Psalms 1:1', 'APIBIBLE_OKE', 'coverage-key', fetcher)).status, 404);
+  assert.equal(calls, 1);
+});
+
 test('API.Bible endpoint validates, protects quota, hides secrets and never caches passages', async () => {
   let calls = 0, reservations = 0;
   const handler = loadFunction('functions/api/api-bible.js', { fetch: async () => {
@@ -116,7 +152,8 @@ function ui(fetcher) {
     save = function () {}; toast = function () {}; positionBiblePreview = function () {};
     bibleVersions = [{id:'12', abbreviation:'ASV', title:'American Standard Version'}];
     window.testApi = { request: requestBiblePassage, options: bibleVersionOptions, valid: validBibleVersion,
-      report: reportApiBibleView, state: S, load: loadBiblePreviewText,
+      report: reportApiBibleView, state: S, load: loadBiblePreviewText, catalog: loadBibleVersions,
+      clearCatalog: function() { bibleVersions = []; },
       activate: function(link, preview) { activeBiblePreview = {link:link, preview:preview}; } };
   `);
   vm.runInNewContext(source, { window, document, URL, AbortController, fetch: fetcher });
@@ -153,6 +190,52 @@ test('API.Bible failure uses a labelled fallback; aborted requests do not issue 
   const controller = new AbortController(); controller.abort();
   await assert.rejects(api.request('John 3:16', 'APIBIBLE_MSG', controller.signal));
   assert.equal(urls.length, 3);
+});
+
+test('same-translation backup uses API.Bible before accepting another YouVersion translation', async () => {
+  for (const outcome of ['missing', 'fallback']) {
+    const urls = [];
+    const { api } = ui(async url => {
+      urls.push(url);
+      if (url.includes('/api/api-bible')) return json({ text: 'Synthetic ASV', provider: 'api-bible', fallback: false, version: { abbreviation: 'ASV' } });
+      return outcome === 'missing' ? new Response(null, { status: 503 }) : json({ text: 'Synthetic BSB', fallback: true, version: { abbreviation: 'BSB' } });
+    });
+    const result = await api.request('John 3:16', 'ASV', new AbortController().signal);
+    assert.equal(result.version.abbreviation, 'ASV');
+    assert.equal(result.fallback, false);
+    assert.equal(urls.length, 2);
+    assert.match(urls[1], /version=APIBIBLE_ASV/);
+  }
+});
+
+test('catalog combines providers, admits only verified curated API editions and retries a failed provider', async () => {
+  let unavailable = true;
+  const urls = [];
+  const h = ui(async url => {
+    urls.push(url);
+    if (url.endsWith('/api/api-bible')) return unavailable ? new Response(null, { status: 503 }) : json({ versions: [
+      { id: 'APIBIBLE_RV', abbreviation: 'RV', title: 'Revised Version 1885' },
+      { id: 'APIBIBLE_OJPS', abbreviation: 'OJPS', title: 'JPS Tanakh 1917', group: 'Additional editions', coverage: 'Old Testament' },
+      { id: 'APIBIBLE_NIV', abbreviation: 'NIV', title: 'Uncurated version' }
+    ] });
+    return json({ versions: [{ id: '12', abbreviation: 'ASV', title: 'American Standard Version' }] });
+  });
+  h.api.clearCatalog();
+  await h.api.catalog();
+  assert.doesNotMatch(h.api.options('ASV', ''), /APIBIBLE_RV/);
+  unavailable = false;
+  await h.api.catalog();
+  const html = h.api.options('ASV', '');
+  assert.match(html, /APIBIBLE_RV/);
+  assert.match(html, /<optgroup label="Additional editions">/);
+  assert.doesNotMatch(html, /APIBIBLE_NIV/);
+  assert.equal((html.match(/>ASV —/g) || []).length, 1);
+  assert.equal(urls.length, 4);
+  await h.api.catalog();
+  assert.equal(urls.length, 4, 'complete catalogs do not fetch again during this session');
+  for (const abbreviation of ['RV', 'DRA', 'T4T', 'LXXUP', 'OJPS', 'OKE']) {
+    assert.equal(h.api.valid('APIBIBLE_' + abbreviation), 'APIBIBLE_' + abbreviation);
+  }
 });
 
 test('display tracking queues each displayed passage token and loads the official tracker once', () => {

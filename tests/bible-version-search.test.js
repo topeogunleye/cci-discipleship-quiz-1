@@ -65,6 +65,34 @@ test('bibleVersionOptions returns all translations when query is empty', () => {
   assert.match(html, /value="111">NIV11 — New International Version 2011/);
 });
 
+test('duplicate provider editions have one row and retain an existing saved provider ID', () => {
+  const { testApi } = setupTestEnvironment([
+    { id: '12', abbreviation: 'ASV', title: 'American Standard Version' },
+    { id: '1', abbreviation: 'KJV', title: 'King James Version' },
+    { id: '206', abbreviation: 'engWEBUS', title: 'World English Bible US' },
+    { id: '999', abbreviation: 'WEBUS', title: 'World English Bible US duplicate' }
+  ]);
+  let html = testApi.bibleVersionOptions('ASV', '');
+  assert.equal((html.match(/>ASV —/g) || []).length, 1);
+  assert.equal((html.match(/>KJV —/g) || []).length, 1);
+  assert.equal((html.match(/World English Bible US/g) || []).length, 1);
+  html = testApi.bibleVersionOptions('12', '');
+  assert.match(html, /value="12" selected/);
+  assert.doesNotMatch(html, /value="ASV"/);
+});
+
+test('specialist options are grouped with coverage labels and remain searchable and selectable', () => {
+  const { testApi } = setupTestEnvironment([
+    { id: 'APIBIBLE_RV', abbreviation: 'RV', title: 'Revised Version 1885' },
+    { id: 'APIBIBLE_OKE', abbreviation: 'OKE', title: 'Targum Onkelos (Etheridge)', group: 'Additional editions', coverage: 'Torah only (Genesis–Deuteronomy)' }
+  ]);
+  const html = testApi.bibleVersionOptions('APIBIBLE_OKE', '');
+  assert.match(html, /<optgroup label="Additional editions"><option value="APIBIBLE_OKE" selected/);
+  assert.match(html, /Torah only/);
+  assert.ok(html.indexOf('value="APIBIBLE_RV"') < html.indexOf('<optgroup'));
+  assert.match(testApi.bibleVersionOptions('APIBIBLE_OKE', 'onkelos'), /value="APIBIBLE_OKE" selected/);
+});
+
 test('search results do not silently become the active translation', () => {
   const { testApi } = setupTestEnvironment();
   const html = testApi.bibleVersionOptions('ASV', 'amp');

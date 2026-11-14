@@ -1,6 +1,21 @@
 const { passageIds } = require('./youversion.cjs');
 const API = 'https://rest.api.bible/v1';
-const TITLES = { KJV: 'King James Version', MSG: 'The Message', GNT: 'Good News Translation' };
+const EDITIONS = {
+  KJV: { title: 'King James Version' }, MSG: { title: 'The Message' }, GNT: { title: 'Good News Translation' },
+  RV: { title: 'Revised Version 1885', discover: true },
+  DRA: { title: 'Douay-Rheims American 1899', discover: true },
+  T4T: { title: 'Translation for Translators', discover: true },
+  LXXUP: { title: 'Brenton English Septuagint (Updated)', group: 'Additional editions', coverage: 'Old Testament (Septuagint)', discover: true },
+  OJPS: { title: 'JPS Tanakh 1917', group: 'Additional editions', coverage: 'Old Testament (Hebrew Bible)', discover: true },
+  OKE: { title: 'Targum Onkelos (Etheridge)', group: 'Additional editions', coverage: 'Torah only (Genesis–Deuteronomy)', discover: true },
+  // Equivalent translations are available as backup providers, never extra picker rows.
+  ASV: { title: 'American Standard Version' }, BSB: { title: 'Berean Standard Bible' },
+  FBV: { title: 'Free Bible Version' }, GNV: { title: 'Geneva Bible' }, LSV: { title: 'Literal Standard Version' },
+  TCENT: { title: 'The Text-Critical English New Testament' }, TOJB2011: { title: 'The Orthodox Jewish Bible' },
+  WEBUS: { title: 'World English Bible, American English Edition' },
+  WMB: { title: 'World Messianic Bible' }, WMBBE: { title: 'World Messianic Bible British Edition' }
+};
+function supportedVersion(id) { return typeof id === 'string' && id.startsWith('APIBIBLE_') && Object.hasOwn(EDITIONS, id.slice(9)); }
 let cached = null;
 let cachedKey = '';
 let expires = 0;
@@ -31,10 +46,11 @@ async function versions(key, fetcher = fetch) {
     for (const bible of result.data) {
       if (bible.language?.id !== 'eng' || !/^[a-zA-Z0-9-]{1,80}$/.test(bible.id || '')) continue;
       const abbreviations = [bible.abbreviationLocal, bible.abbreviation].map(a => String(a || '').replace(/^eng/i, '').toUpperCase());
-      const abbreviation = abbreviations.find(a => Object.hasOwn(TITLES, a));
+      const abbreviation = abbreviations.find(a => Object.hasOwn(EDITIONS, a));
       if (!abbreviation || found.has(abbreviation)) continue;
       found.set(abbreviation, { id: 'APIBIBLE_' + abbreviation, upstreamId: bible.id,
-        abbreviation, title: TITLES[abbreviation], copyright: String(bible.copyright || ''), publisher: '' });
+        abbreviation, title: EDITIONS[abbreviation].title, group: EDITIONS[abbreviation].group || '',
+        coverage: EDITIONS[abbreviation].coverage || '', copyright: String(bible.copyright || ''), publisher: '' });
     }
     const catalog = [...found.values()];
     if (cachedKey === key) { cached = catalog; expires = Date.now() + 3600000; }
@@ -46,9 +62,14 @@ async function versions(key, fetcher = fetch) {
 
 async function passage(reference, preferred, key, fetcher = fetch) {
   const ids = passageIds(reference);
-  if (!ids || !/^APIBIBLE_(KJV|MSG|GNT)$/.test(preferred)) return { status: 400, error: 'Enter a supported Bible reference and translation.' };
+  if (!ids || !supportedVersion(preferred)) return { status: 400, error: 'Enter a supported Bible reference and translation.' };
   const version = (await versions(key, fetcher)).find(v => v.id === preferred);
   if (!version) return { status: 404, error: 'This translation is not available to the configured API.Bible key.' };
+  if (['LXXUP', 'OJPS', 'OKE'].includes(version.abbreviation)) {
+    const ot = 'GEN EXO LEV NUM DEU JOS JDG RUT 1SA 2SA 1KI 2KI 1CH 2CH EZR NEH EST JOB PSA PRO ECC SNG ISA JER LAM EZK DAN HOS JOL AMO OBA JON MIC NAM HAB ZEP HAG ZEC MAL'.split(' ');
+    const books = version.abbreviation === 'OKE' ? ot.slice(0, 5) : ot;
+    if (ids.some(id => !books.includes(id.split('.')[0]))) return { status: 404, error: 'This edition covers ' + version.coverage + '.' };
+  }
   // Fetch sequentially to avoid amplifying a rate limit. Never return partial text.
   const parts = [];
   for (const id of ids) {
@@ -66,4 +87,28 @@ async function passage(reference, preferred, key, fetcher = fetch) {
     fumsTokens: parts.map(p => p.meta?.fumsToken).filter(t => typeof t === 'string' && t.length < 4096) };
 }
 
-module.exports = { versions, passage };
+let verified = null, verification = null;
+async function verifiedVersions(key, fetcher = fetch) {
+  if (verified?.key === key && Date.now() < verified.expires) return verified.versions;
+  if (verification?.key === key) return verification.promise;
+  const promise = (async () => {
+    const catalog = (await versions(key, fetcher)).filter(v => EDITIONS[v.abbreviation].discover);
+    const checks = await Promise.all(catalog.map(async version => {
+      try {
+        const result = await passage('Genesis 1:1', version.id, key, fetcher);
+        if (result.status || !result.text || !result.version.copyright) return null;
+        return result.version;
+      } catch (error) {
+        if ([403, 404].includes(error.status)) return null;
+        throw error;
+      }
+    }));
+    const available = checks.filter(Boolean);
+    verified = { key, expires: Date.now() + 86400000, versions: available };
+    return available;
+  })();
+  verification = { key, promise };
+  try { return await promise; } finally { if (verification?.promise === promise) verification = null; }
+}
+
+module.exports = { versions, passage, supportedVersion, verifiedVersions };

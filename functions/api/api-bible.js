@@ -8,7 +8,8 @@ export async function onRequestGet({ request, env }) {
   if (!auth.originAllowed(request, env)) return reply({ error: 'Origin not allowed.' }, 403);
   const params = new URL(request.url).searchParams;
   const reference = params.get('q'), version = params.get('version');
-  if (params.getAll('q').length !== 1 || params.getAll('version').length !== 1 || !references.passageIds(reference) || !/^APIBIBLE_(KJV|MSG|GNT)$/.test(version || '')) return reply({ error: 'Enter a supported Bible reference and translation.' }, 400);
+  const catalogRequest = reference === null && version === null;
+  if (!catalogRequest && (params.getAll('q').length !== 1 || params.getAll('version').length !== 1 || !references.passageIds(reference) || !bible.supportedVersion(version))) return reply({ error: 'Enter a supported Bible reference and translation.' }, 400);
   if (!env.API_BIBLE_KEY) return reply({ error: 'Bible previews are not configured yet.' }, 503);
   try {
     const limitedFetch = async (url, options) => {
@@ -20,6 +21,7 @@ export async function onRequestGet({ request, env }) {
       if (!reservation.ok) { const error = new Error('Bible request limit'); error.status = reservation.status; throw error; }
       return fetch(url, options);
     };
+    if (catalogRequest) return reply({ versions: await bible.verifiedVersions(env.API_BIBLE_KEY, limitedFetch) });
     const result = await bible.passage(reference, version, env.API_BIBLE_KEY, limitedFetch);
     return reply(result, result.status || 200);
   } catch (error) {
