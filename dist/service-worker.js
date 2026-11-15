@@ -1,9 +1,11 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v71';
+const CACHE_NAME = CACHE_PREFIX + 'v72';
 const CORE_FILES = [
   './',
+  'app/',
+  'js/landing.js',
   'offline.html',
   'manifest.webmanifest',
   'icons/icon.svg',

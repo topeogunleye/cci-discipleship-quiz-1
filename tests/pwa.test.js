@@ -10,7 +10,7 @@ const manifest = JSON.parse(read('manifest.webmanifest'));
 
 test('web app manifest declares standalone install metadata and valid icon assets', () => {
   assert.equal(manifest.display, 'standalone');
-  assert.equal(manifest.start_url, './');
+  assert.equal(manifest.start_url, './app/');
   assert.equal(manifest.scope, './');
   for (const size of [192, 512]) {
     const icon = manifest.icons.find(item => item.sizes === `${size}x${size}`);
@@ -26,7 +26,7 @@ test('web app manifest declares standalone install metadata and valid icon asset
 test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
   const serviceWorker = read('service-worker.js');
   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v71'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v72'/);
   assert.match(serviceWorker, /decks\/manifest\.json/);
   assert.match(serviceWorker, /content\/devotionals\.json/);
   assert.match(serviceWorker, /content\/lesson-transcripts\.json/);
@@ -57,7 +57,8 @@ test('activation deletes previous app caches and deck assets absent from the cur
     [url('settings.json'), {}]
   ]);
   const cacheStore = new Map([
-    ['cci-study-pwa-v71', activeEntries],
+    ['cci-study-pwa-v72', activeEntries],
+    ['cci-study-pwa-v71', new Map()],
     ['cci-study-pwa-v70', new Map()],
     ['cci-study-pwa-v69', new Map()],
     ['cci-study-pwa-v68', new Map()],
@@ -115,7 +116,8 @@ test('activation deletes previous app caches and deck assets absent from the cur
 
   assert.equal(cacheStore.has('cci-study-pwa-v50'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v51'), false);
-  assert.equal(cacheStore.has('cci-study-pwa-v71'), true);
+  assert.equal(cacheStore.has('cci-study-pwa-v72'), true);
+  assert.equal(cacheStore.has('cci-study-pwa-v71'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v70'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v69'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v68'), false);
@@ -268,20 +270,20 @@ test('protected account, video, and transcript requests bypass the offline cache
 
 test('standalone dist package includes all PWA runtime assets', () => {
   const dist = path.join(root, 'dist');
-  for (const file of ['index.html', 'manifest.webmanifest', 'service-worker.js', 'offline.html', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'decks/manifest.json', 'content/devotionals.json', 'content/lesson-transcripts.json']) {
+  for (const file of ['index.html', 'app/index.html', 'manifest.webmanifest', 'service-worker.js', 'offline.html', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'decks/manifest.json', 'content/devotionals.json', 'content/lesson-transcripts.json']) {
     assert.ok(fs.existsSync(path.join(dist, file)), `Missing dist/${file}`);
   }
-  const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
+  const html = fs.readFileSync(path.join(dist, 'app/index.html'), 'utf8');
   assert.doesNotMatch(html, /<script\s+src=(?!"js\/supabase\.bundle\.js")|<link rel="stylesheet"/i);
   assert.match(html, /<script src="js\/supabase\.bundle\.js"><\/script>/);
   assert.match(html, /rel="manifest" href="manifest\.webmanifest"/);
   const worker = fs.readFileSync(path.join(dist, 'service-worker.js'), 'utf8');
-  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v71'/);
+  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v72'/);
   const coreBlock = worker.match(/const CORE_FILES = \[([\s\S]*?)\];/);
   assert.ok(coreBlock, 'Service worker defines its core precache files');
   const coreFiles = Array.from(coreBlock[1].matchAll(/'([^']+)'/g), match => match[1]);
   for (const file of coreFiles) {
-    const relative = file === './' ? 'index.html' : file.replace(/^\.\//, '');
+    const relative = file.endsWith('/') ? file + 'index.html' : file.replace(/^\.\//, '');
     assert.ok(fs.existsSync(path.join(dist, relative)), `Missing dist/${relative}, listed in service-worker precache`);
     if (/\.(?:m?js|css)$/i.test(relative)) {
       const asset = fs.readFileSync(path.join(dist, relative), 'utf8');

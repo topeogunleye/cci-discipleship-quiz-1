@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+# App and supporting documents use noindex responses. Keep them crawlable so
+# search engines can read that directive; authentication protects private media.
+Sitemap: https://cci-discipleship-quiz.pages.dev/sitemap.xml

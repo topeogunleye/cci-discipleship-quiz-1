@@ -4,10 +4,11 @@ A lightweight, offline-first study app for CCI discipleship lessons. The web app
 
 ## Run locally
 
-For development, serve the repository over HTTP so the app can fetch the individual deck files:
+For the production layout, including the public home page, indexing headers,
+404 responses, and Pages Functions, run:
 
 ```bash
-python3 -m http.server 8000
+npm run dev
 ```
 
 Then visit <http://localhost:8000>.
@@ -18,7 +19,31 @@ To build the offline app package, run:
 npm run build
 ```
 
-Open `dist/index.html` directly or share the complete `dist/` folder. The Supabase client bundle is loaded from `dist/js/`; guest study works without an account or backend.
+The build creates the public home at `dist/index.html` and the study app at
+`dist/app/index.html`. Share the complete `dist/` folder, or open
+`dist-native/index.html` directly for standalone offline study. Guest study
+works without an account or backend. Capacitor uses `dist-native/` so native
+apps open directly into study rather than the public home page.
+
+## Search indexing
+
+Only `https://cci-discipleship-quiz.pages.dev/` is intended for search. The
+public landing page declares that canonical URL, social metadata, and `WebSite`
+structured data. `robots.txt` allows crawling so search engines can read the
+`noindex` directives on `/app/`, `/offline`, and supporting content/deck files.
+The sitemap contains only the public home URL. A top-level `404.html` disables
+Cloudflare Pages' fallback that previously served the app for unknown URLs.
+
+Existing `/#/...` bookmarks and root authentication callbacks forward to
+`/app/`, preserving query parameters and fragments. The web app retains its
+origin, storage keys, root API routes, and service-worker scope. The manifest
+retains its installation ID and opens `/app/`; its native copy opens `./`.
+Private video/transcript authentication is unchanged: indexing directives
+never replace access control. If the production hostname changes, update the
+landing canonical/social/structured-data URLs, robots sitemap URL, and sitemap
+together. After deployment, verify headers and status codes on Pages and use
+Search Console to inspect indexing; repository changes cannot remove existing
+Google results immediately.
 
 ## Build for iPhone and Android
 

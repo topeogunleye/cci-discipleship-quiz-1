@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, '..');
 const outputDir = path.join(root, 'dist');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const manifest = JSON.parse(read('decks/manifest.json'));
-const deckText = manifest.map(file => read(path.join('decks', file)).trimEnd()).join('\n\n');
+const deckText = manifest.map(file => read(path.join('decks', file)).replace(/\r\n/g, '\n').trimEnd()).join('\n\n');
 const inlineJson = JSON.stringify(deckText).replace(/</g, '\\u003c');
 const devotionalsJson = JSON.stringify(JSON.parse(read('content/devotionals.json'))).replace(/</g, '\\u003c');
 const lessonVideosJson = JSON.stringify(JSON.parse(read('content/lesson-videos.json'))).replace(/</g, '\\u003c');
@@ -70,8 +70,12 @@ for (const retired of ['content/sermons', 'content/sermons.json', 'js/sermons.js
 // an output directory reused by a later build.
 fs.rmSync(path.join(outputDir, 'transcripts'), { recursive: true, force: true });
 fs.mkdirSync(outputDir, { recursive: true });
-fs.writeFileSync(path.join(outputDir, 'index.html'), html);
-for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html', 'favicon.ico', 'style.css', '_headers']) {
+fs.writeFileSync(path.join(outputDir, 'index.html'), read('landing.html'));
+fs.mkdirSync(path.join(outputDir, 'app'), { recursive: true });
+// Resolve shared assets at the same origin root. Accounts and browser storage
+// keep their existing origin/keys; the native package keeps its root app entry.
+fs.writeFileSync(path.join(outputDir, 'app', 'index.html'), html.replace('<head>', '<head>\n<base href="../">'));
+for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html', '404.html', 'robots.txt', 'sitemap.xml', 'favicon.ico', 'style.css', '_headers']) {
   fs.copyFileSync(path.join(root, file), path.join(outputDir, file));
 }
 for (const directory of ['decks', 'icons', 'content', 'js']) {
@@ -83,4 +87,20 @@ fs.writeFileSync(path.join(outputDir, 'decks', 'starter-decks.js'), starterDecks
 require('./lesson-transcripts.js').writeLessonTranscripts(root);
 normalizeTextFile(path.join(outputDir, 'style.css'));
 normalizeTextFiles(path.join(outputDir, 'js'));
-console.log(`Built dist/index.html (${Buffer.byteLength(html)} bytes)`);
+// Capacitor still opens directly into the offline study app, without web-only
+// routing or a landing page. This generated output is not deployed to Pages.
+const nativeOutputDir = path.join(root, 'dist-native');
+fs.mkdirSync(nativeOutputDir, { recursive: true });
+for (const directory of ['decks', 'icons', 'content', 'js']) {
+  fs.cpSync(path.join(outputDir, directory), path.join(nativeOutputDir, directory), { recursive: true });
+}
+for (const file of ['favicon.ico', 'style.css', 'offline.html']) {
+  fs.copyFileSync(path.join(outputDir, file), path.join(nativeOutputDir, file));
+}
+fs.writeFileSync(path.join(nativeOutputDir, 'index.html'), html);
+const nativeManifest = JSON.parse(read('manifest.webmanifest'));
+nativeManifest.start_url = './';
+fs.writeFileSync(path.join(nativeOutputDir, 'manifest.webmanifest'), JSON.stringify(nativeManifest, null, 2) + '\n');
+fs.writeFileSync(path.join(nativeOutputDir, 'service-worker.js'), read('service-worker.js').replace(/^  'app\/',\r?\n/m, ''));
+fs.writeFileSync(path.join(outputDir, 'offline.html'), read('offline.html').replace('href="./"', 'href="./app/"'));
+console.log(`Built public landing, dist/app/index.html and native app (${Buffer.byteLength(html)} bytes)`);

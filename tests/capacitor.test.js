@@ -10,7 +10,7 @@ test('Capacitor targets both native platforms and the existing offline build', (
   const config = JSON.parse(read('capacitor.config.json'));
   const pkg = JSON.parse(read('package.json'));
   assert.equal(config.appName, 'Disciple');
-  assert.equal(config.webDir, 'dist');
+  assert.equal(config.webDir, 'dist-native');
   assert.match(config.appId, /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$/);
   for (const platform of ['@capacitor/android', '@capacitor/ios']) assert.ok(pkg.dependencies[platform]);
   assert.match(pkg.scripts.sync, /npm run build.*cap sync/);
@@ -28,7 +28,7 @@ test('native bridge handles app back, background, and file sharing without requi
 });
 
 test('iOS and Android shells use the offline app build, CCI icons, and matching splash screens', () => {
-  const offlinePage = read('dist/index.html');
+  const offlinePage = read('dist-native/index.html');
   const androidIcon = fs.readFileSync(path.join(root, 'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png'));
   const iosIcon = fs.readFileSync(path.join(root, 'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png'));
   const androidSplash = fs.readFileSync(path.join(root, 'android/app/src/main/res/drawable-port-xxxhdpi/splash.png'));
@@ -46,7 +46,7 @@ test('iOS and Android shells use the offline app build, CCI icons, and matching 
 test('offline build inlines the bridge and the mobile study helper before app startup', () => {
   const page = read('index.html');
   const build = read('scripts/build.js');
-  const bundled = read('dist/index.html');
+  const bundled = read('dist-native/index.html');
   assert.ok(page.indexOf('js/native-bridge.bundle.js') < page.indexOf('js/app.js'));
   assert.ok(page.indexOf('js/mobile-study.js') < page.indexOf('js/app.js'));
   assert.match(build, /native-bridge\.bundle\.js/);

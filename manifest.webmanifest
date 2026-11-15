@@ -3,7 +3,7 @@
   "name": "Disciple",
   "short_name": "Disciple",
   "description": "Study CCI discipleship lessons with flashcards, quizzes, and spaced repetition.",
-  "start_url": "./",
+  "start_url": "./app/",
   "scope": "./",
   "display": "standalone",
   "background_color": "#F5F6FB",

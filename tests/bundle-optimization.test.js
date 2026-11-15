@@ -12,10 +12,10 @@ const StudyLogic = require('../js/study.js');
 const StudyStorage = require('../js/storage.js');
 const MobileStudy = require('../js/mobile-study.js');
 
-test('bundle optimization keeps dist/index.html under 800 KB and generates external starter-decks.js', () => {
-  const distHtml = fs.readFileSync(path.join(root, 'dist/index.html'), 'utf8');
-  assert.ok(distHtml.length < 800000, `dist/index.html size (${distHtml.length} bytes) must be under 800 KB to prevent mobile payload bloat`);
-  assert.match(distHtml, /<script type="application\/json" id="starter-fallback">""<\/script>/, 'dist/index.html must not embed 1 MB monolithic starter text');
+test('bundle optimization keeps dist/app/index.html under 800 KB and generates external starter-decks.js', () => {
+  const distHtml = fs.readFileSync(path.join(root, 'dist/app/index.html'), 'utf8');
+  assert.ok(distHtml.length < 800000, `dist/app/index.html size (${distHtml.length} bytes) must be under 800 KB to prevent mobile payload bloat`);
+  assert.match(distHtml, /<script type="application\/json" id="starter-fallback">""<\/script>/, 'dist/app/index.html must not embed 1 MB monolithic starter text');
 
   const starterDecksPath = path.join(root, 'dist/decks/starter-decks.js');
   assert.ok(fs.existsSync(starterDecksPath), 'dist/decks/starter-decks.js must exist for fallback/file: mode');

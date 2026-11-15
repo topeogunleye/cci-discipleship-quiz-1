@@ -1,4 +1,5 @@
 node_modules/
+/dist-native/
 .wrangler/
 functions/_generated/
 .DS_Store
