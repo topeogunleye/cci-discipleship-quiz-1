@@ -26,7 +26,7 @@ test('web app manifest declares standalone install metadata and valid icon asset
 test('service worker uses versioned shell/deck caches and an offline navigation fallback', () => {
   const serviceWorker = read('service-worker.js');
   assert.match(serviceWorker, /CACHE_PREFIX\s*=\s*'cci-study-pwa-'/);
-  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v72'/);
+  assert.match(serviceWorker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v73'/);
   assert.match(serviceWorker, /decks\/manifest\.json/);
   assert.match(serviceWorker, /content\/devotionals\.json/);
   assert.match(serviceWorker, /content\/lesson-transcripts\.json/);
@@ -57,7 +57,8 @@ test('activation deletes previous app caches and deck assets absent from the cur
     [url('settings.json'), {}]
   ]);
   const cacheStore = new Map([
-    ['cci-study-pwa-v72', activeEntries],
+    ['cci-study-pwa-v73', activeEntries],
+    ['cci-study-pwa-v72', new Map()],
     ['cci-study-pwa-v71', new Map()],
     ['cci-study-pwa-v70', new Map()],
     ['cci-study-pwa-v69', new Map()],
@@ -116,7 +117,8 @@ test('activation deletes previous app caches and deck assets absent from the cur
 
   assert.equal(cacheStore.has('cci-study-pwa-v50'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v51'), false);
-  assert.equal(cacheStore.has('cci-study-pwa-v72'), true);
+  assert.equal(cacheStore.has('cci-study-pwa-v73'), true);
+  assert.equal(cacheStore.has('cci-study-pwa-v72'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v71'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v70'), false);
   assert.equal(cacheStore.has('cci-study-pwa-v69'), false);
@@ -270,7 +272,7 @@ test('protected account, video, and transcript requests bypass the offline cache
 
 test('standalone dist package includes all PWA runtime assets', () => {
   const dist = path.join(root, 'dist');
-  for (const file of ['index.html', 'app/index.html', 'manifest.webmanifest', 'service-worker.js', 'offline.html', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'decks/manifest.json', 'content/devotionals.json', 'content/lesson-transcripts.json']) {
+  for (const file of ['index.html', 'app/index.html', 'manifest.webmanifest', 'service-worker.js', 'offline.html', 'icons/favicon-v2.ico', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'decks/manifest.json', 'content/devotionals.json', 'content/lesson-transcripts.json']) {
     assert.ok(fs.existsSync(path.join(dist, file)), `Missing dist/${file}`);
   }
   const html = fs.readFileSync(path.join(dist, 'app/index.html'), 'utf8');
@@ -278,7 +280,7 @@ test('standalone dist package includes all PWA runtime assets', () => {
   assert.match(html, /<script src="js\/supabase\.bundle\.js"><\/script>/);
   assert.match(html, /rel="manifest" href="manifest\.webmanifest"/);
   const worker = fs.readFileSync(path.join(dist, 'service-worker.js'), 'utf8');
-  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v72'/);
+  assert.match(worker, /CACHE_NAME\s*=\s*CACHE_PREFIX \+ 'v73'/);
   const coreBlock = worker.match(/const CORE_FILES = \[([\s\S]*?)\];/);
   assert.ok(coreBlock, 'Service worker defines its core precache files');
   const coreFiles = Array.from(coreBlock[1].matchAll(/'([^']+)'/g), match => match[1]);

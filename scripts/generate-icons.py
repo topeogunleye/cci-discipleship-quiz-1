@@ -10,6 +10,7 @@ Generates all required platform dimensions and formats deterministically.
 import os
 import sys
 import base64
+import shutil
 from PIL import Image, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -215,6 +216,8 @@ def main():
         append_images=[icon_32, icon_16]
     )
     print("Saved favicon.ico")
+    # Versioned browser-tab asset avoids reusing the immutable raster SVG cache.
+    shutil.copyfile(os.path.join(ROOT, 'favicon.ico'), os.path.join(icons_dir, 'favicon-v2.ico'))
 
     # SVG icon embedding full-resolution 512px restyle
     with open(os.path.join(icons_dir, 'icon-512.png'), 'rb') as f:
