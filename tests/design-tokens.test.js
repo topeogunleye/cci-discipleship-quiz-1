@@ -44,6 +44,20 @@ test('white text meets WCAG AA contrast across all deck gradient stops', () => {
   }
 });
 
+test('accent text stays readable without lightening filled brand buttons', () => {
+  const blocks = [
+    styles.match(/:root\s*\{([^}]+)\}/)[1],
+    styles.match(/:root:not\(\[data-theme="light"\]\)\s*\{([^}]+)\}/)[1],
+    styles.match(/:root\[data-theme="dark"\]\s*\{([^}]+)\}/)[1]
+  ];
+  for (const block of blocks) {
+    const token = name => block.match(new RegExp('--' + name + ':\\s*(#[\\da-f]{6});', 'i'))[1];
+    assert.ok(contrastRatio(token('accent-text'), token('bg')) >= 4.5);
+    assert.ok(contrastRatio(token('accent-text'), token('surface')) >= 4.5);
+    assert.ok(contrastRatio(token('accent-ink'), token('accent')) >= 4.5);
+  }
+});
+
 test('sunrise gradient text uses dark ink with WCAG AA contrast', () => {
   const gradient = styles.match(/--grad-hero-sunrise:\s*linear-gradient\([^;]*\);/);
   assert.ok(gradient, 'Expected the sunrise hero gradient token');

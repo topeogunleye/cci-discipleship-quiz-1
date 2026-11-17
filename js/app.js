@@ -1753,7 +1753,7 @@
     return '<nav class="bottom-tab-bar" aria-label="Main Navigation">' +
       tabs.map(function (tab) {
         var isActive = tab.id === activeTab;
-        return '<button class="tab-btn' + (isActive ? ' active' : '') + '" data-act="nav-tab" data-tab="' + tab.id + '" aria-selected="' + (isActive ? 'true' : 'false') + '" aria-label="' + tab.label + ' tab">' +
+        return '<button class="tab-btn' + (isActive ? ' active' : '') + '" data-act="nav-tab" data-tab="' + tab.id + '"' + (isActive ? ' aria-current="page"' : '') + ' aria-label="' + tab.label + ' tab">' +
           tabIconSvg(tab.icon) +
           '<span class="tab-label">' + tab.label + '</span>' +
         '</button>';
@@ -2478,9 +2478,9 @@
       '<div class="settings-row">' +
         '<div><strong>Theme</strong><p class="meta">Select light, dark, or follow system</p></div>' +
         '<div class="theme-pill-group" role="group" aria-label="Theme selection">' +
-          '<button class="theme-pill' + (theme === 'auto' ? ' active' : '') + '" data-act="set-theme" data-theme="auto">Auto</button>' +
-          '<button class="theme-pill' + (theme === 'light' ? ' active' : '') + '" data-act="set-theme" data-theme="light">Light</button>' +
-          '<button class="theme-pill' + (theme === 'dark' ? ' active' : '') + '" data-act="set-theme" data-theme="dark">Dark</button>' +
+          '<button type="button" class="theme-pill' + (theme === 'auto' ? ' active' : '') + '" data-act="set-theme" data-theme="auto" aria-pressed="' + (theme === 'auto') + '">Auto</button>' +
+          '<button type="button" class="theme-pill' + (theme === 'light' ? ' active' : '') + '" data-act="set-theme" data-theme="light" aria-pressed="' + (theme === 'light') + '">Light</button>' +
+          '<button type="button" class="theme-pill' + (theme === 'dark' ? ' active' : '') + '" data-act="set-theme" data-theme="dark" aria-pressed="' + (theme === 'dark') + '">Dark</button>' +
         '</div>' +
       '</div>' +
     '</div>' +
@@ -2542,14 +2542,15 @@
     var displayTitle = parsed.topic || title;
     var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + renderReferenceNote(c, it.deckId) + bibleNote(c);
     var isLast = s.i === s.cards.length - 1;
+    var answerSummaryId = session ? 'video-flash-answer-summary' : 'flash-answer-summary';
     var cardFace = s.flipped
       ? '<div class="flip on flash-card-back" data-flip-surface="true">' +
           '<div class="inner"><div class="face back" aria-hidden="false">' +
             '<span class="card-face-top"><span class="tag">Answer · ' + c.answer + '</span><span class="face-index">' + (s.i + 1) + ' / ' + s.cards.length + '</span></span>' +
-            '<span class="a">' + esc(c.options[ai]) + '</span>' +
+            '<span class="a" id="' + answerSummaryId + '">' + esc(c.options[ai]) + '</span>' +
             notes +
             '<span class="qs">' + esc(c.question) + '</span>' +
-            '<button class="flip-cue flip-cue-button" data-act="flip" type="button" aria-label="Show question"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap or Space to see question</button>' +
+            '<button class="flip-cue flip-cue-button" data-act="flip" type="button" aria-label="Show question" aria-describedby="' + answerSummaryId + '"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap or Space to see question</button>' +
           '</div></div>' +
         '</div>'
       : '<button class="flip" data-act="flip" type="button" aria-pressed="false" aria-label="Reveal answer">' +
@@ -3443,8 +3444,8 @@
     }
     if (!keep) window.scrollTo(0, 0);
     if (V.name === 'flash') {
-      var f = app.querySelector('.flip');
-      if (f) f.focus({ preventScroll: true });
+      var f = app.querySelector('.flip-cue-button, button.flip[data-act="flip"]');
+      if (f) f.focus();
     } else if (V.name === 'quiz' || V.name === 'exam') {
       var q = app.querySelector('.qtext');
       if (q) q.focus({ preventScroll: true });
@@ -3945,8 +3946,8 @@
 
     if (!s.results) {
       if (s.name === 'flash') {
-        var f = modal.querySelector('.flip');
-        if (f) f.focus({ preventScroll: true });
+        var f = modal.querySelector('.flip-cue-button, button.flip[data-act="flip"]');
+        if (f) f.focus();
       } else if (s.name === 'quiz') {
         var q = modal.querySelector('.qtext');
         if (q) q.focus({ preventScroll: true });
@@ -4490,7 +4491,13 @@
       case 'account-sync':
       case 'account-import':
       case 'account-video-session': accountAction(a); break;
-      case 'set-theme': if (t.dataset.theme) { S.settings.theme = t.dataset.theme; applyTheme(); save(); render(true); } break;
+      case 'set-theme':
+        if (['auto', 'light', 'dark'].indexOf(t.dataset.theme) >= 0) {
+          S.settings.theme = t.dataset.theme; applyTheme(); save(); render(true);
+          var themeButton = app.querySelector('[data-act="set-theme"][data-theme="' + S.settings.theme + '"]');
+          if (themeButton) themeButton.focus({ preventScroll: true });
+        }
+        break;
       case 'toggle-streak': S.settings.showStreak = S.settings.showStreak === false; save(); render(true); break;
       case 'toggle-shuffle': S.settings.shuffle = !S.settings.shuffle; save(); render(true); break;
       case 'toggle-draft-devotionals':
@@ -4990,7 +4997,12 @@
       }
       return;
     }
-    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    if (e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable) return;
+    if (activeBiblePreview && isWithinActiveBiblePreview(e.target)) return;
+    // Native controls own their activation keys; quiz shortcuts must not replace
+    // Enter on Close, a reference link, or the feedback-panel controls.
+    var shortcutControl = e.target.closest('button, a, summary, [role="button"], [role="link"], [role="textbox"], [contenteditable]');
     if (V.videoStudy && !V.videoStudy.results) {
       if (V.videoStudy.name === 'flash') {
         if (e.key === 'ArrowRight') stepVideoStudy(1);
@@ -5003,6 +5015,7 @@
           renderVideoStudyModal();
         }
       } else if (V.videoStudy.name === 'quiz') {
+        if (shortcutControl) return;
         var k = 'abcd'.indexOf(e.key.toLowerCase());
         if (k < 0) k = '1234'.indexOf(e.key);
         if (k >= 0 && V.videoStudy.picked === null) pickVideoStudy(k);
@@ -5015,6 +5028,7 @@
       if (e.key === 'ArrowRight') step(1); else if (e.key === 'ArrowLeft') step(-1);
       else if ((e.key === ' ' || e.key === 'Enter') && e.target.closest('button.flip[data-act="flip"], button.flip-cue-button')) { e.preventDefault(); V.flipped = !V.flipped; render(true); }
     } else if (V.name === 'quiz' || V.name === 'exam') {
+      if (shortcutControl) return;
       var k = 'abcd'.indexOf(e.key.toLowerCase()); if (k < 0) k = '1234'.indexOf(e.key);
       if (k >= 0 && V.picked === null) pick(k); else if ((e.key === 'Enter' || e.key === 'ArrowRight') && V.picked !== null) step(1);
     }

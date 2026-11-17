@@ -529,7 +529,7 @@ test('main tabs and Devotion keep desktop navigation while study sessions use th
     assert.match(elements.app.innerHTML, /class="desktop-shell(?: desktop-shell-home)?"/, `${tab} should use the shared shell`);
     assert.match(elements.app.innerHTML, /<aside class="desktop-sidebar">/, `${tab} should render desktop navigation`);
     assert.match(elements.app.innerHTML, /<nav class="bottom-tab-bar"/, `${tab} should retain mobile navigation markup`);
-    assert.match(elements.app.innerHTML, new RegExp(`data-tab="${tab}" aria-selected="true"`), `${tab} should be selected`);
+    assert.match(elements.app.innerHTML, new RegExp(`data-tab="${tab}" aria-current="page"`), `${tab} should be current`);
     if (tab === 'practice') {
       assert.match(elements.app.innerHTML, /Pick how you want to practice, then choose what to cover\./);
       assert.match(elements.app.innerHTML, /data-act="practice-mode" data-mode="challenge"/);

@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v73';
+const CACHE_NAME = CACHE_PREFIX + 'v74';
 const CORE_FILES = [
   './',
   'app/',
