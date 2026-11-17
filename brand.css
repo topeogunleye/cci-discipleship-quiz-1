@@ -1,0 +1,15 @@
+/* Shared CCI identity for the public homepage and study app. */
+:root {
+  --cci-burgundy: #B5173A;
+  --cci-burgundy-hover: #9E1231;
+  --cci-burgundy-dark-hover: #D42149;
+  --cci-burgundy-on-dark: #FF8FAB;
+  --cci-burgundy-soft: #FDE8ED;
+  --cci-burgundy-soft-dark: #38152B;
+  --cci-action-ink: #FFFFFF;
+  --cci-font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --cci-button-radius: 999px;
+  --cci-card-radius: 22px;
+  --cci-control-height: 48px;
+  --cci-space: 8px;
+}

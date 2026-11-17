@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
+const brand = fs.readFileSync(path.join(__dirname, '..', 'brand.css'), 'utf8');
 const styles = fs.readFileSync(path.join(__dirname, '..', 'style.css'), 'utf8');
 
 function relativeLuminance(hex) {
@@ -51,7 +52,11 @@ test('accent text stays readable without lightening filled brand buttons', () =>
     styles.match(/:root\[data-theme="dark"\]\s*\{([^}]+)\}/)[1]
   ];
   for (const block of blocks) {
-    const token = name => block.match(new RegExp('--' + name + ':\\s*(#[\\da-f]{6});', 'i'))[1];
+    const token = name => {
+      const value = block.match(new RegExp('--' + name + ':\\s*([^;]+);', 'i'))[1];
+      const shared = value.match(/var\(--([\w-]+)\)/);
+      return shared ? brand.match(new RegExp('--' + shared[1] + ':\\s*(#[\\da-f]{6});', 'i'))[1] : value;
+    };
     assert.ok(contrastRatio(token('accent-text'), token('bg')) >= 4.5);
     assert.ok(contrastRatio(token('accent-text'), token('surface')) >= 4.5);
     assert.ok(contrastRatio(token('accent-ink'), token('accent')) >= 4.5);

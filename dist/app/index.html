@@ -12,9 +12,27 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Disciple — Study Decks</title>
 <style>
+/* Shared CCI identity for the public homepage and study app. */
+:root {
+  --cci-burgundy: #B5173A;
+  --cci-burgundy-hover: #9E1231;
+  --cci-burgundy-dark-hover: #D42149;
+  --cci-burgundy-on-dark: #FF8FAB;
+  --cci-burgundy-soft: #FDE8ED;
+  --cci-burgundy-soft-dark: #38152B;
+  --cci-action-ink: #FFFFFF;
+  --cci-font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --cci-button-radius: 999px;
+  --cci-card-radius: 22px;
+  --cci-control-height: 48px;
+  --cci-space: 8px;
+}
+
+</style>
+<style>
 /* ============================================================
    CCI Discipleship Quiz — Design System
-   Fabulous-style coaching UI
+   Shared CCI identity with study-specific surfaces and chapter colors
    ============================================================ */
 
 /* ---------- Design Tokens (Light) ---------- */
@@ -36,11 +54,11 @@
   --line-subtle: #EEF0F8;
 
   /* Brand — Crimson primary action */
-  --accent: #B5173A;
-  --accent-text: #B5173A;
-  --accent-hover: #9E1231;
-  --accent-soft: #FDE8ED;
-  --accent-ink: #FFFFFF;
+  --accent: var(--cci-burgundy);
+  --accent-text: var(--cci-burgundy);
+  --accent-hover: var(--cci-burgundy-hover);
+  --accent-soft: var(--cci-burgundy-soft);
+  --accent-ink: var(--cci-action-ink);
 
   /* Secondary button pill */
   --btn-secondary-bg: #E8EAF2;
@@ -101,7 +119,7 @@
   --shadow-card: 0 4px 20px rgba(22, 21, 43, 0.05), 0 1px 3px rgba(22, 21, 43, 0.03);
 
   /* Typography scale */
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: var(--cci-font);
   --text-xs: 0.8rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
@@ -126,9 +144,9 @@
   --radius-input: 14px;
   --radius-lg: 20px;
   --radius-xl: 22px;
-  --radius-card: 22px;
-  --radius-full: 999px;
-  --radius-btn: 999px;
+  --radius-card: var(--cci-card-radius);
+  --radius-full: var(--cci-button-radius);
+  --radius-btn: var(--cci-button-radius);
 
   /* Transitions */
   --ease-out: cubic-bezier(.2, .7, .3, 1);
@@ -153,11 +171,11 @@
     --line: #2C286C;
     --line-subtle: #24205A;
 
-    --accent: #B5173A;
-    --accent-text: #FF8FAB;
-    --accent-hover: #D42149;
-    --accent-soft: #38152B;
-    --accent-ink: #FFFFFF;
+    --accent: var(--cci-burgundy);
+    --accent-text: var(--cci-burgundy-on-dark);
+    --accent-hover: var(--cci-burgundy-dark-hover);
+    --accent-soft: var(--cci-burgundy-soft-dark);
+    --accent-ink: var(--cci-action-ink);
 
     --btn-secondary-bg: #272365;
     --btn-secondary-ink: #F2F1FD;
@@ -210,11 +228,11 @@
   --line: #2C286C;
   --line-subtle: #24205A;
 
-  --accent: #B5173A;
-  --accent-text: #FF8FAB;
-  --accent-hover: #D42149;
-  --accent-soft: #38152B;
-  --accent-ink: #FFFFFF;
+  --accent: var(--cci-burgundy);
+  --accent-text: var(--cci-burgundy-on-dark);
+  --accent-hover: var(--cci-burgundy-dark-hover);
+  --accent-soft: var(--cci-burgundy-soft-dark);
+  --accent-ink: var(--cci-action-ink);
 
   --btn-secondary-bg: #272365;
   --btn-secondary-ink: #F2F1FD;
@@ -1749,14 +1767,14 @@ a:hover { color: var(--link-hover); }
 
 .hero-action .btn.primary {
   background: #FFFFFF;
-  color: #16152B;
+  color: var(--cci-burgundy);
   border-color: #FFFFFF;
   font-weight: 700;
 }
 
 .hero-action .btn.primary:hover {
-  background: #F0F2FA;
-  color: #16152B;
+  background: var(--cci-burgundy-soft);
+  color: var(--cci-burgundy-hover);
   border-color: #F0F2FA;
 }
 
@@ -2752,7 +2770,7 @@ a:hover { color: var(--link-hover); }
 
 .hero-card-actions .btn.primary {
   background: #FFFFFF;
-  color: var(--accent);
+  color: var(--cci-burgundy);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
@@ -5816,7 +5834,7 @@ html[data-theme="dark"] .picker-selection-footer {
   border: 0;
   border-radius: 999px;
   background: #fff;
-  color: #3624A4;
+  color: var(--cci-burgundy);
   font: inherit;
   font-weight: 700;
 }
@@ -6199,7 +6217,7 @@ html[data-theme="dark"] .picker-selection-footer {
     border: 0;
     border-radius: 999px;
     background: #fff;
-    color: #3624a4;
+    color: var(--cci-burgundy);
     font: inherit;
     font-weight: 700;
   }
@@ -6623,7 +6641,7 @@ html[data-theme="dark"] .picker-selection-footer {
     border: 0;
     border-radius: var(--radius-full);
     background: #FFFFFF;
-    color: #3624A4;
+    color: var(--cci-burgundy);
     font-size: var(--text-base);
     font-weight: 700;
     cursor: pointer;
@@ -9074,16 +9092,16 @@ html[data-theme="dark"] .picker-selection-footer {
 
 html[data-theme="dark"] .desktop-sidebar .desktop-nav-item.active,
 html[data-theme="dark"] .desktop-sidebar .desktop-nav-item.active:hover {
-  background: #241A5C;
-  color: #FF74AA;
+  background: var(--accent-soft);
+  color: var(--accent-text);
   box-shadow: none;
 }
 
 @media (prefers-color-scheme: dark) {
   html:not([data-theme="light"]) .desktop-sidebar .desktop-nav-item.active,
   html:not([data-theme="light"]) .desktop-sidebar .desktop-nav-item.active:hover {
-    background: #241A5C;
-    color: #FF74AA;
+    background: var(--accent-soft);
+    color: var(--accent-text);
     box-shadow: none;
   }
 }
@@ -9091,8 +9109,8 @@ html[data-theme="dark"] .desktop-sidebar .desktop-nav-item.active:hover {
 @media (min-width: 901px) and (prefers-color-scheme: dark) {
   html:not([data-theme="light"]) .desktop-sidebar .desktop-nav-item.active,
   html:not([data-theme="light"]) .desktop-sidebar .desktop-nav-item.active:hover {
-    background: #241A5C;
-    color: #FF74AA;
+    background: var(--accent-soft);
+    color: var(--accent-text);
     box-shadow: none;
   }
 }
@@ -9100,14 +9118,14 @@ html[data-theme="dark"] .desktop-sidebar .desktop-nav-item.active:hover {
 @media (prefers-color-scheme: dark) {
   html:not([data-theme="light"]) .practice-mode-tile.is-selected,
   html:not([data-theme="light"]) .practice-cover-tile.is-selected {
-    border-color: #FF74AA;
+    border-color: var(--accent-text);
     box-shadow: 0 0 0 3px rgba(255, 116, 170, 0.17);
   }
 }
 
 html[data-theme="dark"] .practice-mode-tile.is-selected,
 html[data-theme="dark"] .practice-cover-tile.is-selected {
-  border-color: #FF74AA;
+  border-color: var(--accent-text);
   box-shadow: 0 0 0 3px rgba(255, 116, 170, 0.17);
 }
 

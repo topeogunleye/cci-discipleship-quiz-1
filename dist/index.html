@@ -25,16 +25,17 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"CCI Discipleship","alternateName":"Disciple","url":"https://cci-discipleship-quiz.pages.dev/","description":"Flashcards, quizzes, and offline study across 12 discipleship chapters.","inLanguage":"en"}</script>
   <script src="js/landing.js" defer></script>
+  <link rel="stylesheet" href="brand.css">
   <style>
-    :root{color-scheme:light;--ink:#16152b;--muted:#56556b;--accent:#b5173a;--line:#dedde8}
-    *{box-sizing:border-box}body{margin:0;background:#f5f6fb;color:var(--ink);font:17px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    :root{color-scheme:light;--ink:#16152b;--muted:#56556b;--accent:var(--cci-burgundy);--line:#dedde8}
+    *{box-sizing:border-box}body{margin:0;background:#f5f6fb;color:var(--ink);font:17px/1.65 var(--cci-font)}
     a{color:var(--accent);text-underline-offset:.22em}a:focus-visible{outline:3px solid var(--ink);outline-offset:5px}
-    .wrap{width:min(1100px,100% - 3rem);margin:auto}header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.5rem 0;border-bottom:1px solid var(--line)}
+    .wrap{width:min(1100px,100% - 3rem);margin:auto}header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:calc(3 * var(--cci-space)) 0;border-bottom:1px solid var(--line)}
     .brand{font-size:1.1rem;font-weight:750;color:var(--ink);text-decoration:none}.brand span{color:var(--accent)}.nav-link{font-size:.9rem;font-weight:650}
     .hero{display:grid;grid-template-columns:1.5fr 1fr;gap:4rem;align-items:center;padding:6rem 0 5rem}.eyebrow{color:var(--accent);font-size:.75rem;font-weight:750;letter-spacing:.16em;text-transform:uppercase}
     h1{font-size:clamp(2.6rem,6vw,4.7rem);line-height:1.06;letter-spacing:-.055em;margin:1rem 0 1.5rem;font-weight:750}h1 span{display:block;color:var(--accent)}.lead{max-width:36rem;color:var(--muted);font-size:1.12rem}
-    .button{display:inline-block;background:var(--accent);color:white;padding:.9rem 1.5rem;border-radius:999px;text-decoration:none;font-weight:650;margin-top:1rem}.button:hover{background:#9e1231}.note{font-size:.85rem;color:var(--muted)}
-    .study-card{padding:2.25rem;border:1px solid var(--line);border-radius:1.5rem;background:white;box-shadow:0 18px 45px #17152b08}.study-card h2{font-size:1.5rem;line-height:1.3;margin:.5rem 0 1.5rem}.step{display:flex;gap:1rem;align-items:center;padding:1rem 0;border-top:1px solid var(--line)}.number{color:var(--accent);font-size:.8rem;font-weight:700}.step strong{display:block;font-size:1rem}.step small{color:var(--muted)}
+    .button{display:inline-block;background:var(--accent);color:white;padding:.9rem 1.5rem;border-radius:var(--cci-button-radius);text-decoration:none;font-weight:700;min-height:var(--cci-control-height);margin-top:1rem}.button:hover{background:var(--cci-burgundy-hover)}.note{font-size:.85rem;color:var(--muted)}
+    .study-card{padding:2.25rem;border:1px solid var(--line);border-radius:var(--cci-card-radius);background:white;box-shadow:0 18px 45px #17152b08}.study-card h2{font-size:1.5rem;line-height:1.3;margin:.5rem 0 1.5rem}.step{display:flex;gap:1rem;align-items:center;padding:1rem 0;border-top:1px solid var(--line)}.number{color:var(--accent);font-size:.8rem;font-weight:700}.step strong{display:block;font-size:1rem}.step small{color:var(--muted)}
     section{padding:3.5rem 0;border-top:1px solid var(--line)}h2{font-size:clamp(1.7rem,3vw,2.2rem);letter-spacing:-.035em;line-height:1.25;margin:.5rem 0 1rem}.section-intro{color:var(--muted);max-width:42rem}.features{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;margin-top:2rem}.features h3{font-size:1.1rem}.features p{color:var(--muted);font-size:.95rem}
     .chapters{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem 2rem;padding-left:1.5rem;color:var(--muted)}.chapters li{padding-left:.3rem}footer{padding:2rem 0 3rem;color:var(--muted);font-size:.85rem;border-top:1px solid var(--line)}
     @media(max-width:750px){.hero{grid-template-columns:1fr;gap:2.5rem;padding:3rem 0}.features,.chapters{grid-template-columns:1fr}.features{gap:.5rem}.study-card{padding:1.5rem}section{padding:2.5rem 0}.wrap{width:calc(100% - 2rem)}header{align-items:flex-start}.nav-link{white-space:nowrap}}

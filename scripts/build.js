@@ -44,6 +44,7 @@ function normalizeTextFiles(directory) {
 
 normalizeTextFile(path.join(root, 'js/supabase.bundle.js'));
 
+html = replaceOnce(html, '<link rel="stylesheet" href="brand.css">', `<style>\n${read('brand.css')}\n</style>`);
 html = replaceOnce(html, '<link rel="stylesheet" href="style.css">', `<style>\n${read('style.css')}\n</style>`);
 // Keep starter-fallback lightweight in dist/index.html to save 1.09 MB of payload bloat
 // Decks are loaded dynamically via decks/manifest.json and decks/starter-decks.js
@@ -75,7 +76,7 @@ fs.mkdirSync(path.join(outputDir, 'app'), { recursive: true });
 // Resolve shared assets at the same origin root. Accounts and browser storage
 // keep their existing origin/keys; the native package keeps its root app entry.
 fs.writeFileSync(path.join(outputDir, 'app', 'index.html'), html.replace('<head>', '<head>\n<base href="../">'));
-for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html', '404.html', 'robots.txt', 'sitemap.xml', 'favicon.ico', 'style.css', '_headers']) {
+for (const file of ['manifest.webmanifest', 'service-worker.js', 'offline.html', '404.html', 'robots.txt', 'sitemap.xml', 'favicon.ico', 'style.css', 'brand.css', '_headers']) {
   fs.copyFileSync(path.join(root, file), path.join(outputDir, file));
 }
 for (const directory of ['decks', 'icons', 'content', 'js']) {
@@ -94,7 +95,7 @@ fs.mkdirSync(nativeOutputDir, { recursive: true });
 for (const directory of ['decks', 'icons', 'content', 'js']) {
   fs.cpSync(path.join(outputDir, directory), path.join(nativeOutputDir, directory), { recursive: true });
 }
-for (const file of ['favicon.ico', 'style.css', 'offline.html']) {
+for (const file of ['favicon.ico', 'style.css', 'brand.css', 'offline.html']) {
   fs.copyFileSync(path.join(outputDir, file), path.join(nativeOutputDir, file));
 }
 fs.writeFileSync(path.join(nativeOutputDir, 'index.html'), html);
