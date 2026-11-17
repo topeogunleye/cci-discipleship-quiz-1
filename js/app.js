@@ -2331,7 +2331,7 @@
     var videoNav = videos.length > 1
       ? '<nav class="lesson-video-segments" aria-label="Videos in this chapter">' + videos.map(function (item, itemIndex) { return '<button type="button" class="lesson-video-segment' + (itemIndex === index ? ' is-active' : '') + '" data-act="lesson-video-select" data-index="' + itemIndex + '" aria-current="' + (itemIndex === index ? 'true' : 'false') + '">' + (itemIndex + 1) + '. ' + esc(item.title) + '</button>'; }).join('') + '</nav>'
       : '<div class="lesson-video-progress" aria-label="Chapter ' + section + ' of ' + S.decks.length + '"><span>Chapter ' + section + ' of ' + S.decks.length + '</span><progress value="' + section + '" max="' + S.decks.length + '">Chapter ' + section + ' of ' + S.decks.length + '</progress></div>';
-    return '<main class="lesson-video-page" aria-labelledby="lesson-video-title">' +
+    return '<section class="lesson-video-page" aria-labelledby="lesson-video-title">' +
       '<header class="lesson-video-topbar"><button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button><div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong></div><span class="lesson-video-section-count">' + section + ' / ' + S.decks.length + '</span></header>' +
       '<section class="lesson-video-frame' + (video && canStartPlayback ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
       '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title" tabindex="-1">' + esc(title) + '</h1><p>' + (canStartPlayback ? 'Watch this lesson video, then reinforce Chapter ' + section + ' (' + esc(parsed.topic) + ') with study activities covering all ' + d.cards.length + ' questions across the chapter’s ' + videos.length + ' recordings.' : 'Study Chapter ' + section + ' (' + esc(parsed.topic) + ') locally with flashcards or a quiz covering all ' + d.cards.length + ' questions.' + (accountStatus.user ? ' Secure video access is being prepared.' : ' Sign in to watch its lesson videos.')) + '</p></div>' + (video && canStartPlayback ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">' + (V.videoTime > 0 ? 'Resume lesson' : 'Play lesson') + '</button>' : '') + '</section>' +
@@ -2354,7 +2354,7 @@
       })() +
       transcriptPanel +
       videoNav +
-    '</main>';
+    '</section>';
   };
 
 
@@ -2982,7 +2982,7 @@
       return '<div class="' + cls + '"><span class="streak-day-name">' + dName + '</span><span class="streak-day-mark">' + (isStudied ? '✓' : '·') + '</span></div>';
     }).join('');
 
-    return '<div class="streak-screen-container" role="main" aria-labelledby="streak-title">' +
+    return '<div class="streak-screen-container" aria-labelledby="streak-title">' +
       '<div class="streak-hero-card">' +
         '<div class="streak-flame-hero" aria-hidden="true">' +
           '<div class="streak-flame-circle"><span class="flame-emoji">🔥</span></div>' +
@@ -3008,7 +3008,7 @@
     var answers = V.answers || (V.answers = Object.assign({}, MobileStudy.defaultOnboarding(false)));
 
     if (step === 0) {
-      return '<div class="onboarding-screen splash-screen" role="main">' +
+      return '<div class="onboarding-screen splash-screen">' +
         '<div class="onboarding-hero-art" aria-hidden="true">' +
           '<div class="splash-icon-wrapper">' +
             '<svg viewBox="0 0 100 100" class="splash-svg" width="90" height="90">' +
@@ -3033,7 +3033,7 @@
     }
 
     if (step === 1) {
-      return '<div class="onboarding-screen welcome-screen" role="main">' +
+      return '<div class="onboarding-screen welcome-screen">' +
         '<div class="onboarding-top-nav">' +
           '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
           '<button class="btn-text-skip" data-act="onboarding-skip">Skip</button>' +
@@ -3079,7 +3079,7 @@
         '</button>';
       }).join('');
 
-      return '<div class="onboarding-screen question-screen" role="main">' +
+      return '<div class="onboarding-screen question-screen">' +
         '<div class="onboarding-top-nav">' +
           '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
           '<span class="onboarding-step-counter">1 of 4</span>' +
@@ -3114,7 +3114,7 @@
         '</button>';
       }).join('');
 
-      return '<div class="onboarding-screen question-screen" role="main">' +
+      return '<div class="onboarding-screen question-screen">' +
         '<div class="onboarding-top-nav">' +
           '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
           '<span class="onboarding-step-counter">2 of 4</span>' +
@@ -3149,7 +3149,7 @@
         '</button>';
       }).join('');
 
-      return '<div class="onboarding-screen question-screen" role="main">' +
+      return '<div class="onboarding-screen question-screen">' +
         '<div class="onboarding-top-nav">' +
           '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
           '<span class="onboarding-step-counter">3 of 4</span>' +
@@ -3184,7 +3184,7 @@
         '</button>';
       }).join('');
 
-      return '<div class="onboarding-screen question-screen" role="main">' +
+      return '<div class="onboarding-screen question-screen">' +
         '<div class="onboarding-top-nav">' +
           '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
           '<span class="onboarding-step-counter">4 of 4</span>' +
@@ -3205,7 +3205,7 @@
       var topicLabels = { soteriology: 'Soteriology & Salvation', christology: 'Christology & Trinity', conduct: 'Conduct & Prayer', bible: 'Bible Foundations' };
       var timeLabels = { morning: 'Morning Sunrise', midday: 'Midday Break', evening: 'Evening Quiet', anytime: 'Flexible Anytime' };
 
-      return '<div class="onboarding-screen summary-screen" role="main">' +
+      return '<div class="onboarding-screen summary-screen">' +
         '<div class="onboarding-top-nav">' +
           '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
           '<button class="btn-text-skip" data-act="onboarding-skip">Skip</button>' +
@@ -3231,7 +3231,7 @@
       '</div>';
     }
 
-    return '<div class="onboarding-screen commit-screen" role="main">' +
+    return '<div class="onboarding-screen commit-screen">' +
       '<div class="onboarding-top-nav">' +
         '<button class="btn-back-step" data-act="onboarding-back" aria-label="Go back">‹</button>' +
         '<button class="btn-text-skip" data-act="commit-finish">Skip to Home</button>' +
@@ -3410,7 +3410,7 @@
     app.innerHTML = banner() +
       '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + (animateRouteChange ? ' app-screen-enter' : '') + '">' +
         (hasDesktopSidebar ? renderDesktopSidebar(V.name === 'devotional' ? 'home' : V.name) : '') +
-        '<main class="desktop-main">' + view() + tabBarHtml + rocketHtml + '</main>' +
+        '<div class="desktop-main">' + view() + tabBarHtml + rocketHtml + '</div>' +
       '</div>';
     animateRouteChange = false;
     var renderedVideo = document.getElementById('lesson-video-player');
@@ -3954,7 +3954,7 @@
       }
     } else {
       var retBtn = modal.querySelector('.video-study-return-btn');
-      if (retBtn) retBtn.focus({ preventScroll: true });
+      if (retBtn) retBtn.focus();
     }
   }
 

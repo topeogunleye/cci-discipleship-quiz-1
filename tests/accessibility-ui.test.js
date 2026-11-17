@@ -54,6 +54,7 @@ function appUi() {
   vm.runInNewContext(source, { window, document, URL });
   return {
     ui: window.ui, document, front, back,
+    html: () => html,
     key(key, element, extra) {
       const event = { key, target: element || document.activeElement || body, preventDefault() { this.defaultPrevented = true; }, ...extra };
       for (const fn of listeners.keydown) fn(event);
@@ -142,4 +143,27 @@ test('mobile navigation exposes the current destination with a supported state',
     assert.ok(buttons.find(s => s.includes(`data-tab="${page}"`)).includes('aria-current="page"'));
     assert.doesNotMatch(html, /aria-selected/);
   }
+});
+
+test('routes leave the primary main landmark to the persistent app container', () => {
+  const app = appUi();
+  const card = { id: 'one', question: 'Question?', options: ['Answer', 'Other'], answer: 'A' };
+  app.ui.state.decks = [{ id: 'lesson', title: 'Soteriology', cards: [card] }];
+  const views = [
+    { name: 'home' }, { name: 'journey' }, { name: 'settings' },
+    { name: 'streak' }, { name: 'lesson-video', id: 'lesson', videoIndex: 0 },
+    ...Array.from({ length: 8 }, (_, step) => ({ name: 'onboarding', step }))
+  ];
+  for (const view of views) {
+    app.ui.setView(view);
+    app.ui.render();
+    assert.match(app.html(), /class="desktop-main"/, view.name);
+    if (view.name === 'lesson-video') {
+      assert.match(app.html(), /<section class="lesson-video-page" aria-labelledby="lesson-video-title">/);
+    }
+    assert.doesNotMatch(app.html(), /<main\b|role=["']main["']/i,
+      `${view.name}${view.step ?? ''} must not nest another main landmark`);
+  }
+  const shell = fs.readFileSync(require.resolve('../index.html'), 'utf8');
+  assert.match(shell, /<main\b[^>]*id="app"/);
 });

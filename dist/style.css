@@ -315,8 +315,9 @@ input:not([type]):focus,
 textarea:focus,
 select:focus,
 .search:focus {
-  border-color: var(--accent);
-  outline: none;
+  border-color: var(--accent-text);
+  outline: 2.5px solid var(--accent-text);
+  outline-offset: 2px;
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
@@ -9612,7 +9613,9 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 
 .video-study-body {
   flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  scroll-padding-block: var(--space-md);
   -webkit-overflow-scrolling: touch;
   padding: var(--space-md);
   display: flex;
@@ -9620,6 +9623,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 }
 
 .video-study-body .study-shell {
+  flex: 0 0 auto;
   padding: 0;
   margin: 0;
   max-width: none;
@@ -9629,11 +9633,51 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
   min-height: auto;
 }
 
+/* Results stay inside the dialog's scroll area instead of covering its header. */
+.video-study-body .coaching-completion-screen {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  padding: 0 16px 20px;
+  border-radius: var(--radius-card);
+  background: linear-gradient(135deg, #FF843C 0%, #FF7650 44%, #F64F70 100%);
+  color: #171333;
+}
+
+.video-study-body :focus-visible {
+  scroll-margin-block: var(--space-md);
+}
+
+.video-study-body .coaching-completion-screen :focus-visible {
+  outline-color: #171333;
+}
+
+@media (max-width: 900px) {
+  .video-study-body .completion-landscape {
+    right: -16px;
+    left: -16px;
+    width: calc(100% + 32px);
+  }
+}
+
+@media (min-width: 901px) {
+  .video-study-body .completion-actions-bar.result-actions .btn[data-act="review"],
+  .video-study-body .completion-actions-bar.result-actions .btn[data-act="again"] {
+    color: #171333;
+  }
+}
+
 .video-study-body .study-header {
   display: none !important;
 }
 
 .video-study-body .coaching-completion-hero {
+  width: 100%;
+  margin: 0;
   padding-top: var(--space-sm);
 }
 
