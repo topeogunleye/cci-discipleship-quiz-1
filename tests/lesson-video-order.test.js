@@ -9,7 +9,7 @@ test('reordering preserves every original video field and section assignment', (
   const originalFields = catalog.map(({ group, ...video }) => video).sort((a, b) => a.id.localeCompare(b.id));
   const canonical = JSON.stringify(originalFields.map(video => Object.fromEntries(Object.entries(video).sort(([a], [b]) => a.localeCompare(b)))));
   assert.equal(crypto.createHash('sha256').update(canonical).digest('hex'), '9fc8c662b872b4553649edd83edf756cb8400103e53f2e45ca6e0e623f7a0547');
-  assert.equal(new Set(catalog.map(video => video.group).filter(Boolean)).size, 16);
+  assert.equal(new Set(catalog.map(video => video.group).filter(Boolean)).size, 18);
 });
 
 test('group headings preserve global video indices, active selection and escaping', () => {
@@ -167,4 +167,12 @@ test('catalog follows the approved order in all twelve sections', () => {
     const deckId = catalog.find(video => video.id === ids[0]).deckId;
     assert.deepEqual(catalog.filter(video => video.deckId === deckId).map(video => video.id), ids);
   });
+});
+
+test('Christology has the two source groups, with three recordings each', () => {
+  const videos = catalog.filter(video => video.id.startsWith('section-04-'));
+  assert.deepEqual(videos.map(video => video.group), [
+    ...Array(3).fill('Christology – Jesus: Son of God'),
+    ...Array(3).fill('Christology – Jesus: Son of Man')
+  ]);
 });
