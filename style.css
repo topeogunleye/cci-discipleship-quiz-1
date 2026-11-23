@@ -9732,3 +9732,9 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 .resume-study-btn {
   font-weight: 700;
 }
+
+/* Video groups keep continuous chapter navigation and numbering. */
+.lesson-video-group { width: 100%; min-width: 0; }
+.lesson-video-group h3 { margin: 4px 0 10px; color: var(--ink); font-size: var(--text-base); line-height: 1.5; }
+.lesson-video-group-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+.lesson-video-group .lesson-video-segment { max-width: 100%; overflow-wrap: anywhere; text-align: left; }

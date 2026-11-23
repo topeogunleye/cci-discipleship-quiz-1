@@ -648,6 +648,7 @@
         id: item.id,
         deckId: item.deckId,
         title: item.title.trim(),
+        group: typeof item.group === 'string' ? item.group.trim() : '',
         videoUrl: objectKey ? apiBase + '/api/videos?key=' + encodeURIComponent(objectKey) : '',
         objectKey: objectKey,
         posterUrl: mediaUrl(item.posterUrl),
@@ -678,6 +679,21 @@
     return LESSON_VIDEOS.filter(function (item) {
       return item.deckId === deckId || (deckId && item.deckId && (item.deckId.indexOf(deckId) === 0 || deckId.indexOf(item.deckId) === 0));
     });
+  }
+  function lessonVideoGroups(videos, selectedIndex) {
+    var html = '', currentGroup = '', hasGroup = false;
+    videos.forEach(function (item, itemIndex) {
+      var group = item.group || '';
+      if (group !== currentGroup || itemIndex === 0) {
+        if (hasGroup) html += '</div></section>';
+        hasGroup = !!group;
+        currentGroup = group;
+        if (hasGroup) html += '<section class="lesson-video-group" aria-labelledby="video-group-' + itemIndex + '"><h3 id="video-group-' + itemIndex + '">' + esc(group) + '</h3><div class="lesson-video-group-buttons">';
+      }
+      html += '<button type="button" class="lesson-video-segment' + (itemIndex === selectedIndex ? ' is-active' : '') + '" data-act="lesson-video-select" data-index="' + itemIndex + '" aria-current="' + (itemIndex === selectedIndex ? 'true' : 'false') + '">' + (itemIndex + 1) + '. ' + esc(item.title) + '</button>';
+    });
+    if (hasGroup) html += '</div></section>';
+    return html;
   }
   function cardMatchesVideo(card, video) {
     if (!card || !video || !card.ref) return false;
@@ -2329,7 +2345,7 @@
           : '<p class="lesson-transcript-note">English captions and a searchable transcript are available after you sign in to watch.</p>')
       : (video && canStartPlayback ? '<p class="lesson-transcript-note">Captions and a searchable transcript are not available for this recording yet.</p>' : '');
     var videoNav = videos.length > 1
-      ? '<nav class="lesson-video-segments" aria-label="Videos in this chapter">' + videos.map(function (item, itemIndex) { return '<button type="button" class="lesson-video-segment' + (itemIndex === index ? ' is-active' : '') + '" data-act="lesson-video-select" data-index="' + itemIndex + '" aria-current="' + (itemIndex === index ? 'true' : 'false') + '">' + (itemIndex + 1) + '. ' + esc(item.title) + '</button>'; }).join('') + '</nav>'
+      ? '<nav class="lesson-video-segments" aria-label="Videos in this chapter">' + lessonVideoGroups(videos, index) + '</nav>'
       : '<div class="lesson-video-progress" aria-label="Chapter ' + section + ' of ' + S.decks.length + '"><span>Chapter ' + section + ' of ' + S.decks.length + '</span><progress value="' + section + '" max="' + S.decks.length + '">Chapter ' + section + ' of ' + S.decks.length + '</progress></div>';
     return '<section class="lesson-video-page" aria-labelledby="lesson-video-title">' +
       '<header class="lesson-video-topbar"><button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button><div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong></div><span class="lesson-video-section-count">' + section + ' / ' + S.decks.length + '</span></header>' +
