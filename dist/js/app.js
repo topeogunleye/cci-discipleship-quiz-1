@@ -5025,7 +5025,9 @@
     loadLessonTranscript(details.dataset.transcriptUrl).then(function (cues) {
       details.dataset.loading = 'false';
       details.dataset.loaded = 'true';
-      updateLessonTranscript(details, cues, '');
+      // The learner may have typed while the transcript request was pending.
+      var searchInput = details.querySelector('.lesson-transcript-body input');
+      updateLessonTranscript(details, cues, searchInput ? searchInput.value : '');
     }).catch(function () {
       details.dataset.loading = 'false';
       if (status) status.textContent = 'The transcript could not be loaded. Close and reopen this section to try again.';

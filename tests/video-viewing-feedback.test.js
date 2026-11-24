@@ -93,3 +93,30 @@ test('transcript seek confirms timestamp, offers return and preserves paused or 
   seekLessonTranscript(f.player, details, -1);
   assert.equal(f.player.currentTime, 120);
 });
+
+test('typing during transcript loading filters the results when the request resolves', async () => {
+  let toggle, resolve;
+  const pending = new Promise(done => { resolve = done; });
+  const input = { value: '' }, status = { textContent: '' }, list = { innerHTML: '', hidden: true };
+  const details = {
+    open: true, dataset: { transcriptUrl: '/test.vtt' }, matches: () => true,
+    querySelector: selector => selector === '.lesson-transcript-status' ? status : selector === '.lesson-transcript-cues' ? list : input
+  };
+  const updater = source.slice(source.indexOf('  function updateLessonTranscript('), source.indexOf('  function returnToLessonVideo('));
+  const listener = source.slice(source.indexOf("  document.addEventListener('toggle'"), source.indexOf("  document.addEventListener('keydown'", source.indexOf("  document.addEventListener('toggle'")));
+  vm.runInNewContext(updater + listener, {
+    document: { addEventListener: (event, handler) => { toggle = handler; } },
+    loadLessonTranscript: () => pending, esc: value => String(value)
+  });
+  toggle({ target: details });
+  input.value = 'viper';
+  resolve([
+    { startText: '00:00:41.000', start: 41000, text: 'A viper was hiding.' },
+    { startText: '00:00:56.000', start: 56000, text: 'The viper came out.' },
+    { startText: '00:01:00.000', start: 60000, text: 'Another sentence.' }
+  ]);
+  await pending;
+  assert.equal(status.textContent, 'Showing 2 matching transcript segments.');
+  assert.doesNotMatch(list.innerHTML, /Another sentence/);
+  assert.equal(details.dataset.loaded, 'true');
+});
