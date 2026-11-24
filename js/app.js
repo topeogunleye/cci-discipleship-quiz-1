@@ -2368,13 +2368,16 @@
     var parsed = MobileStudy.parseChapterTitle(d.title), section = parsed.sectionNum || 1;
     var videos = lessonVideosForDeck(d.id), index = Math.max(0, Math.min(Number.isInteger(V.videoIndex) ? V.videoIndex : 0, videos.length - 1));
     var video = videos[index] || null, title = video ? video.title : parsed.topic + ' video lesson';
-    var videoNavigation = videos.length > 1
-      ? '<nav class="lesson-video-navigation" aria-label="Lesson video navigation">' +
+    var renderVideoNavigation = function (placement) {
+      if (videos.length <= 1) return '';
+      return '<nav class="lesson-video-navigation lesson-video-navigation--' + placement + '" aria-label="Lesson video navigation">' +
         '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-index="' + Math.max(0, index - 1) + '"' + (index === 0 ? ' disabled' : '') + ' aria-label="Previous video' + (index > 0 ? ': ' + esc(videos[index - 1].title) : '') + '" title="' + (index > 0 ? 'Previous: ' + esc(videos[index - 1].title) : 'First video') + '">‹ <span>Previous</span></button>' +
         '<span class="lesson-video-position" aria-live="polite">Video ' + (index + 1) + ' of ' + videos.length + '</span>' +
         '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-index="' + Math.min(videos.length - 1, index + 1) + '"' + (index === videos.length - 1 ? ' disabled' : '') + ' aria-label="Next video' + (index < videos.length - 1 ? ': ' + esc(videos[index + 1].title) : '') + '" title="' + (index < videos.length - 1 ? 'Next: ' + esc(videos[index + 1].title) : 'Last video') + '"><span>Next</span> ›</button>' +
-      '</nav>'
-      : '';
+      '</nav>';
+    };
+    var videoNavigationTop = renderVideoNavigation('top');
+    var videoNavigationBelow = renderVideoNavigation('below');
     var canWatchVideo = !!(accountStatus.user && accountStatus.videoReady);
     var isNative = typeof window !== 'undefined' && window.CciNative && window.CciNative.isNative;
     var tokenParam = canWatchVideo && isNative && account && typeof account.playbackTicket === 'function' ? account.playbackTicket(video && video.id) : '';
@@ -2407,11 +2410,15 @@
       ? '<nav class="lesson-video-segments" aria-label="Videos in this chapter">' + lessonVideoGroups(videos, index) + '</nav>'
       : '<div class="lesson-video-progress" aria-label="Chapter ' + section + ' of ' + S.decks.length + '"><span>Chapter ' + section + ' of ' + S.decks.length + '</span><progress value="' + section + '" max="' + S.decks.length + '">Chapter ' + section + ' of ' + S.decks.length + '</progress></div>';
     return '<section class="lesson-video-page" aria-labelledby="lesson-video-title">' +
-      '<header class="lesson-video-topbar"><button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button><div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong></div><span class="lesson-video-section-count">' + section + ' / ' + S.decks.length + '</span></header>' +
+      '<header class="lesson-video-topbar">' +
+        '<button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button>' +
+        '<div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong></div>' +
+        '<div class="lesson-video-topbar-right"><span class="lesson-video-section-count">Chapter ' + section + ' / ' + S.decks.length + '</span>' + videoNavigationTop + '</div>' +
+      '</header>' +
       '<section class="lesson-video-frame' + (video && canStartPlayback ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
       (video && canStartPlayback ? '<div class="lesson-video-feedback"><p role="status" aria-live="polite" aria-atomic="true"></p><button type="button" class="btn sm" hidden>Retry video</button></div>' : '') +
       '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title" tabindex="-1">' + esc(title) + '</h1><p>' + (canStartPlayback ? 'Watch this lesson video, then reinforce Chapter ' + section + ' (' + esc(parsed.topic) + ') with study activities covering all ' + d.cards.length + ' questions across the chapter’s ' + videos.length + ' recordings.' : 'Study Chapter ' + section + ' (' + esc(parsed.topic) + ') locally with flashcards or a quiz covering all ' + d.cards.length + ' questions.' + (accountStatus.user ? ' Secure video access is being prepared.' : ' Sign in to watch its lesson videos.')) + '</p></div>' + (video && canStartPlayback ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">' + (V.videoTime > 0 ? 'Resume lesson' : 'Play lesson') + '</button>' : '') + '</section>' +
-      videoNavigation +
+      videoNavigationBelow +
       (function () {
         var videoCards = video ? cardsForVideo(d, video) : [];
         var isLastVideo = !videos.length || index >= videos.length - 1;

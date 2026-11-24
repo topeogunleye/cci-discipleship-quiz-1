@@ -764,6 +764,13 @@ test('hybrid video study scopes questions to active video and preserves Section 
   // 1. Intermediate video (index 0): only Video buttons, NO Chapter buttons
   t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 0 });
   t.render();
+  const navigationMarkup = elements.app.innerHTML;
+  assert.equal((navigationMarkup.match(/class="lesson-video-navigation lesson-video-navigation--(?:top|below)"/g) || []).length, 2, 'the renderer should provide one desktop and one below-player navigation variant');
+  assert.match(navigationMarkup, /lesson-video-topbar-right[\s\S]*lesson-video-navigation--top/);
+  assert.match(navigationMarkup, /class="lesson-video-section-count">Chapter \d+ \/ \d+<\/span>/);
+  assert.match(navigationMarkup, /lesson-video-position" aria-live="polite">Video 1 of 2<\/span>/);
+  assert.match(navigationMarkup, /lesson-video-navigation--below/);
+  assert.equal((navigationMarkup.match(/data-index="0" disabled aria-label="Previous video/g) || []).length, 2, 'both variants should disable Previous on the first video');
   assert.match(elements.app.innerHTML, /Video Flashcards \(1\)/);
   assert.match(elements.app.innerHTML, /Video Quiz \(1\)/);
   assert.doesNotMatch(elements.app.innerHTML, /Chapter Flashcards/);
@@ -772,6 +779,7 @@ test('hybrid video study scopes questions to active video and preserves Section 
   // 2. Final video (index 1): has both Video and Chapter buttons
   t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 1 });
   t.render();
+  assert.equal((elements.app.innerHTML.match(/data-index="1" disabled aria-label="Next video/g) || []).length, 2, 'both variants should disable Next on the final video');
   assert.match(elements.app.innerHTML, /Video Flashcards \(1\)/);
   assert.match(elements.app.innerHTML, /Video Quiz \(1\)/);
   assert.match(elements.app.innerHTML, /Chapter Flashcards \(2\)/);

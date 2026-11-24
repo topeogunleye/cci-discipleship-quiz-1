@@ -9502,7 +9502,11 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 .lesson-video-nav-button{min-width:132px;min-height:46px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
 .lesson-video-nav-button:disabled{opacity:.48;cursor:not-allowed}
 .lesson-video-position{min-width:110px;text-align:center;color:var(--muted);font-size:var(--text-sm);font-weight:700}
-@media(max-width:700px){.lesson-video-navigation{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.lesson-video-position{grid-column:1 / -1;grid-row:1;width:100%}.lesson-video-nav-button{width:100%;min-width:0}.lesson-video-navigation .lesson-video-nav-button:first-child{grid-column:1;grid-row:2}.lesson-video-navigation .lesson-video-nav-button:last-child{grid-column:2;grid-row:2}}
+.lesson-video-navigation--top{display:none}
+.lesson-video-navigation--below{display:flex}
+.lesson-video-topbar-right{display:flex;align-items:center;justify-self:end;gap:10px;min-width:0}
+@media(max-width:700px){.lesson-video-navigation{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.lesson-video-navigation--top{display:none}.lesson-video-navigation--below{display:grid}.lesson-video-position{grid-column:1 / -1;grid-row:1;width:100%}.lesson-video-nav-button{width:100%;min-width:0}.lesson-video-navigation .lesson-video-nav-button:first-child{grid-column:1;grid-row:2}.lesson-video-navigation .lesson-video-nav-button:last-child{grid-column:2;grid-row:2}.lesson-video-topbar-right{grid-column:2;grid-row:2}.lesson-video-section-count{grid-column:auto;grid-row:auto}}
+@media(min-width:1280px){.lesson-video-topbar{position:relative;display:flex;justify-content:space-between;gap:16px}.lesson-video-topbar-right{gap:10px;margin-left:auto}.lesson-video-top-title{position:absolute;top:50%;left:50%;width:min(30%,360px);transform:translate(-50%,-50%)}.lesson-video-navigation--top{display:flex;width:auto;margin:0;gap:8px}.lesson-video-navigation--below{display:none}.lesson-video-navigation--top .lesson-video-nav-button{min-width:96px;min-height:48px;padding-inline:12px}.lesson-video-navigation--top .lesson-video-position{white-space:nowrap}}
 
 /* ---------- Video Lesson In-Page Study Modal ---------- */
 .video-study-scrim {
