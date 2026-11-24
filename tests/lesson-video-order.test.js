@@ -19,11 +19,15 @@ test('group headings preserve global video indices, active selection and escapin
   const render = vm.runInNewContext(helper + ';lessonVideoGroups', { esc });
   const videos = [{ title: 'One', group: 'First & next' }, { title: 'Two', group: 'First & next' }, { title: '<Three>', group: 'Last' }];
   const html = render(videos, 2);
-  assert.equal((html.match(/<h3 /g) || []).length, 2);
+  assert.equal((html.match(/<h3/g) || []).length, 2);
   assert.deepEqual([...html.matchAll(/data-index="(\d+)"/g)].map(match => Number(match[1])), [0, 1, 2]);
   assert.match(html, /data-index="2" aria-current="true"/);
   assert.match(html, /First &amp; next/);
   assert.match(html, /3\. &lt;Three&gt;/);
+  assert.equal((html.match(/<details /g) || []).length, 2);
+  assert.equal((html.match(/class="lesson-video-group" open/g) || []).length, 1);
+  assert.match(html, /<details class="lesson-video-group" open><summary><h3>Last/);
+  assert.match(html, /lesson-video-current-label">Current/);
   assert.doesNotMatch(render(videos.map(({ title }) => ({ title })), 0), /<h3|lesson-video-group/);
 });
 

@@ -681,19 +681,78 @@
     });
   }
   function lessonVideoGroups(videos, selectedIndex) {
-    var html = '', currentGroup = '', hasGroup = false;
+    var groups = [];
     videos.forEach(function (item, itemIndex) {
-      var group = item.group || '';
-      if (group !== currentGroup || itemIndex === 0) {
-        if (hasGroup) html += '</div></section>';
-        hasGroup = !!group;
-        currentGroup = group;
-        if (hasGroup) html += '<section class="lesson-video-group" aria-labelledby="video-group-' + itemIndex + '"><h3 id="video-group-' + itemIndex + '">' + esc(group) + '</h3><div class="lesson-video-group-buttons">';
-      }
-      html += '<button type="button" class="lesson-video-segment' + (itemIndex === selectedIndex ? ' is-active' : '') + '" data-act="lesson-video-select" data-index="' + itemIndex + '" aria-current="' + (itemIndex === selectedIndex ? 'true' : 'false') + '">' + (itemIndex + 1) + '. ' + esc(item.title) + '</button>';
+      var name = item.group || '';
+      if (!groups.length || groups[groups.length - 1].name !== name) groups.push({ name: name, start: itemIndex, items: [] });
+      groups[groups.length - 1].items.push(item);
     });
-    if (hasGroup) html += '</div></section>';
+    var selected = videos[selectedIndex];
+    var html = selected && selected.group ? '<p class="lesson-video-current-group">Current group: <strong>' + esc(selected.group) + '</strong></p>' : '';
+    groups.forEach(function (group) {
+      var isCurrent = selectedIndex >= group.start && selectedIndex < group.start + group.items.length;
+      if (group.name) html += '<details class="lesson-video-group"' + (isCurrent ? ' open' : '') + '><summary><h3>' + esc(group.name) + '</h3><span class="lesson-video-group-count">' + group.items.length + ' videos' + (isCurrent ? ' · Current group' : '') + '</span></summary><div class="lesson-video-group-buttons">';
+      group.items.forEach(function (item, offset) {
+        var itemIndex = group.start + offset, active = itemIndex === selectedIndex;
+        html += '<button type="button" class="lesson-video-segment' + (active ? ' is-active' : '') + '" data-act="lesson-video-select" data-index="' + itemIndex + '" aria-current="' + (active ? 'true' : 'false') + '">' + (itemIndex + 1) + '. ' + esc(item.title) + (active ? '<span class="lesson-video-current-label">Current</span>' : '') + '</button>';
+      });
+      if (group.name) html += '</div></details>';
+    });
     return html;
+  }
+  function showLessonVideoFeedback(feedback, message, retryable) {
+    if (!feedback) return;
+    feedback.querySelector('[role="status"]').textContent = message;
+    feedback.querySelector('button').hidden = !retryable;
+  }
+  function bindLessonVideoFeedback(player, feedback) {
+    if (!player || !feedback) return;
+    var restoredTime = null;
+    function show(message, retryable) { showLessonVideoFeedback(feedback, message, retryable); }
+    function ready() {
+      if (player.error) return;
+      if (restoredTime !== null && player.readyState >= 1) {
+        var time = restoredTime;
+        restoredTime = null;
+        try { player.currentTime = Math.min(time, Number.isFinite(player.duration) ? player.duration : time); } catch (e) {}
+      }
+      show('', false);
+    }
+    player.addEventListener('loadstart', function () { show('Loading video…', false); });
+    player.addEventListener('waiting', function () { show('Buffering video. Playback will continue when ready.', false); });
+    player.addEventListener('stalled', function () { show('The video connection is slow. Check your connection or retry the video.', true); });
+    ['loadedmetadata', 'canplay', 'playing'].forEach(function (event) { player.addEventListener(event, ready); });
+    function failed() {
+      var code = player.error && player.error.code;
+      show(code === 3 || code === 4 ? 'This video could not be played. Retry, or try another browser if the problem continues.' : 'The video could not load. Check your connection and retry. If access has expired, sign in again through Settings.', true);
+    }
+    player.addEventListener('error', failed);
+    // A failed <source> does not necessarily raise an error on the video itself.
+    var source = player.querySelector && player.querySelector('source');
+    if (source) source.addEventListener('error', failed);
+    feedback.querySelector('button').addEventListener('click', function () {
+      restoredTime = Number.isFinite(player.currentTime) ? player.currentTime : 0;
+      player.pause();
+      show('Retrying video…', false);
+      player.load();
+    });
+    if (player.error) failed();
+    else if (player.readyState >= 3) ready();
+    else show('Loading video…', false);
+  }
+  function seekLessonTranscript(player, details, time) {
+    if (!player || !details || !Number.isFinite(time) || time < 0) return;
+    var target = Number.isFinite(player.duration) ? Math.min(time, player.duration) : time;
+    var status = details.querySelector('.lesson-transcript-status');
+    try { player.currentTime = target; } catch (e) {
+      if (status) status.textContent = 'The video is not ready to seek yet. Wait for it to load and try again.';
+      return;
+    }
+    var seconds = Math.floor(target), minutes = Math.floor(seconds / 60), hours = Math.floor(minutes / 60);
+    var timestamp = [hours, minutes % 60, seconds % 60].map(function (value) { return String(value).padStart(2, '0'); }).join(':');
+    if (status) status.textContent = 'Moved video to ' + timestamp + '. ' + (player.paused ? 'Playback remains paused.' : 'Playback continues.');
+    var back = details.querySelector('[data-act="lesson-video-return"]');
+    if (back) back.hidden = false;
   }
   function cardMatchesVideo(card, video) {
     if (!card || !video || !card.ref) return false;
@@ -2341,7 +2400,7 @@
       : '<div class="lesson-video-unavailable" role="status"><strong>Lesson video not available yet</strong><p>The ' + esc(parsed.topic) + ' video has not been added yet. Use Flashcards or Take quiz below.</p></div>';
     var transcriptPanel = video && transcriptSourceUrl
       ? (canWatchVideo
-          ? '<details class="lesson-transcript" data-video-id="' + esc(video.id) + '" data-transcript-url="' + esc(transcriptSourceUrl) + '"><summary>Search transcript</summary><div class="lesson-transcript-body"><label for="lesson-transcript-search">Find a word or phrase</label><input id="lesson-transcript-search" type="search" autocomplete="off" aria-controls="lesson-transcript-cues"><p class="lesson-transcript-status" role="status" aria-live="polite">Open to load transcript segments.</p><ol class="lesson-transcript-cues" id="lesson-transcript-cues" hidden></ol></div></details>'
+          ? '<details class="lesson-transcript" data-video-id="' + esc(video.id) + '" data-transcript-url="' + esc(transcriptSourceUrl) + '"><summary>Search transcript</summary><div class="lesson-transcript-body"><label for="lesson-transcript-search">Find a word or phrase</label><input id="lesson-transcript-search" type="search" autocomplete="off" aria-controls="lesson-transcript-cues"><p class="lesson-transcript-status" role="status" aria-live="polite">Open to load transcript segments.</p><button type="button" class="btn sm lesson-transcript-back" data-act="lesson-video-return" hidden>Back to video</button><ol class="lesson-transcript-cues" id="lesson-transcript-cues" hidden></ol></div></details>'
           : '<p class="lesson-transcript-note">English captions and a searchable transcript are available after you sign in to watch.</p>')
       : (video && canStartPlayback ? '<p class="lesson-transcript-note">Captions and a searchable transcript are not available for this recording yet.</p>' : '');
     var videoNav = videos.length > 1
@@ -2350,6 +2409,7 @@
     return '<section class="lesson-video-page" aria-labelledby="lesson-video-title">' +
       '<header class="lesson-video-topbar"><button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button><div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong></div><span class="lesson-video-section-count">' + section + ' / ' + S.decks.length + '</span></header>' +
       '<section class="lesson-video-frame' + (video && canStartPlayback ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
+      (video && canStartPlayback ? '<div class="lesson-video-feedback"><p role="status" aria-live="polite" aria-atomic="true"></p><button type="button" class="btn sm" hidden>Retry video</button></div>' : '') +
       '<section class="lesson-video-summary"><div><span class="eyebrow">CHAPTER ' + section + (video && videos.length > 1 ? ' · VIDEO ' + (index + 1) + ' OF ' + videos.length : '') + '</span><h1 id="lesson-video-title" tabindex="-1">' + esc(title) + '</h1><p>' + (canStartPlayback ? 'Watch this lesson video, then reinforce Chapter ' + section + ' (' + esc(parsed.topic) + ') with study activities covering all ' + d.cards.length + ' questions across the chapter’s ' + videos.length + ' recordings.' : 'Study Chapter ' + section + ' (' + esc(parsed.topic) + ') locally with flashcards or a quiz covering all ' + d.cards.length + ' questions.' + (accountStatus.user ? ' Secure video access is being prepared.' : ' Sign in to watch its lesson videos.')) + '</p></div>' + (video && canStartPlayback ? '<button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">' + (V.videoTime > 0 ? 'Resume lesson' : 'Play lesson') + '</button>' : '') + '</section>' +
       videoNavigation +
       (function () {
@@ -3431,6 +3491,7 @@
     animateRouteChange = false;
     var renderedVideo = document.getElementById('lesson-video-player');
     if (renderedVideo) {
+      bindLessonVideoFeedback(renderedVideo, app.querySelector('.lesson-video-feedback'));
       var videoAction = app.querySelector('.lesson-video-continue');
       var syncVideoAction = function () {
         if (!videoAction) return;
@@ -4367,7 +4428,9 @@
           var playbackAttempt = !lessonVideoElement.paused && !lessonVideoElement.ended
             ? (lessonVideoElement.pause(), null)
             : lessonVideoElement.play();
-          if (playbackAttempt && playbackAttempt.catch) playbackAttempt.catch(function () { toast('Video playback could not start. Check the video source and try again.'); });
+          if (playbackAttempt && playbackAttempt.catch) playbackAttempt.catch(function () {
+            if (document.getElementById('lesson-video-player') === lessonVideoElement) showLessonVideoFeedback(app.querySelector('.lesson-video-feedback'), 'Playback could not start. Retry the video or check your connection.', true);
+          });
         }
         break;
       case 'video-ticket-retry':
@@ -4388,9 +4451,14 @@
           go({ name: 'lesson-video', id: returnContext.deckId, videoIndex: returnContext.videoIndex, videoTime: returnContext.currentTime });
         }
         break;
+      case 'lesson-video-return':
+        returnToLessonVideo();
+        var backToPlayerAction = app.querySelector('.lesson-video-continue');
+        if (backToPlayerAction) backToPlayerAction.focus({ preventScroll: true });
+        break;
       case 'lesson-transcript-seek':
         var transcriptVideo = document.getElementById('lesson-video-player'), seekTime = Number(t.dataset.time);
-        if (transcriptVideo && Number.isFinite(seekTime) && seekTime >= 0) transcriptVideo.currentTime = seekTime;
+        seekLessonTranscript(transcriptVideo, t.closest('.lesson-transcript'), seekTime);
         break;
       case 'seek-video-reference':
         var refDeckId = t.dataset.deckId;
