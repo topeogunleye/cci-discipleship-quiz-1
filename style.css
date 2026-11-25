@@ -6005,12 +6005,14 @@ html[data-theme="dark"] .picker-selection-footer {
 }
 
 @media (min-width: 768px) and (max-width: 900px) {
+  .desktop-shell:not(.desktop-shell-full),
   .desktop-shell-home {
     display: grid;
     grid-template-columns: 176px minmax(0, 1fr);
     min-height: 100vh;
   }
 
+  .desktop-shell:not(.desktop-shell-full) .desktop-sidebar,
   .desktop-shell-home .desktop-sidebar {
     position: sticky;
     top: 0;
@@ -6021,6 +6023,10 @@ html[data-theme="dark"] .picker-selection-footer {
     gap: 28px;
     padding: 22px 12px;
     background: var(--bg);
+  }
+
+  .desktop-shell:not(.desktop-shell-full) .bottom-tab-bar {
+    display: none;
   }
 
   .desktop-shell-home .rocket-container {
@@ -6042,6 +6048,7 @@ html[data-theme="dark"] .picker-selection-footer {
     margin: 0;
   }
 
+  .desktop-shell .desktop-logo,
   .desktop-shell-home .desktop-logo {
     display: flex;
     align-items: center;
@@ -6050,6 +6057,8 @@ html[data-theme="dark"] .picker-selection-footer {
     margin: 0 4px;
   }
 
+  .desktop-shell .desktop-logo-mark,
+  .desktop-shell .desktop-logo-mark svg,
   .desktop-shell-home .desktop-logo-mark,
   .desktop-shell-home .desktop-logo-mark svg {
     display: block;
@@ -6057,18 +6066,21 @@ html[data-theme="dark"] .picker-selection-footer {
     height: 34px;
   }
 
+  .desktop-shell .desktop-logo-name,
   .desktop-shell-home .desktop-logo-name {
     color: var(--ink);
     font-size: 1.1rem;
     font-weight: 700;
   }
 
+  .desktop-shell .desktop-nav,
   .desktop-shell-home .desktop-nav {
     display: flex;
     flex-direction: column;
     gap: 8px;
   }
 
+  .desktop-shell .desktop-nav-item,
   .desktop-shell-home .desktop-nav-item {
     display: flex;
     min-height: 44px;
@@ -6084,16 +6096,19 @@ html[data-theme="dark"] .picker-selection-footer {
     font-weight: 600;
   }
 
+  .desktop-shell .desktop-nav-item svg,
   .desktop-shell-home .desktop-nav-item svg {
     width: 19px;
     height: 19px;
   }
 
+  .desktop-shell .desktop-nav-item.active,
   .desktop-shell-home .desktop-nav-item.active {
     background: var(--surface);
     color: var(--accent);
   }
 
+  .desktop-shell .desktop-main,
   .desktop-shell-home .desktop-main {
     display: block;
     min-width: 0;
@@ -9852,9 +9867,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
   .lesson-video-topbar .lesson-video-nav-button { min-width: 112px; }
   .lesson-video-topbar .lesson-video-position { min-width: 96px; }
   .lesson-video-summary-copy > .eyebrow { display: none; }
-}
-@media (min-width: 1280px) {
-  .lesson-video-content { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 24px; align-items: start; }
+  .lesson-video-content { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 20px; align-items: start; }
   .lesson-video-side { padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
   .lesson-video-side > :first-child { margin-top: 0; }
   .lesson-video-side .lesson-video-segments { padding: 12px; }
@@ -9862,6 +9875,9 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
   .lesson-video-main .lesson-video-summary { gap: 16px; flex-wrap: wrap; }
   .lesson-video-main .lesson-video-summary-copy { flex: 1 1 360px; }
   .lesson-video-main .lesson-video-continue { min-width: 160px; }
+}
+@media (min-width: 1280px) {
+  .lesson-video-content { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 24px; align-items: start; }
 }
 @media (min-width: 1024px) and (max-height: 600px) {
   .lesson-video-top-title > span { display: none; }
