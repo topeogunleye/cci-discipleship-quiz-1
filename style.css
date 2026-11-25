@@ -9833,3 +9833,14 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 .video-study-body .question-meta-row { flex-wrap: wrap; }
 .video-study-body .coaching-first-tooltip { max-width: 100%; overflow-wrap: anywhere; }
 .video-study-body .tooltip-dot { flex-shrink: 0; }
+
+/* Saved-session choices retain readable scope labels on narrow screens. */
+.session-scope-label { overflow-wrap: anywhere; }
+#modal .session-switch-dialog {
+  max-height: calc(100vh - 104px - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100dvh - 104px - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.session-switch-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+.session-switch-actions .btn { min-height: 48px; white-space: normal; line-height: 1.4; }

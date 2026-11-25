@@ -295,7 +295,7 @@ test('lesson video study modal launches overlay without unmounting player, pause
   assert.match(appSource, /finishVideoStudy/);
   assert.match(appSource, /class="sheet video-study-modal"/);
   assert.match(appSource, /data-act="close-video-study"/);
-  assert.match(appSource, /data-act="resume-video-study"/);
+  assert.match(appSource, /data-act="resume-unfinished-session"/);
   assert.match(appSource, /data-act="results-return-video"/);
 
   const styleSource = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
@@ -499,10 +499,13 @@ test('lesson video study modal launches overlay without unmounting player, pause
   assert.equal(t.getS().pausedSession.returnToVideo.deckId, deckId);
   assert.equal(t.getS().pausedSession.i, 1);
 
-  // Re-opening setup offers resume shortcut
+  // Starting after setup compares the requested scope with saved work before replacement.
   t.setup('flash', deckId);
-  assert.match(elements.modal.innerHTML, /data-act="resume-video-study"/);
-  assert.match(elements.modal.innerHTML, /Resume saved flashcards/);
+  t.start();
+  assert.match(elements.modal.innerHTML, /data-act="resume-unfinished-session"/);
+  assert.match(elements.modal.innerHTML, /Resume saved session/);
+  assert.equal(t.getV().videoStudy, null, 'saved work must not be replaced before a choice');
+  assert.equal(t.getS().pausedSession.i, 1);
 });
 
 

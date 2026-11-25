@@ -1176,6 +1176,16 @@
   function switchStorageOwner(owner) {
     owner = typeof owner === 'string' && owner ? owner : null;
     if (owner === requestedStorageOwnerId) return accountSwitchQueue;
+    // Finish saving under the old owner before opening another local profile.
+    if (activeStorageOwnerId === requestedStorageOwnerId && (isStudySession(V.name) || V.videoStudy)) {
+      if (V.name === 'exam' && V.deadline) V.remaining = Math.max(0, V.deadline - Date.now());
+      saveActiveSession();
+      stopExamTimer();
+      pendingSessionStart = null; pendingSessionResume = null;
+      closeModal();
+      V = { name: 'home' };
+      syncHashWithView(V, true);
+    } else if (pendingSessionStart || pendingSessionResume) closeModal();
     clearLessonTranscriptCache();
     lessonVideoVisits = Object.create(null);
     requestedStorageOwnerId = owner;
@@ -1393,9 +1403,47 @@
       '<p class="meta">A free account syncs CCI lesson progress across devices. Custom decks remain local, and you can keep studying without an account.</p>' + controls +
       '<p class="account-message meta" id="account-message" role="status" aria-live="polite">' + esc(message) + '</p></div>';
   }
+  var pendingSessionStart = null, pendingSessionResume = null;
+  function sessionScopeLabel(session) {
+    var options = session.opts || {}, ids = session.ids || [];
+    var labels = ids.map(function (id) { var d = deck(id); return d ? MobileStudy.parseChapterTitle(d.title).topic : 'Unavailable chapter'; });
+    var scope = labels.length ? labels.join(', ') : 'Selected questions';
+    if (options.videoId) {
+      var video = LESSON_VIDEOS.find(function (item) { return item.id === options.videoId; });
+      scope += ' · Video: ' + (video ? video.title : 'Saved recording');
+    } else if (Object.prototype.hasOwnProperty.call(options, 'videoId') && options.videoId === null) scope += ids.length > 1 ? ' · Whole chapters' : ' · Whole chapter';
+    else if (!options.sessionScopeKey) scope += ' · Saved scope not recorded';
+    var source = { daily: 'Daily study', due: 'Scheduled review', weak: 'Weak spots', challenge: 'Challenge' }[options.studySource];
+    var count = (session.cards || []).length;
+    if (options.limit > 0) count = Math.min(count, options.limit);
+    var settings = (options.unk ? ' · Skip known cards' : '') + (options.shuf ? ' · Shuffled' : ' · In order');
+    if (options.duration) settings += ' · ' + Math.round(options.duration / 60000) + ' minutes';
+    return (session.name === 'flash' ? 'Flashcards' : session.name === 'exam' ? 'Timed exam' : 'Quiz') + ' · ' + (source ? source + ' · ' : '') + scope + ' · ' + count + ' questions' + settings;
+  }
+  function confirmSessionStart(request, launch) {
+    if (requestedStorageOwnerId !== activeStorageOwnerId) { toast('Your profile is loading. Try again shortly.'); return; }
+    var active = V.videoStudy || (isStudySession(V.name) ? V : null);
+    var saved = active && !active.results ? MobileStudy.snapshot(active) : S.pausedSession;
+    if (!saved || !saved.cards || !saved.cards.length) { launch(); return; }
+    var owner = requestedStorageOwnerId;
+    var same = !!(saved.opts && saved.opts.sessionScopeKey && saved.opts.sessionScopeKey === request.opts.sessionScopeKey);
+    var unchangedOwner = function () {
+      if (owner === requestedStorageOwnerId && owner === activeStorageOwnerId) return true;
+      toast('Your account changed. Choose a session again.');
+      return false;
+    };
+    pendingSessionStart = function () { if (unchangedOwner()) { S.pausedSession = null; launch(); } };
+    pendingSessionResume = function () { if (unchangedOwner()) { S.pausedSession = saved; resumeStudySession(); } };
+    openModal('<div class="scrim" data-act="close"></div><section class="sheet session-switch-dialog" role="dialog" aria-modal="true" aria-labelledby="session-switch-title" aria-describedby="session-switch-consequences"><h2 id="session-switch-title" tabindex="-1">' + (same ? 'Resume or start fresh?' : 'You have an unfinished session') + '</h2>' +
+      '<h3>Saved session</h3><p class="session-scope-label">' + esc(sessionScopeLabel(saved)) + '</p><p>Question ' + (Math.min((saved.i || 0) + 1, saved.cards.length)) + ' of ' + saved.cards.length + ' · ' + (saved.name === 'flash' ? Object.keys(saved.marks || {}).length + ' rated cards' : (saved.answers || []).length + ' submitted answers') + '</p>' +
+      '<h3>Requested session</h3><p class="session-scope-label">' + esc(sessionScopeLabel(request)) + '</p>' +
+      '<p id="session-switch-consequences">This app keeps one unfinished session per profile on this device. Replacing it removes its saved position and session history. Previously recorded ratings and learning progress stay saved.</p>' +
+      '<div class="session-switch-actions"><button type="button" class="btn primary" data-act="resume-unfinished-session">Resume saved session</button><button type="button" class="btn danger" data-act="replace-unfinished-session">Replace saved session and start</button><button type="button" class="btn" data-act="close">Cancel</button></div></section>', { preserveReturnFocus: !!returnFocus, focusSelector: '#session-switch-title' });
+  }
   function isStudySession(name) { return name === 'flash' || name === 'quiz' || name === 'exam'; }
   function saveActiveSession() {
     if (V.videoStudy) {
+      if (V.videoStudy.results) return Promise.resolve();
       S.pausedSession = MobileStudy.snapshot(V.videoStudy);
       return save();
     }
@@ -1413,8 +1461,16 @@
     toast('Study paused. Your progress is saved.');
   }
   function resumeStudySession() {
+    if (requestedStorageOwnerId !== activeStorageOwnerId) { toast('Your profile is loading. Try again shortly.'); return; }
     var session = MobileStudy.restore(S.pausedSession, S.decks);
     if (!session) { S.pausedSession = null; save(); render(true); toast('That saved session is no longer available.'); return; }
+    var currentPlayer = document.getElementById('lesson-video-player');
+    if (currentPlayer && !currentPlayer.paused) currentPlayer.pause();
+    if (session.returnToVideo) {
+      go({ name: 'lesson-video', id: session.returnToVideo.deckId, videoIndex: session.returnToVideo.videoIndex, videoTime: session.returnToVideo.currentTime });
+      startVideoStudyModal(session.name, session.cards, session.opts, session.ids, session.returnToVideo, session);
+      return;
+    }
     go(session);
     if (session.name === 'exam') startExamTimer();
     saveActiveSession();
@@ -1725,11 +1781,14 @@
   }
   function ask(msg, label, fn) { pendingAsk = fn; openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><h2 id="dialog-title" class="dialog-title">Please confirm</h2><p>' + esc(msg) + '</p><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn danger" data-act="askok">' + esc(label) + '</button></div></div>'); }
   function closeModal() {
+    var restoreVideoStudy = (pendingSessionStart || pendingSessionResume) && V.videoStudy;
     closeBiblePreview(false);
     modal.innerHTML = ''; pendingAsk = null;
+    pendingSessionStart = null; pendingSessionResume = null;
     var rocketEl = document.querySelector('.rocket-container');
     if (rocketEl) rocketEl.style.display = '';
     if (returnFocus && document.contains(returnFocus)) returnFocus.focus(); returnFocus = null;
+    if (restoreVideoStudy) renderVideoStudyModal();
   }
   function download(filename, text) {
     var viaBlob = function () {
@@ -1975,7 +2034,6 @@
     // Hero Card: Continue (resumes saved session if there is one) or Today Focus
     var heroCard = '';
     if (S.pausedSession) {
-      var pausedLabel = S.pausedSession.name === 'exam' ? 'exam' : (S.pausedSession.name === 'quiz' ? 'quiz' : 'flashcard session');
       var pausedCardNum = Math.min((S.pausedSession.i || 0) + 1, (S.pausedSession.cards || []).length);
       heroCard = '<section class="hero-card hero-continue" aria-label="Continue saved study">' +
         '<div class="hero-card-header">' +
@@ -1983,7 +2041,7 @@
           '<span class="hero-meta">Card ' + pausedCardNum + ' of ' + S.pausedSession.cards.length + '</span>' +
         '</div>' +
         '<h2 class="hero-card-title">Pick up where you left off</h2>' +
-        '<p class="hero-card-desc">Your ' + pausedLabel + ' is waiting right where you stopped.</p>' +
+        '<p class="hero-card-desc">' + esc(sessionScopeLabel(S.pausedSession)) + '</p>' +
         '<div class="hero-card-actions">' +
           '<button class="btn primary full" data-act="resume-study">Resume Study</button>' +
           '<button class="btn sm ghost" data-act="discard-study">End session</button>' +
@@ -2116,7 +2174,7 @@
       ? 'Continue · ' + Math.min((S.pausedSession.i || 0) + 1, (S.pausedSession.cards || []).length) + ' of ' + S.pausedSession.cards.length + ' cards'
       : (dueCount ? 'Your next step: ' + plural(dailyFocusCount, 'card') : (unmasteredCount > 0 ? 'Start your ' + dailyFocusCount + '-card daily focus' : 'You’ve mastered every card'));
     var desktopHeroDescription = S.pausedSession
-      ? 'Your study session is ready when you are.'
+      ? sessionScopeLabel(S.pausedSession)
       : (dueCount
         ? plural(dueCount, 'card') + ' scheduled for review today. Start with your ' + dailyFocusCount + '-card focus.'
         : (unmasteredCount > 0
@@ -2495,7 +2553,7 @@
         var videoCards = video ? cardsForVideo(d, video) : [];
         var isLastVideo = !videos.length || index >= videos.length - 1;
         var resumePausedBtn = (S.pausedSession && S.pausedSession.cards && S.pausedSession.cards.length)
-          ? '<button type="button" class="btn resume-study-btn" data-act="resume-paused-study">Resume ' + (S.pausedSession.name === 'quiz' ? 'Quiz' : 'Flashcards') + ' (' + (Math.min((S.pausedSession.i || 0) + 1, S.pausedSession.cards.length)) + ' of ' + S.pausedSession.cards.length + ')</button>'
+          ? '<button type="button" class="btn resume-study-btn" data-act="resume-paused-study">Resume saved session (' + (Math.min((S.pausedSession.i || 0) + 1, S.pausedSession.cards.length)) + ' of ' + S.pausedSession.cards.length + ') · ' + esc(sessionScopeLabel(S.pausedSession)) + '</button>'
           : '';
         var videoStudyButtons = videoCards.length
           ? '<button type="button" class="btn" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" data-video-id="' + esc(video.id) + '" aria-label="Study Video Flashcards, ' + videoCards.length + ' cards">Video Flashcards (' + videoCards.length + ')</button>' +
@@ -2699,6 +2757,7 @@
     var displayTitle = parsed.topic || title;
     var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + renderReferenceNote(c, it.deckId) + bibleNote(c);
     var isLast = s.i === s.cards.length - 1;
+    var savedRating = (s.marks || {})[c.id];
     var answerSummaryId = session ? 'video-flash-answer-summary' : 'flash-answer-summary';
     var cardFace = s.flipped
       ? '<div class="flip on flash-card-back" data-flip-surface="true">' +
@@ -2722,7 +2781,8 @@
       sessionHead(displayTitle, (s.i + 1) + ' / ' + s.cards.length) +
       progressBar(s.i + 1, s.cards.length) +
       '<div class="coaching-question-container">' + cardFace + '</div>' +
-      (s.flipped ? '<div class="flash-rating row grow" role="group" aria-label="Mark your confidence">' +
+      (s.flipped && savedRating ? '<p class="note" role="status">Rating saved: ' + (savedRating === 'known' ? 'I know it' : 'Still learning') + '. Use Next to continue.</p>' : '') +
+      (s.flipped && !savedRating ? '<div class="flash-rating row grow" role="group" aria-label="Mark your confidence">' +
         '<button class="btn btn-confidence" data-act="mark" data-v="unknown">Still learning</button>' +
         '<button class="btn primary btn-confidence" data-act="mark" data-v="known">I know it</button>' +
       '</div>' : '') +
@@ -3890,7 +3950,6 @@
     };
     var q = mode === 'quiz';
     var scopeNote = '';
-    var resumeBtn = '';
     if (returnToVideo && ids.length === 1) {
       var targetDeck = deck(ids[0]);
       if (targetDeck) {
@@ -3909,10 +3968,7 @@
             ' · ' + targetDeck.cards.length + ' ' + (targetDeck.cards.length === 1 ? 'question' : 'questions') + '</p>';
         }
       }
-      if (S.pausedSession && S.pausedSession.returnToVideo && S.pausedSession.returnToVideo.deckId === ids[0] && S.pausedSession.name === mode && S.pausedSession.cards && S.pausedSession.cards.length) {
-        var savedCardNum = Math.min((S.pausedSession.i || 0) + 1, S.pausedSession.cards.length);
-        resumeBtn = '<button type="button" class="btn primary full" data-act="resume-video-study" style="margin-bottom:var(--space-md);">Resume saved ' + (q ? 'quiz' : 'flashcards') + ' (' + savedCardNum + ' of ' + S.pausedSession.cards.length + ')</button>';
-      }
+
     }
     var totalCards = videoCards.length || (function () {
       var count = 0;
@@ -3934,10 +3990,9 @@
     })();
     openModal('<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setup-title"><h2 id="setup-title">' + (targetVideo && videoCards.length ? (q ? 'Start video quiz' : 'Start video flashcards') : (q ? 'Start quiz' : 'Start flashcards')) + '</h2>' +
       scopeNote +
-      resumeBtn +
       (q ? '<label class="field"><span>Questions</span><select id="s-len">' + questionCountOptions + '</select></label>'
          : '<label class="check"><input type="checkbox" id="s-shuf"' + (S.settings.shuffle ? ' checked' : '') + '> Shuffle cards</label>') +
-      '<label class="check"><input type="checkbox" id="s-unk"> Skip cards I already know</label><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="start">' + (resumeBtn ? 'Start fresh' : 'Start') + '</button></div></div>');
+      '<label class="check"><input type="checkbox" id="s-unk"> Skip cards I already know</label><div class="row end"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="start">Start</button></div></div>');
   }
   function setupExam(ids, mixed, defaultCount, defaultMinutes) {
     var selectedIds = ids && ids.length ? ids.slice() : S.decks.map(function (d) { return d.id; });
@@ -4002,10 +4057,9 @@
       ? { unk: false, limit: +document.getElementById('exam-count').value, shuf: true, duration: Math.max(1, Math.min(180, +document.getElementById('exam-minutes').value || 30)) * 60 * 1000, saveBest: false }
       : { unk: document.getElementById('s-unk').checked, limit: s.mode === 'quiz' ? +document.getElementById('s-len').value : 0, shuf: s.mode === 'quiz' ? true : document.getElementById('s-shuf').checked };
     o.videoId = s.videoId || null;
-    if (s.mode === 'flash') { S.settings.shuffle = o.shuf; save(); }
+    o.studySource = s.videoId ? 'video' : 'chapter';
     var selectedCount = cards.length;
     if (o.unk) cards = cards.filter(function (x) { return !isMastered(x.deckId, x.card.id); });
-    if (exam) cards = StudyLogic.examQuestions(cards, o.limit);
     if (!cards.length) { toast(selectedCount ? 'All selected cards are already marked known.' : 'There are no cards in this selection yet.'); return; }
     if (s.returnToVideo) {
       var studyVideo = document.getElementById('lesson-video-player');
@@ -4019,19 +4073,19 @@
   function startDue() {
     var cards = dueReviewItems(allCardItems(), Date.now());
     if (!cards.length) { toast('No cards are scheduled for review today.'); return; }
-    begin('flash', shuffle(cards), { unk: false, limit: 0, shuf: true }, deckIdsFor(cards));
+    begin('flash', shuffle(cards), { unk: false, limit: 0, shuf: true, studySource: 'due' }, deckIdsFor(cards));
   }
   function startDailyStudy() {
     var all = allCardItems(), due = dueReviewItems(all, Date.now());
     var dailyLimit = (S.onboarding && S.onboarding.dailyMinutes) ? S.onboarding.dailyMinutes : 10;
     var cards = MobileStudy.selectDailyItems(due, all, function (item) { return isMastered(item.deckId, item.card.id); }, dailyLimit);
     if (!cards.length) { toast('All cards are mastered. Try a quiz or exam to review them.'); return; }
-    begin('flash', shuffle(cards), { unk: false, limit: cards.length, shuf: true, daily: true }, deckIdsFor(cards));
+    begin('flash', shuffle(cards), { unk: false, limit: cards.length, shuf: true, daily: true, studySource: 'daily' }, deckIdsFor(cards));
   }
   function startWeakSpots() {
     var cards = StudyLogic.weakSpots(allCardItems(), 10);
     if (!cards.length) { toast('Answer some questions first to build weak-spot stats.'); return; }
-    begin('quiz', shuffle(cards), { unk: false, limit: 0, shuf: true, saveBest: false }, deckIdsFor(cards));
+    begin('quiz', shuffle(cards), { unk: false, limit: 0, shuf: true, studySource: 'weak', saveBest: false }, deckIdsFor(cards));
   }
   function startChallenge(ids, requestedMode) {
     var all = allCardItems();
@@ -4047,10 +4101,18 @@
     );
     if (!cards.length) { toast('No challenge questions available.'); return; }
     var mode = requestedMode === 'flash' ? 'flash' : 'quiz';
-    begin(mode, shuffle(cards), { unk: false, limit: mode === 'quiz' ? 10 : 0, shuf: true, challenge: true, saveBest: false }, deckIdsFor(cards));
+    begin(mode, shuffle(cards), { unk: false, limit: mode === 'quiz' ? 10 : 0, shuf: true, challenge: true, studySource: 'challenge', saveBest: false }, deckIdsFor(cards));
   }
 
-  function startVideoStudyModal(mode, cards, o, ids, returnToVideo, restoredState) {
+  function startVideoStudyModal(mode, cards, o, ids, returnToVideo, restoredState, approved) {
+    o = Object.assign({}, o || {});
+    if (!restoredState && !approved) {
+      o.sessionScopeKey = MobileStudy.sessionScopeKey(mode, cards, o, ids);
+      confirmSessionStart({ name: mode, cards: cards, opts: o, ids: ids }, function () { startVideoStudyModal(mode, cards, o, ids, returnToVideo, null, true); });
+      return;
+    }
+    if (!restoredState && mode === 'flash' && /^(chapter|video)$/.test(o.studySource || '')) S.settings.shuffle = o.shuf;
+    if (!restoredState && mode === 'exam') cards = StudyLogic.examQuestions(cards, o.limit);
     if (!restoredState && (mode === 'quiz' || mode === 'exam')) {
       cards = cards.map(function (it) { return { deckId: it.deckId, card: it.card, optionOrder: shuffle([0, 1, 2, 3]) }; });
       if (mode === 'quiz' && o && o.limit && o.limit < cards.length) cards = cards.slice(0, o.limit);
@@ -4137,14 +4199,14 @@
     if (n < 0) return;
     s.i = n;
     s.flipped = false;
-    s.picked = null;
+    s.picked = MobileStudy.answeredOptionIndex(s);
     S.pausedSession = MobileStudy.snapshot(s);
     save();
     renderVideoStudyModal();
   }
 
   function pickVideoStudy(k) {
-    if (!V.videoStudy || V.videoStudy.picked !== null) return;
+    if (!V.videoStudy || V.videoStudy.picked !== null || MobileStudy.answeredOptionIndex(V.videoStudy) !== null) return;
     var s = V.videoStudy;
     try { window.localStorage.setItem('cci_seen_answer_tooltip', 'true'); } catch (e) {}
     var it = s.cards[s.i], selected = LET[(it.optionOrder || [0, 1, 2, 3])[k]], ok = selected === it.card.answer;
@@ -4240,7 +4302,15 @@
     }
   }
 
-  function begin(mode, cards, o, ids, returnToVideo) {
+  function begin(mode, cards, o, ids, returnToVideo, approved) {
+    o = Object.assign({}, o || {});
+    if (!approved) {
+      o.sessionScopeKey = MobileStudy.sessionScopeKey(mode, cards, o, ids);
+      confirmSessionStart({ name: mode, cards: cards, opts: o, ids: ids }, function () { begin(mode, cards, o, ids, returnToVideo, true); });
+      return;
+    }
+    if (mode === 'flash' && /^(chapter|video)$/.test(o.studySource || '')) S.settings.shuffle = o.shuf;
+    if (mode === 'exam') cards = StudyLogic.examQuestions(cards, o.limit);
     if (mode === 'quiz' || mode === 'exam') {
       cards = cards.map(function (it) { return { deckId: it.deckId, card: it.card, optionOrder: shuffle([0, 1, 2, 3]) }; });
       if (mode === 'quiz' && o.limit && o.limit < cards.length) cards = cards.slice(0, o.limit);
@@ -4584,7 +4654,6 @@
           go({ name: 'lesson-video', id: refDeckId || V.id, videoIndex: newIdx, videoTime: targetTime, autoPlayVideo: true });
           break;
         }
-
         if (isStudySession(V.name)) {
           if (V.name === 'exam') stopExamTimer();
           S.pausedSession = MobileStudy.snapshot(V);
@@ -4606,16 +4675,7 @@
         });
         break;
       case 'resume-paused-study':
-        var restoredPaused = MobileStudy.restore(S.pausedSession, S.decks);
-        if (restoredPaused) {
-          var currPlayer = document.getElementById('lesson-video-player');
-          if (currPlayer && !currPlayer.paused) currPlayer.pause();
-          if (restoredPaused.returnToVideo) {
-            startVideoStudyModal(restoredPaused.name, restoredPaused.cards, restoredPaused.opts, restoredPaused.ids, restoredPaused.returnToVideo, restoredPaused);
-          } else {
-            begin(restoredPaused.name, restoredPaused.cards, restoredPaused.opts, restoredPaused.ids, null, restoredPaused);
-          }
-        }
+        resumeStudySession();
         break;
       case 'chapter-info':
         openLessonDetailSheet(t.dataset.id);
@@ -4746,16 +4806,19 @@
         closeVideoStudyModal();
         break;
       case 'resume-video-study':
-        var restored = MobileStudy.restore(S.pausedSession, S.decks);
-        if (restored) {
-          var studyVid = document.getElementById('lesson-video-player');
-          if (studyVid && !studyVid.paused) studyVid.pause();
-          startVideoStudyModal(restored.name, restored.cards, restored.opts, restored.ids, restored.returnToVideo, restored);
-        } else {
-          S.pausedSession = null;
-          save();
-          toast('Saved session could not be restored.');
-        }
+        resumeStudySession();
+        break;
+      case 'resume-unfinished-session':
+        var resumeUnfinished = pendingSessionResume;
+        pendingSessionStart = null; pendingSessionResume = null;
+        closeModal();
+        if (resumeUnfinished) resumeUnfinished();
+        break;
+      case 'replace-unfinished-session':
+        var replaceUnfinished = pendingSessionStart;
+        pendingSessionStart = null; pendingSessionResume = null;
+        closeModal();
+        if (replaceUnfinished) replaceUnfinished();
         break;
       case 'results-return-video':
         if (V.videoStudy) {
@@ -4944,12 +5007,16 @@
         break;
       case 'mark':
         if (V.videoStudy) {
-          mark(V.videoStudy.cards[V.videoStudy.i], t.dataset.v);
-          V.videoStudy.marks[V.videoStudy.cards[V.videoStudy.i].card.id] = t.dataset.v;
+          if (!V.videoStudy.marks[V.videoStudy.cards[V.videoStudy.i].card.id]) {
+            mark(V.videoStudy.cards[V.videoStudy.i], t.dataset.v);
+            V.videoStudy.marks[V.videoStudy.cards[V.videoStudy.i].card.id] = t.dataset.v;
+          }
           stepVideoStudy(1);
         } else {
-          mark(V.cards[V.i], t.dataset.v);
-          V.marks[V.cards[V.i].card.id] = t.dataset.v;
+          if (!V.marks[V.cards[V.i].card.id]) {
+            mark(V.cards[V.i], t.dataset.v);
+            V.marks[V.cards[V.i].card.id] = t.dataset.v;
+          }
           step(1);
         }
         break;
@@ -4989,10 +5056,10 @@
     var n = V.i + dir;
     if (n >= V.cards.length) return V.name === 'flash' ? finishFlash() : (V.name === 'exam' ? finishExam(false) : finishQuiz());
     if (n < 0) return;
-    V.i = n; V.flipped = false; V.picked = null; saveActiveSession(); render();
+    V.i = n; V.flipped = false; V.picked = MobileStudy.answeredOptionIndex(V); saveActiveSession(); render();
   }
   function pick(k) {
-    if (V.picked !== null) return;
+    if (V.picked !== null || MobileStudy.answeredOptionIndex(V) !== null) return;
     try { window.localStorage.setItem('cci_seen_answer_tooltip', 'true'); } catch (e) {}
     var it = V.cards[V.i], selected = LET[(it.optionOrder || [0, 1, 2, 3])[k]], ok = selected === it.card.answer;
     triggerHaptic(ok ? 'correct' : 'wrong');
@@ -5166,6 +5233,7 @@
     }
     if (modal.innerHTML && e.key === 'Escape') {
       e.preventDefault();
+      if (pendingSessionStart || pendingSessionResume) return closeModal();
       if (V.videoStudy) return closeVideoStudyModal();
       return closeModal();
     }
@@ -5178,6 +5246,7 @@
       }
       return;
     }
+    if (pendingSessionStart || pendingSessionResume) return;
     if (e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
     if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable) return;
     if (activeBiblePreview && isWithinActiveBiblePreview(e.target)) return;
