@@ -12873,8 +12873,10 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
     parts.forEach(function (part) {
       var trimmed = part.trim();
       if (!trimmed) return;
-      var timeMatch = trimmed.match(/(?:\[|\()?(\d{1,2}:\d{2}(?::\d{2})?)\b/);
+      var timeMatch = trimmed.match(/(?:\[|\()?\s*\b(\d{1,2}:\d{2}(?::\d{2})?)\b\s*(?:\]|\))?(?:\s*(?:–|-|to)\s*(?:\[|\()?\s*\b(\d{1,2}:\d{2}(?::\d{2})?)\b\s*(?:\]|\))?)?/);
       var timeStr = timeMatch ? timeMatch[1] : null;
+      var endTimeStr = (timeMatch && timeMatch[2]) ? timeMatch[2] : null;
+      var rangeStr = timeStr ? (endTimeStr ? (timeStr + '–' + endTimeStr) : timeStr) : null;
       var timeSec = timeStr ? parseTimeToSeconds(timeStr) : 0;
       var video = resolveVideoForRef(trimmed, currentDeckId);
       if (!video && lastResolvedVideo) video = lastResolvedVideo;
@@ -12883,6 +12885,8 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
         raw: trimmed,
         video: video,
         timeStr: timeStr,
+        endTimeStr: endTimeStr,
+        rangeStr: rangeStr,
         timeSec: timeSec
       });
     });
@@ -12900,8 +12904,11 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
         return esc(link.raw);
       }
       var preRollSec = Math.max(0, link.timeSec - 3);
-      var label = (link.video.title ? link.video.title + ' ' : '') + '· ' + link.timeStr;
-      return '<button type="button" class="ref-timestamp-btn" data-act="seek-video-reference" data-deck-id="' + esc(link.video.deckId) + '" data-video-id="' + esc(link.video.id) + '" data-time="' + preRollSec + '" aria-label="Watch video from ' + esc(link.timeStr) + '" title="Watch video from ' + esc(link.timeStr) + ' (with 3s lead-in)">' +
+      var displayRange = link.rangeStr || link.timeStr;
+      var label = (link.video.title ? link.video.title + ' ' : '') + '· ' + displayRange;
+      var timeDesc = 'Watch video from ' + link.timeStr + (link.endTimeStr ? ' to ' + link.endTimeStr : '');
+      var titleText = timeDesc + ' (with 3s lead-in)';
+      return '<button type="button" class="ref-timestamp-btn" data-act="seek-video-reference" data-deck-id="' + esc(link.video.deckId) + '" data-video-id="' + esc(link.video.id) + '" data-time="' + preRollSec + '" aria-label="' + esc(timeDesc) + '" title="' + esc(titleText) + '">' +
         '<span class="ref-play-icon" aria-hidden="true">▶</span> ' + esc(label) +
       '</button>';
     }).join(' <span class="ref-separator">·</span> ');
