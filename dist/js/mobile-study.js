@@ -55,6 +55,29 @@
     return selected.slice(0, target);
   }
 
+  // Scope is optional metadata inside the existing version-1 snapshot options.
+  function sessionScopeKey(mode, cards, opts, ids) {
+    opts = opts || {};
+    var scopeCards = (cards || []).map(function (item) { return [item.deckId, item.card ? item.card.id : item.cardId]; });
+    if (opts.shuf) scopeCards.sort(function (a, b) { return JSON.stringify(a).localeCompare(JSON.stringify(b)); });
+    return JSON.stringify({
+      mode: mode, ids: (ids || []).slice().sort(),
+      video: opts.videoId || null, source: opts.studySource || 'selected',
+      unknownOnly: !!opts.unk, limit: Number(opts.limit) || 0, shuffle: !!opts.shuf,
+      duration: Number(opts.duration) || 0, saveBest: opts.saveBest !== false,
+      cards: scopeCards
+    });
+  }
+
+  function answeredOptionIndex(session) {
+    var item = session.cards[session.i];
+    if (!item) return null;
+    var answer = (session.answers || []).find(function (entry) { return entry.item.deckId === item.deckId && entry.item.card.id === item.card.id; });
+    if (!answer) return null;
+    var index = (item.optionOrder || [0, 1, 2, 3]).indexOf(LETTERS.indexOf(answer.selected));
+    return index >= 0 ? index : null;
+  }
+
   function snapshot(session) {
     if (!session || MODES.indexOf(session.name) < 0 || !Array.isArray(session.cards)) return null;
     return {
@@ -124,6 +147,8 @@
       });
     }
     var picked = Number.isInteger(saved.picked) && saved.picked >= 0 && saved.picked < 4 ? saved.picked : null;
+    var answeredIndex = answeredOptionIndex({ cards: cards, i: index, answers: answers });
+    if (answeredIndex !== null) picked = answeredIndex;
     var remaining = Number.isFinite(saved.remaining) && saved.remaining >= 0 ? saved.remaining : undefined;
     var returnToVideo = saved.returnToVideo && typeof saved.returnToVideo.deckId === 'string' && Number.isInteger(saved.returnToVideo.videoIndex) && Number.isFinite(saved.returnToVideo.currentTime) && saved.returnToVideo.currentTime >= 0 && decks.some(function (deck) { return deck && deck.id === saved.returnToVideo.deckId; })
       ? { deckId: saved.returnToVideo.deckId, videoIndex: Math.max(0, saved.returnToVideo.videoIndex), currentTime: saved.returnToVideo.currentTime }
@@ -593,6 +618,8 @@
     filterDevotionals: filterDevotionals,
     getTodayDevotional: getTodayDevotional,
     calculateStreak: calculateStreak,
+    sessionScopeKey: sessionScopeKey,
+    answeredOptionIndex: answeredOptionIndex,
     snapshot: snapshot,
     restore: restore
   });
