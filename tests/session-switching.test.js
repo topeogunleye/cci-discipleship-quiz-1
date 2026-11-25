@@ -47,7 +47,7 @@ function appHarness() {
       switchStorageOwner, setAdapter: value => { storageAdapter = value; },
       saved: () => recorded, studied: () => studied,
       setVideos: value => { LESSON_VIDEOS = value; },
-      flash: views.flash
+      flash: views.flash, results: views.results, home: views.home, settings: views.settings, syncVideoStudyResume
     };
   `);
   vm.runInNewContext(wrapped, { window, document, URL, setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {} });
@@ -62,7 +62,7 @@ function appHarness() {
     handlers.keydown.forEach(fn => fn(event));
     return event;
   };
-  return { app, elements, click, key, focus: () => focus };
+  return { app, elements, click, key, focus: () => focus, document };
 }
 
 test('session identity includes video, question pool, source, mode, chapters and settings; ignores randomized ordering', () => {
@@ -100,7 +100,7 @@ for (const video of [false, true]) test(`${video ? 'video' : 'chapter'} start le
   assert.equal(app.state().pausedSession, saved);
   assert.equal(app.saved().length, 0);
   assert.match(elements.modal.innerHTML, /Saved session[\s\S]*Requested session/);
-  assert.match(elements.modal.innerHTML, /Previously recorded ratings and learning progress stay saved/);
+  assert.match(elements.modal.innerHTML, /Recorded ratings and learning progress stay saved/);
   click('replace-unfinished-session');
   const next = video ? app.view().videoStudy : app.view();
   assert.equal(next.name, 'flash');
@@ -263,7 +263,7 @@ test('scope labels expose the exact video and changed settings with escaped dial
   app.begin('quiz', cards, { videoId: 'video-two', limit: 2, unk: true, shuf: true }, ['chapter']);
   assert.match(elements.modal.innerHTML, /&lt;First recording&gt;/);
   assert.match(elements.modal.innerHTML, /Second recording/);
-  assert.match(elements.modal.innerHTML, /2 questions · Skip known cards · Shuffled/);
+  assert.match(elements.modal.innerHTML, /2 questions · Skip mastered questions · Shuffled/);
   assert.match(elements.modal.innerHTML, /role="dialog" aria-modal="true" aria-labelledby="session-switch-title"/);
 });
 
@@ -355,4 +355,111 @@ test('completed video results do not become a new unfinished snapshot during lif
   await app.saveActiveSession();
   assert.equal(app.state().pausedSession, null);
   assert.equal(app.saved().length, 0);
+});
+
+test('mixed-practice entry labels round-trip without changing session identity or legacy origins', () => {
+  const { app } = appHarness();
+  const mixed = session('quiz', { studySource: 'challenge', entryPoint: 'mixed-practice' });
+  const originalKey = mixed.opts.sessionScopeKey;
+  assert.equal(originalKey, MobileStudy.sessionScopeKey('quiz', mixed.cards, { ...mixed.opts, entryPoint: 'challenge' }, mixed.ids));
+  const restored = MobileStudy.restore(json(MobileStudy.snapshot(mixed)), decks);
+  assert.equal(restored.opts.sessionScopeKey, originalKey);
+  assert.match(app.sessionScopeLabel(restored), /Quiz · Mixed practice/);
+  assert.equal(restored.i, mixed.i);
+  assert.equal(restored.answers.length, mixed.answers.length);
+  const legacy = session('quiz', { studySource: 'challenge' });
+  const before = json(legacy);
+  assert.match(app.sessionScopeLabel(legacy), /Quiz · Challenge/);
+  assert.doesNotMatch(app.sessionScopeLabel(legacy), /Mixed practice/);
+  assert.deepEqual(json(legacy), before);
+});
+
+test('Home offers direct lesson entry and a separate Details button', () => {
+  const { app } = appHarness();
+  const html = app.home();
+  const articles = Array.from(html.matchAll(/<article class="desktop-lesson-card[\s\S]*?<\/article>/g), m => m[0]);
+  assert.ok(articles.length);
+  for (const article of articles) {
+    assert.match(article, /data-act="open-chapter"[^>]+aria-label="Open lesson /);
+    assert.match(article, /<\/button><button[^>]+data-act="lesson-detail-open"[^>]+aria-label="Details for /);
+    assert.equal((article.match(/<button /g) || []).length, 2);
+  }
+});
+
+test('video results have one primary return while keeping review and retake distinct', () => {
+  const { app } = appHarness();
+  const result = { kind: 'quiz', score: 0, total: 3, all: cards, missed: cards, opts: {}, ids: ['chapter'], returnToVideo: { deckId: 'chapter', videoIndex: 0 } };
+  app.setView({ name: 'lesson-video', videoStudy: { results: result } });
+  app.state().progress.chapter = { cards: {}, best: null };
+  const before = json(app.state());
+  const footer = app.results(result).split('result-actions completion-actions-bar')[1];
+  assert.match(footer, /data-act="results-return-video">Return to video/);
+  assert.doesNotMatch(footer, /data-act="results-continue"/);
+  assert.match(footer, /data-act="review">Review 3 missed questions/);
+  assert.match(footer, /data-act="again">Retake quiz/);
+  app.results(result);
+  assert.deepEqual(json(app.state()), before, 'rendering or returning must not score another attempt');
+});
+
+test('exam results offer the same Home destination before and after answer review', () => {
+  const { app } = appHarness();
+  const html = app.results({ kind: 'exam', score: 1, total: 1, all: cards.slice(0, 1), review: [{ item: cards[0], selected: 'A', ok: true }] });
+  assert.match(html, /exam-summary-return[\s\S]*<h1>Exam results<\/h1>/);
+  assert.equal((html.match(/data-act="home">Back to study<\/button>/g) || []).length, 2);
+  assert.ok(html.indexOf('Back to study') < html.indexOf('Answer review'));
+  assert.ok(html.lastIndexOf('Back to study') > html.indexOf('Answer review'));
+});
+
+test('Settings toggles expose their setting name and current state', () => {
+  const { app } = appHarness();
+  for (const enabled of [false, true]) {
+    app.state().settings.shuffle = enabled;
+    const html = app.settings();
+    assert.match(html, new RegExp('data-act="toggle-shuffle" aria-label="Shuffle flashcards: ' + (enabled ? 'On' : 'Off') + '" aria-pressed="' + enabled + '"'));
+    assert.match(html, /data-act="toggle-streak" aria-label="Show daily streak: (On|Off)" aria-pressed="(true|false)"/);
+    assert.match(html, /data-act="toggle-draft-devotionals" aria-label="Show draft devotionals: (On|Off)" aria-pressed="(true|false)"/);
+  }
+});
+
+test('closing video practice refreshes only its Resume control, preserving player and progress', () => {
+  const { app, elements } = appHarness();
+  const saved = MobileStudy.snapshot(session('flash'));
+  app.state().pausedSession = saved;
+  const before = json(app.state());
+  let removed = 0, markup = '';
+  const actions = {
+    querySelector(selector) { assert.equal(selector, '.resume-study-btn'); return { remove() { removed++; } }; },
+    insertAdjacentHTML(where, html) { assert.equal(where, 'afterbegin'); markup = html; }
+  };
+  elements.app.querySelector = selector => {
+    assert.equal(selector, '.lesson-video-study-actions', 'never query or reconstruct the player');
+    return actions;
+  };
+  app.syncVideoStudyResume();
+  assert.equal(removed, 1);
+  assert.match(markup, /Resume saved session \(2 of 3\)/);
+  assert.deepEqual(json(app.state()), before);
+  app.state().pausedSession = null;
+  app.syncVideoStudyResume();
+  assert.equal(removed, 2);
+  assert.equal(markup, '');
+});
+
+
+test('refreshing Resume retains focus or returns it to the first practice action', () => {
+  const { app, elements, document } = appHarness();
+  const practice = { focus() { document.activeElement = practice; } };
+  const makeResume = () => ({ remove() { current = null; document.activeElement = null; }, focus() { document.activeElement = current; } });
+  let current = makeResume();
+  document.activeElement = current;
+  elements.app.querySelector = () => ({
+    querySelector(selector) { return selector === '.resume-study-btn' ? current : practice; },
+    insertAdjacentHTML(where, html) { current = html ? makeResume() : null; }
+  });
+  app.state().pausedSession = MobileStudy.snapshot(session('flash'));
+  app.syncVideoStudyResume();
+  assert.equal(document.activeElement, current);
+  app.state().pausedSession = null;
+  app.syncVideoStudyResume();
+  assert.equal(document.activeElement, practice);
 });
