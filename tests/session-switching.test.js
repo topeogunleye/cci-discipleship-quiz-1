@@ -138,7 +138,7 @@ test('legacy version-one snapshots survive reload and are never guessed to match
   legacy.marks = { q1: 'known' };
   app.state().pausedSession = json(legacy);
   app.begin('flash', cards, {}, ['chapter']);
-  assert.match(elements.modal.innerHTML, /Saved scope not recorded/);
+  assert.match(elements.modal.innerHTML, /Earlier saved session/);
   assert.doesNotMatch(elements.modal.innerHTML, /Resume or start fresh/);
   click('resume-unfinished-session');
   assert.equal(app.view().i, 1);

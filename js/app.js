@@ -697,6 +697,37 @@
     var index = visit ? videos.findIndex(function (video) { return video.id === visit.videoId; }) : -1;
     return { name: 'lesson-video', id: deckId, videoIndex: index < 0 ? 0 : index, videoTime: index < 0 ? 0 : visit.time };
   }
+  function nextLessonDestination(deckId) {
+    // Use the curriculum order, including missing lessons; never skip to a later recording.
+    var index = STARTER_DECKS.findIndex(function (source) { return 'd-' + slug(source.title) === deckId; });
+    if (index < 0) return { kind: 'unknown' };
+    if (index === STARTER_DECKS.length - 1) return { kind: 'last' };
+    var source = STARTER_DECKS[index + 1], id = 'd-' + slug(source.title), next = deck(id);
+    var title = MobileStudy.parseChapterTitle(source.title).topic;
+    if (!next) return { kind: 'missing', title: title };
+    return { kind: lessonVideosForDeck(id).length ? 'video' : 'chapter', id: id, title: title };
+  }
+  function openNextLesson() {
+    if (V.name !== 'lesson-video') return;
+    var videos = lessonVideosForDeck(V.id);
+    if (videos.length && (V.videoIndex || 0) < videos.length - 1) return;
+    var next = nextLessonDestination(V.id);
+    if (next.kind !== 'video' && next.kind !== 'chapter') return;
+    var player = document.getElementById('lesson-video-player');
+    rememberLessonVideoVisit(V.id, videos[V.videoIndex || 0], player ? player.currentTime : undefined);
+    if (player) player.pause();
+    // Preserve practice snapshots; this navigation does not submit or finish study.
+    if (V.videoStudy && !V.videoStudy.results) saveActiveSession();
+    closeModal();
+    go(next.kind === 'video'
+      ? { name: 'lesson-video', id: next.id, videoIndex: 0, videoTime: 0 }
+      : { name: 'chapter', id: next.id });
+    if (next.kind === 'video') restoreLessonVideoSelectionFocus('next');
+    else {
+      var heading = app.querySelector('.chapter-view-title');
+      if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
+    }
+  }
   function restoreLessonVideoSelectionFocus(direction) {
     var navigation = app.querySelector('.lesson-video-navigation');
     if (navigation && direction) {
@@ -1412,7 +1443,7 @@
       var video = LESSON_VIDEOS.find(function (item) { return item.id === options.videoId; });
       scope += ' · Video: ' + (video ? video.title : 'Saved recording');
     } else if (Object.prototype.hasOwnProperty.call(options, 'videoId') && options.videoId === null) scope += ids.length > 1 ? ' · Whole chapters' : ' · Whole chapter';
-    else if (!options.sessionScopeKey) scope += ' · Saved scope not recorded';
+    else if (!options.sessionScopeKey) scope += ' · Earlier saved session';
     var source = { daily: 'Daily study', due: 'Scheduled review', weak: 'Weak spots', challenge: 'Challenge' }[options.studySource];
     var count = (session.cards || []).length;
     if (options.limit > 0) count = Math.min(count, options.limit);
@@ -2505,12 +2536,22 @@
     var videos = lessonVideosForDeck(d.id), index = Math.max(0, Math.min(Number.isInteger(V.videoIndex) ? V.videoIndex : 0, videos.length - 1));
     var video = videos[index] || null, title = video ? video.title : parsed.topic + ' video lesson';
     rememberLessonVideoVisit(d.id, video, V.videoTime);
-    var videoNavigation = videos.length > 1
+    var boundary = '';
+    if (!video || index === videos.length - 1) {
+      var nextLesson = nextLessonDestination(d.id);
+      boundary = '<div class="lesson-video-boundary">' +
+        (nextLesson.kind === 'video' || nextLesson.kind === 'chapter'
+          ? '<button type="button" class="btn primary lesson-video-next-lesson" data-act="lesson-video-next-lesson">Next lesson: ' + esc(nextLesson.title) + ' →' + (nextLesson.kind === 'chapter' ? '<span class="lesson-video-boundary-note">No video available · Open lesson overview</span>' : '') + '</button>'
+          : (nextLesson.kind === 'missing' ? '<p class="note">Next lesson: ' + esc(nextLesson.title) + ' is unavailable on this device.</p>' : '') +
+            '<button type="button" class="btn" data-act="nav-tab" data-tab="journey">' + (nextLesson.kind === 'last' ? 'Final lesson · ' : '') + 'Back to Journey</button>') +
+        '</div>';
+    }
+    var videoNavigation = videos.length > 1 || boundary
       ? '<nav class="lesson-video-navigation" aria-label="Lesson video navigation">' +
-        '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-video-nav="previous" data-index="' + Math.max(0, index - 1) + '"' + (index === 0 ? ' disabled' : '') + ' aria-label="Previous video' + (index > 0 ? ': ' + esc(videos[index - 1].title) : '') + '" title="' + (index > 0 ? 'Previous: ' + esc(videos[index - 1].title) : 'First video') + '">‹ <span>Previous</span></button>' +
+        (video ? '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-video-nav="previous" data-index="' + Math.max(0, index - 1) + '"' + (index === 0 ? ' disabled' : '') + ' aria-label="Previous video' + (index > 0 ? ': ' + esc(videos[index - 1].title) : '') + '" title="' + (index > 0 ? 'Previous: ' + esc(videos[index - 1].title) : 'First video') + '">‹ <span>Previous</span></button>' +
         '<span class="lesson-video-position" aria-live="polite">Video ' + (index + 1) + ' of ' + videos.length + '</span>' +
-        '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-video-nav="next" data-index="' + Math.min(videos.length - 1, index + 1) + '"' + (index === videos.length - 1 ? ' disabled' : '') + ' aria-label="Next video' + (index < videos.length - 1 ? ': ' + esc(videos[index + 1].title) : '') + '" title="' + (index < videos.length - 1 ? 'Next: ' + esc(videos[index + 1].title) : 'Last video') + '"><span>Next</span> ›</button>' +
-      '</nav>' : '';
+        '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-video-nav="next" data-index="' + Math.min(videos.length - 1, index + 1) + '"' + (index === videos.length - 1 ? ' disabled' : '') + ' aria-label="Next video' + (index < videos.length - 1 ? ': ' + esc(videos[index + 1].title) : '') + '" title="' + (index < videos.length - 1 ? 'Next: ' + esc(videos[index + 1].title) : 'Last video') + '"><span>Next</span> ›</button>' : '') +
+      boundary + '</nav>' : '';
     var canWatchVideo = !!(accountStatus.user && accountStatus.videoReady);
     var isNative = typeof window !== 'undefined' && window.CciNative && window.CciNative.isNative;
     var tokenParam = canWatchVideo && isNative && account && typeof account.playbackTicket === 'function' ? account.playbackTicket(video && video.id) : '';
@@ -4586,6 +4627,9 @@
           render(true);
           restoreLessonVideoSelectionFocus(videoNavigationDirection);
         }
+        break;
+      case 'lesson-video-next-lesson':
+        openNextLesson();
         break;
       case 'lesson-video-play':
         var lessonVideoElement = document.getElementById('lesson-video-player');
