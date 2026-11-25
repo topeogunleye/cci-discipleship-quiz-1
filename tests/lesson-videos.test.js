@@ -859,17 +859,21 @@ test('hybrid video study scopes questions to active video and preserves Section 
   const linksSingle = t.parseReferenceLinks(refSingle, 'd-discipleship-experience-section-12-church-history');
   assert.equal(linksSingle.length, 1);
   assert.equal(linksSingle[0].timeStr, '01:35');
+  assert.equal(linksSingle[0].endTimeStr, '02:50');
+  assert.equal(linksSingle[0].rangeStr, '01:35–02:50');
   assert.equal(linksSingle[0].timeSec, 95);
   assert.equal(linksSingle[0].video.id, 'section-12-baptism-i');
 
-  // 2. Render reference note with 3s pre-roll (95 - 3 = 92)
+  // 2. Render reference note with 3s pre-roll (95 - 3 = 92) and complete range
   const cardWithRef = { id: 'c-test', ref: refSingle };
   const htmlRef = t.renderReferenceNote(cardWithRef, 'd-discipleship-experience-section-12-church-history');
   assert.match(htmlRef, /class="ref-timestamp-btn"/);
   assert.match(htmlRef, /data-act="seek-video-reference"/);
   assert.match(htmlRef, /data-video-id="section-12-baptism-i"/);
   assert.match(htmlRef, /data-time="92"/);
-  assert.match(htmlRef, /BAPTISM I · 01:35/);
+  assert.match(htmlRef, /BAPTISM I · 01:35–02:50/);
+  assert.match(htmlRef, /aria-label="Watch video from 01:35 to 02:50"/);
+  assert.match(htmlRef, /title="Watch video from 01:35 to 02:50 \(with 3s lead-in\)"/);
 
   // 3. Multi-video reference parsing
   const refMulti = 'HOW TO ATTRACT ANGELS I — [13:17] - [14:06]; HOW TO ATTRACT ANGELS II — [03:27] - [04:50]';
@@ -877,10 +881,68 @@ test('hybrid video study scopes questions to active video and preserves Section 
   assert.equal(linksMulti.length, 2);
   assert.equal(linksMulti[0].video.id, 'section-12-how-to-attract-angels-i');
   assert.equal(linksMulti[0].timeStr, '13:17');
+  assert.equal(linksMulti[0].endTimeStr, '14:06');
+  assert.equal(linksMulti[0].rangeStr, '13:17–14:06');
   assert.equal(linksMulti[1].video.id, 'section-12-how-to-attract-angels-ii');
   assert.equal(linksMulti[1].timeStr, '03:27');
+  assert.equal(linksMulti[1].endTimeStr, '04:50');
+  assert.equal(linksMulti[1].rangeStr, '03:27–04:50');
 
-  // 4. Non-timestamp fallback
+  // 4. Multi-clip parsing for single video (distinct 1-minute clips)
+  const refMultiClip = 'Repentance — 06:53–08:04; 13:36–14:40';
+  const linksMultiClip = t.parseReferenceLinks(refMultiClip, 'd-discipleship-experience-section-1-soteriology');
+  assert.equal(linksMultiClip.length, 2);
+  assert.equal(linksMultiClip[0].video.id, 'section-01-repentance');
+  assert.equal(linksMultiClip[0].timeStr, '06:53');
+  assert.equal(linksMultiClip[0].endTimeStr, '08:04');
+  assert.equal(linksMultiClip[0].rangeStr, '06:53–08:04');
+  assert.equal(linksMultiClip[1].video.id, 'section-01-repentance');
+  assert.equal(linksMultiClip[1].timeStr, '13:36');
+  assert.equal(linksMultiClip[1].endTimeStr, '14:40');
+  assert.equal(linksMultiClip[1].rangeStr, '13:36–14:40');
+
+  const htmlMultiClip = t.renderReferenceNote({ id: 'c-multi-clip', ref: refMultiClip }, 'd-discipleship-experience-section-1-soteriology');
+  assert.match(htmlMultiClip, /REPENTANCE · 06:53–08:04/);
+  assert.match(htmlMultiClip, /REPENTANCE · 13:36–14:40/);
+  assert.equal((htmlMultiClip.match(/class="ref-timestamp-btn"/g) || []).length, 2);
+
+  // 5. Soteriology Q19 preserves end timestamps for all lessons
+  const refQ19 = 'Born Again — 08:30–10:54; Original Sin — 08:41–09:41; Repentance — 06:53–08:04; 13:36–14:40; Justification — 05:03–06:07; 09:24–10:31; Righteousness — 01:48–03:34; 05:11–06:53';
+  const linksQ19 = t.parseReferenceLinks(refQ19, 'd-discipleship-experience-section-1-soteriology');
+  assert.equal(linksQ19.length, 8);
+  const expectedQ19 = [
+    { title: 'BORN AGAIN', rangeStr: '08:30–10:54', endTimeStr: '10:54' },
+    { title: 'ORIGINAL SIN', rangeStr: '08:41–09:41', endTimeStr: '09:41' },
+    { title: 'REPENTANCE', rangeStr: '06:53–08:04', endTimeStr: '08:04' },
+    { title: 'REPENTANCE', rangeStr: '13:36–14:40', endTimeStr: '14:40' },
+    { title: 'JUSTIFICATION', rangeStr: '05:03–06:07', endTimeStr: '06:07' },
+    { title: 'JUSTIFICATION', rangeStr: '09:24–10:31', endTimeStr: '10:31' },
+    { title: 'RIGHTEOUSNESS', rangeStr: '01:48–03:34', endTimeStr: '03:34' },
+    { title: 'RIGHTEOUSNESS', rangeStr: '05:11–06:53', endTimeStr: '06:53' }
+  ];
+  linksQ19.forEach((link, idx) => {
+    assert.equal(link.video.title, expectedQ19[idx].title);
+    assert.equal(link.rangeStr, expectedQ19[idx].rangeStr);
+    assert.equal(link.endTimeStr, expectedQ19[idx].endTimeStr);
+  });
+  const htmlQ19 = t.renderReferenceNote({ id: 'c-q19', ref: refQ19 }, 'd-discipleship-experience-section-1-soteriology');
+  assert.match(htmlQ19, /BORN AGAIN · 08:30–10:54/);
+  assert.match(htmlQ19, /ORIGINAL SIN · 08:41–09:41/);
+  assert.match(htmlQ19, /REPENTANCE · 06:53–08:04/);
+  assert.match(htmlQ19, /REPENTANCE · 13:36–14:40/);
+  assert.match(htmlQ19, /JUSTIFICATION · 05:03–06:07/);
+  assert.match(htmlQ19, /JUSTIFICATION · 09:24–10:31/);
+  assert.match(htmlQ19, /RIGHTEOUSNESS · 01:48–03:34/);
+  assert.match(htmlQ19, /RIGHTEOUSNESS · 05:11–06:53/);
+
+  // 6. Single timestamp / open-ended reference formats
+  const refOpenEnded = 'TRINITY II — [14:03]–end of transcript (approximate boundary)';
+  const linksOpen = t.parseReferenceLinks(refOpenEnded, 'd-discipleship-experience-section-12-church-history');
+  assert.equal(linksOpen[0].timeStr, '14:03');
+  assert.equal(linksOpen[0].endTimeStr, null);
+  assert.equal(linksOpen[0].rangeStr, '14:03');
+
+  // 7. Non-timestamp fallback
   const refNoTime = 'Not found in the provided sources — N/A';
   const htmlNoTime = t.renderReferenceNote({ id: 'c-none', ref: refNoTime });
   assert.doesNotMatch(htmlNoTime, /ref-timestamp-btn/);
