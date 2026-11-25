@@ -2296,7 +2296,7 @@
             '</div>' +
             '<button type="button" class="desktop-lesson-open" data-act="open-chapter" data-id="' + d.id + '" aria-label="Open lesson ' + esc(parsed.topic) + '">' +
               '<strong class="desktop-lesson-title">' + esc(parsed.topic) + '</strong>' +
-              '<span class="desktop-lesson-card-bottom"><span>' + plural(total, 'card') + '</span><strong>' + pct + '%</strong></span>' +
+              '<span class="desktop-lesson-card-bottom"><span>' + plural(total, 'card') + '</span> <strong>' + pct + '%</strong></span>' +
               '<span class="desktop-lesson-progress" role="progressbar" aria-label="' + esc(parsed.topic) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></span>' +
             '</button>' +
           '</article>';
@@ -3734,7 +3734,7 @@
     var view = (V.name === 'exam' ? views.quiz : views[V.name]);
     if (typeof view !== 'function') view = views.home;
     var tabBarHtml = isMainTab ? renderTabBar(V.name) : '';
-    var showRocket = (V.name === 'home' || V.name === 'journey');
+    var showRocket = (V.name === 'home');
     var rocketHtml = showRocket ? renderRocketFab() : '';
     app.innerHTML = banner() +
       '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + (animateRouteChange ? ' app-screen-enter' : '') + '">' +
