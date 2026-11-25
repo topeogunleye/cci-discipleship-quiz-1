@@ -697,21 +697,26 @@
     var index = visit ? videos.findIndex(function (video) { return video.id === visit.videoId; }) : -1;
     return { name: 'lesson-video', id: deckId, videoIndex: index < 0 ? 0 : index, videoTime: index < 0 ? 0 : visit.time };
   }
-  function nextLessonDestination(deckId) {
+  function adjacentLessonDestination(deckId, direction) {
     // Use the curriculum order, including missing lessons; never skip to a later recording.
     var index = STARTER_DECKS.findIndex(function (source) { return 'd-' + slug(source.title) === deckId; });
     if (index < 0) return { kind: 'unknown' };
-    if (index === STARTER_DECKS.length - 1) return { kind: 'last' };
-    var source = STARTER_DECKS[index + 1], id = 'd-' + slug(source.title), next = deck(id);
+    var targetIndex = index + (direction === 'previous' ? -1 : 1);
+    if (targetIndex < 0) return { kind: 'first' };
+    if (targetIndex >= STARTER_DECKS.length) return { kind: 'last' };
+    var source = STARTER_DECKS[targetIndex], id = 'd-' + slug(source.title), next = deck(id);
     var title = MobileStudy.parseChapterTitle(source.title).topic;
     if (!next) return { kind: 'missing', title: title };
     return { kind: lessonVideosForDeck(id).length ? 'video' : 'chapter', id: id, title: title };
   }
-  function openNextLesson() {
-    if (V.name !== 'lesson-video') return;
+  function nextLessonDestination(deckId) { return adjacentLessonDestination(deckId, 'next'); }
+  function previousLessonDestination(deckId) { return adjacentLessonDestination(deckId, 'previous'); }
+  function openAdjacentLesson(direction) {
+    if (V.name !== 'lesson-video' || pendingSessionStart || pendingSessionResume) return;
     var videos = lessonVideosForDeck(V.id);
-    if (videos.length && (V.videoIndex || 0) < videos.length - 1) return;
-    var next = nextLessonDestination(V.id);
+    var index = Math.max(0, Math.min(V.videoIndex || 0, videos.length - 1));
+    if (videos.length && (direction === 'previous' ? index !== 0 : index !== videos.length - 1)) return;
+    var next = adjacentLessonDestination(V.id, direction);
     if (next.kind !== 'video' && next.kind !== 'chapter') return;
     var player = document.getElementById('lesson-video-player');
     rememberLessonVideoVisit(V.id, videos[V.videoIndex || 0], player ? player.currentTime : undefined);
@@ -720,21 +725,37 @@
     if (V.videoStudy && !V.videoStudy.results) saveActiveSession();
     closeModal();
     go(next.kind === 'video'
-      ? { name: 'lesson-video', id: next.id, videoIndex: 0, videoTime: 0 }
+      ? { name: 'lesson-video', id: next.id, videoIndex: direction === 'previous' ? lessonVideosForDeck(next.id).length - 1 : 0, videoTime: 0 }
       : { name: 'chapter', id: next.id });
-    if (next.kind === 'video') restoreLessonVideoSelectionFocus('next');
+    if (next.kind === 'video') restoreLessonVideoSelectionFocus('lesson');
     else {
       var heading = app.querySelector('.chapter-view-title');
       if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
     }
   }
+  function openNextLesson() { openAdjacentLesson('next'); }
+  function openPreviousLesson() { openAdjacentLesson('previous'); }
+  function lessonVideoDirectionButton(direction, videos, index, deckId) {
+    var previous = direction === 'previous', label = previous ? 'Previous' : 'Next';
+    var boundary = !videos.length || (previous ? index === 0 : index === videos.length - 1);
+    if (!boundary) {
+      var target = index + (previous ? -1 : 1);
+      return '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-video-nav="' + direction + '" data-index="' + target + '" aria-label="' + label + ' video: ' + esc(videos[target].title) + '">' + (previous ? '‹ ' : '') + label + ' video' + (previous ? '' : ' ›') + '</button>';
+    }
+    var adjacent = adjacentLessonDestination(deckId, direction), available = adjacent.kind === 'video' || adjacent.kind === 'chapter';
+    var title = adjacent.title || (adjacent.kind === 'first' ? 'First lesson' : adjacent.kind === 'last' ? 'Final lesson' : 'No adjacent lesson');
+    var note = adjacent.kind === 'chapter' ? 'No video available · Open lesson overview' : adjacent.kind === 'missing' ? 'Unavailable on this device' : '';
+    var name = label + ' lesson' + (adjacent.title ? ': ' + adjacent.title : ' · ' + title) + (note ? '. ' + note : '');
+    return '<button type="button" class="btn lesson-video-nav-button lesson-video-lesson-button' + (available && !previous ? ' primary' : '') + '" data-video-nav="' + direction + '"' + (available ? ' data-act="lesson-video-' + direction + '-lesson"' : ' disabled') + ' aria-label="' + esc(name) + '"><span>' + (previous ? '‹ ' : '') + label + ' lesson' + (adjacent.title ? ':' : '') + '</span><span class="lesson-video-destination">' + esc(title) + (previous || !available ? '' : ' ›') + '</span>' + (note ? '<span class="lesson-video-boundary-note">' + esc(note) + '</span>' : '') + '</button>';
+  }
   function restoreLessonVideoSelectionFocus(direction) {
     var navigation = app.querySelector('.lesson-video-navigation');
     if (navigation && direction) {
-      var button = navigation.querySelector('[data-video-nav="' + direction + '"]');
-      if (!button || button.disabled) button = navigation.querySelector('button:not([disabled])');
+      var button = direction === 'next' || direction === 'previous' ? navigation.querySelector('[data-video-nav="' + direction + '"]') : null;
+      var contextHeading = document.getElementById('lesson-video-navigation-context');
       navigation.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
-      if (button) button.focus({ preventScroll: true });
+      if (button && !button.disabled) button.focus({ preventScroll: true });
+      else if (contextHeading) contextHeading.focus({ preventScroll: true });
       return;
     }
     var header = app.querySelector('.lesson-video-topbar');
@@ -2536,22 +2557,14 @@
     var videos = lessonVideosForDeck(d.id), index = Math.max(0, Math.min(Number.isInteger(V.videoIndex) ? V.videoIndex : 0, videos.length - 1));
     var video = videos[index] || null, title = video ? video.title : parsed.topic + ' video lesson';
     rememberLessonVideoVisit(d.id, video, V.videoTime);
-    var boundary = '';
-    if (!video || index === videos.length - 1) {
-      var nextLesson = nextLessonDestination(d.id);
-      boundary = '<div class="lesson-video-boundary">' +
-        (nextLesson.kind === 'video' || nextLesson.kind === 'chapter'
-          ? '<button type="button" class="btn primary lesson-video-next-lesson" data-act="lesson-video-next-lesson">Next lesson: ' + esc(nextLesson.title) + ' →' + (nextLesson.kind === 'chapter' ? '<span class="lesson-video-boundary-note">No video available · Open lesson overview</span>' : '') + '</button>'
-          : (nextLesson.kind === 'missing' ? '<p class="note">Next lesson: ' + esc(nextLesson.title) + ' is unavailable on this device.</p>' : '') +
-            '<button type="button" class="btn" data-act="nav-tab" data-tab="journey">' + (nextLesson.kind === 'last' ? 'Final lesson · ' : '') + 'Back to Journey</button>') +
-        '</div>';
-    }
-    var videoNavigation = videos.length > 1 || boundary
-      ? '<nav class="lesson-video-navigation" aria-label="Lesson video navigation">' +
-        (video ? '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-video-nav="previous" data-index="' + Math.max(0, index - 1) + '"' + (index === 0 ? ' disabled' : '') + ' aria-label="Previous video' + (index > 0 ? ': ' + esc(videos[index - 1].title) : '') + '" title="' + (index > 0 ? 'Previous: ' + esc(videos[index - 1].title) : 'First video') + '">‹ <span>Previous</span></button>' +
-        '<span class="lesson-video-position" aria-live="polite">Video ' + (index + 1) + ' of ' + videos.length + '</span>' +
-        '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-video-nav="next" data-index="' + Math.min(videos.length - 1, index + 1) + '"' + (index === videos.length - 1 ? ' disabled' : '') + ' aria-label="Next video' + (index < videos.length - 1 ? ': ' + esc(videos[index + 1].title) : '') + '" title="' + (index < videos.length - 1 ? 'Next: ' + esc(videos[index + 1].title) : 'Last video') + '"><span>Next</span> ›</button>' : '') +
-      boundary + '</nav>' : '';
+    var adjacentNext = nextLessonDestination(d.id), adjacentPrevious = previousLessonDestination(d.id);
+    var showJourney = !videos.length || (index === videos.length - 1 && ['last', 'missing', 'unknown'].indexOf(adjacentNext.kind) >= 0) || (index === 0 && ['missing', 'unknown'].indexOf(adjacentPrevious.kind) >= 0);
+    var contextLabel = 'Lesson ' + section + ': ' + parsed.topic + '. ' + (video ? 'Video ' + (index + 1) + ' of ' + videos.length + ': ' + title : 'No recordings available');
+    var videoNavigation = '<nav class="lesson-video-navigation" aria-label="Video and lesson navigation">' +
+      lessonVideoDirectionButton('previous', videos, index, d.id) +
+      '<h2 class="lesson-video-position" id="lesson-video-navigation-context" data-video-nav="lesson" tabindex="-1" aria-live="polite" aria-label="' + esc(contextLabel) + '">' + (video ? 'Video ' + (index + 1) + ' of ' + videos.length : 'No recordings') + '</h2>' +
+      lessonVideoDirectionButton('next', videos, index, d.id) +
+      (showJourney ? '<div class="lesson-video-boundary"><button type="button" class="btn" data-act="nav-tab" data-tab="journey">' + (adjacentNext.kind === 'last' && index === videos.length - 1 ? 'Final lesson · ' : '') + 'Back to Journey</button></div>' : '') + '</nav>';
     var canWatchVideo = !!(accountStatus.user && accountStatus.videoReady);
     var isNative = typeof window !== 'undefined' && window.CciNative && window.CciNative.isNative;
     var tokenParam = canWatchVideo && isNative && account && typeof account.playbackTicket === 'function' ? account.playbackTicket(video && video.id) : '';
@@ -4627,6 +4640,9 @@
           render(true);
           restoreLessonVideoSelectionFocus(videoNavigationDirection);
         }
+        break;
+      case 'lesson-video-previous-lesson':
+        openPreviousLesson();
         break;
       case 'lesson-video-next-lesson':
         openNextLesson();

@@ -1,46 +1,35 @@
-# Navigation from the final recording to the next lesson
+# Video and lesson navigation
 
-## Baseline
+## Behavior
 
-Started from clean `main`, commit `23ab0b7`, matching the locally recorded `origin/main` and the preceding successful production deployment. Implementation branch: `codex/next-lesson-video-navigation`. Runtime equivalence with production was not independently checked in this task. Session-switching improvements are retained.
+Previous/Next navigate recordings within the current lesson. At the first recording, Previous becomes **Previous lesson: [title]**. At the last recording, Next becomes **Next lesson: [title]**. The former separate Next lesson row is removed.
 
-Before: Previous/Next only selected recordings within the current chapter. Next was disabled on the last recording, and there was no adjacent lesson transition. Single-video chapters had no Previous/Next navigation. Learners could return to the chapter or Journey to find another lesson.
+Lesson destinations follow the manifest-loaded curriculum order. Previous lesson opens that lesson's final recording at 0:00 paused; Next lesson opens its first recording at 0:00 paused. An earlier visit selection does not override these explicit destinations. Ordinary chapter-entry visit resume remains unchanged.
 
-Inspection traced the manifest-loaded `STARTER_DECKS` order, existing lesson-detail navigation, recording groups and visit-only selection, route history, player creation, sign-in return links, and practice snapshots. All twelve current curriculum lessons have recordings. The transition uses the curriculum order already used by lesson-detail navigation, rather than guessing from recording titles or skipping to the next available video.
+Single-video lessons expose both lesson directions. If an adjacent lesson has no recordings, its button explicitly offers the lesson overview. If that lesson is missing locally, its destination is named as unavailable and Journey is offered; no lesson is silently skipped. At the first/final curriculum lesson, the unavailable direction is disabled with explicit context. The final lesson offers Back to Journey without wrapping or implying completion. Custom decks do not receive guessed curriculum destinations.
 
-## Result and tradeoffs
+## Focus and responsive layout
 
-- On the final recording, **Next lesson: [lesson title]** appears immediately within the existing video navigation. Previous and disabled Next still clearly refer to recordings in the current lesson.
-- The action opens the immediately following lesson at recording index 0 and time 0, without an autoplay flag. Existing player markup has no autoplay attribute. A previous visit to that destination's later recording does not override this explicit choice. Ordinary chapter-entry resume behavior remains unchanged.
-- The action occupies a wrapping row in the same navigation group. That group retains its existing top-right placement from 1024px and below-player placement on smaller screens. Keeping the full lesson name on a separate row avoids squeezing the recording controls. The desktop group has a bounded width; narrow layouts allow text to wrap. The new action uses existing theme-aware buttons and a 48px minimum height.
-- After transitioning, the existing navigation-focus helper brings controls into view and focuses Next video (or an available boundary action for a single-video lesson). The existing button focus outlines remain in use.
-- If the immediately following lesson has no recordings, the action explicitly says **No video available · Open lesson overview** and opens that lesson's chapter page. It does not skip the lesson. If the lesson itself is missing locally, a message identifies it and offers Journey, without inventing a target.
-- The final lesson offers **Final lesson · Back to Journey**. No wraparound or completion claim is introduced. A custom deck outside the curriculum offers Journey without calling it the final curriculum lesson. A current chapter with no recording avoids a fake video count and exposes the same explicit boundary fallback.
-- Outgoing playback is paused and its current visit position is retained. Navigation does not write learning progress, submit answers, complete a lesson, or replace paused practice. An active practice snapshot is saved before leaving if present.
+Within a lesson, focus stays on the selected direction's control, including when it becomes a lesson action. A disabled endpoint focuses the navigation context instead of the opposite direction. This fixes the audited sequence where advancing to the last recording focused Previous and another Enter moved backward.
 
-Authentication and private playback endpoints, captions, transcripts, Bible references, scoring, session-switching guards, persisted storage keys and recording metadata are unchanged. No dependencies, fonts or media downloads were added. The service-worker cache advances from v91 to v92 with its related test.
+Cross-lesson navigation focuses the navigation's programmatic context heading. Its visible text gives recording position; its accessible name identifies the lesson and recording. Enter on that heading does not activate another video or lesson. This placement keeps context and controls visible in short landscape layouts. Background video-page renders preserve this focus.
 
-## Verification
+At 1024px and wider, the existing navigation instance moves to the header's right side. Smaller layouts retain it below the player. A three-column grid aligns directional controls around the count; at 700px and below, the count sits above two equal-width controls. Destination titles wrap, and paired controls stretch to equal height. Existing CCI theme styles, fonts and focus outlines remain in use.
 
-Passed: `npm run build`, `npm test` (37 test files), `node tests/next-lesson-navigation.test.js` (10 focused tests), and `git diff --check`.
+## Data and playback preservation
 
-Focused tests exercise rendered HTML and actual application handlers in an isolated JavaScript VM with DOM/media stubs. They cover ordinary navigation and group boundaries, multi/single-video boundaries, all twelve real curriculum transitions, forcing first recording/time zero, preserving progress and unfinished work, guest/player gating and sign-in return index, no-video and missing lessons, the final lesson, history route changes and reload URL decoding.
+Outgoing media is paused and its visit-only position is retained. Explicit lesson transitions save active unfinished practice when needed, without submitting answers, changing scores or marking a lesson complete. Paused sessions, recorded learning progress, authentication, protected media endpoints, captions, transcripts, Bible references, video IDs/titles/groups/order, and ordinary resume actions are preserved. No cloud schema or storage-key migration is required.
 
-These are automated behavior checks, not browser playback or real-device evidence. Browser runtime initialization returned **“Local browser access is unavailable for this chat.”** Consequently:
+No dependencies, fonts or media precaches were added. Service-worker cache version advances from v92 to v93 with its related test.
 
-- Before/after browser screenshots could not be captured. The before state is documented from baseline source; after markup and behavior are exercised by tests.
-- Rendered checks at 360×800, 390×844, 768×1024, 1024×768, 1440×900, short landscape, light/dark/automatic themes, zoom, focus visibility, touch sizing and overflow remain blocked.
-- Actual authorized playback, captions, native player pause state, real Back/Forward/reload, and interactive sign-in return remain unverified. Route and authentication-state tests use isolated fixtures; no production learner data was changed.
+## Validation
 
-Browser follow-up should use an isolated guest profile/test account. Start at a lesson's final recording, select Next lesson, confirm first recording at 0:00 paused, then exercise Previous/Next repeatedly and Back/Forward/reload. Repeat with long titles and each viewport/theme. Use local fixtures for missing-video and final/single-video edge cases. Verify saved practice resumes unchanged.
+Implementation branch: `codex/boundary-aware-lesson-navigation`, based on clean `main` at `9e95e55`. Focused tests cover bidirectional destinations, scope preservation, missing/single-video cases, curriculum endpoints, history, directional focus and context focus across background renders. Existing video-scope assertions reflect the new explicit controls and heading.
 
-## Files
+The local static preview was checked in an isolated Chrome profile through Playwright. Browser checks cover forward/backward lesson transitions, the audited keyboard sequence, safe final-endpoint behavior, Back/Forward/reload, and guest-only unfinished flashcard practice at card 2 of 6. Content-only browser response fixtures exercise single-video and missing-video lessons without modifying server data or authentication.
 
-- `js/app.js`: curriculum boundary resolver, transition handler, final-recording navigation and explicit fallback markup.
-- `style.css`: wrapping boundary action, desktop width bound and mobile grid placement.
-- `service-worker.js`, `tests/pwa.test.js`: v92 refresh.
-- `tests/next-lesson-navigation.test.js`: focused regression coverage.
-- Generated `dist/app/index.html`, `dist/js/app.js`, `dist/style.css`, `dist/service-worker.js`.
-- This report.
+The 56-state matrix covers first/last recordings at 360×800, 390×844, 768×1024, 1024×768, 1440×900, 800×360 and 844×390 CSS pixels in light, dark, automatic-light and automatic-dark states. It showed no horizontal overflow, aligned control pairs and navigation target heights above 48px. These are desktop-browser simulations, not real-device tests.
+
+The in-app Browser connection remains unavailable. Private media, fullscreen, actual captions, full authenticated sign-in return, real screen-reader output and native browser zoom remain unverified. The static preview has no live auth/functions backend. Authentication and private playback unit tests remain relevant, but do not replace an authorized media check. No production learner data was changed.
 
 No commit, push, merge or deployment was performed for this implementation.

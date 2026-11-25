@@ -105,7 +105,7 @@ test('short-screen player fit uses header position and survives scroll without r
   assert.equal(page.querySelector('.lesson-video-frame'), frame);
 });
 
-test('repeated navigation keeps the same direction focused and falls back at boundaries', () => {
+test('repeated navigation preserves direction and uses context at disabled endpoints, never the opposite control', () => {
   const calls = [];
   const previous = { disabled: false, focus: options => calls.push(['previous', options.preventScroll]) };
   const next = { disabled: false, focus: options => calls.push(['next', options.preventScroll]) };
@@ -117,16 +117,19 @@ test('repeated navigation keeps the same direction focused and falls back at bou
     },
     scrollIntoView: options => calls.push(['scroll', options.block, options.behavior])
   };
-  const ctx = context({ app: { querySelector: () => nav }, returnToLessonVideo: () => assert.fail('must not scroll to the player after Previous/Next') });
+  const heading = { focus: options => calls.push(['context', options.preventScroll]) };
+  const ctx = context({ app: { querySelector: () => nav }, document: { getElementById: id => { assert.equal(id, 'lesson-video-navigation-context'); return heading; } }, returnToLessonVideo: () => assert.fail('must not scroll to the player after Previous/Next') });
   ctx.restoreLessonVideoSelectionFocus('next');
   ctx.restoreLessonVideoSelectionFocus('next');
   assert.deepEqual(calls.slice(0, 4), [['scroll', 'nearest', 'instant'], ['next', true], ['scroll', 'nearest', 'instant'], ['next', true]]);
   next.disabled = true;
   ctx.restoreLessonVideoSelectionFocus('next');
-  assert.deepEqual(calls.at(-1), ['previous', true]);
+  assert.deepEqual(calls.at(-1), ['context', true]);
   next.disabled = false; previous.disabled = true;
   ctx.restoreLessonVideoSelectionFocus('previous');
-  assert.deepEqual(calls.at(-1), ['next', true]);
+  assert.deepEqual(calls.at(-1), ['context', true]);
+  ctx.restoreLessonVideoSelectionFocus('lesson');
+  assert.deepEqual(calls.at(-1), ['context', true], 'cross-lesson arrival announces context instead of focusing another jump');
 });
 
 test('catalog selection reveals desktop navigation or the smaller-screen recording heading', () => {
@@ -180,6 +183,12 @@ test('a background video-page render preserves existing navigation focus', () =>
   ctx.render(true);
   assert.equal(document.activeElement, button);
   assert.equal(adjustments, 1);
+  const heading = { focus: () => { document.activeElement = heading; } };
+  document.activeElement = { getAttribute: () => 'lesson' };
+  document.getElementById = id => id === 'lesson-video-navigation-context' ? heading : null;
+  ctx.render(true);
+  assert.equal(document.activeElement, heading, 'a background render retains the lesson-arrival context');
+  assert.equal(adjustments, 2);
   ctx.render(false);
   assert.equal(document.activeElement, document.body, 'an ordinary route render must not steal focus');
 });
