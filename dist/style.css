@@ -9785,7 +9785,7 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
   .lesson-video-section-count { grid-column: 2; grid-row: 1; }
   .lesson-video-top-title { grid-column: 1; grid-row: 2; text-align: left; min-width: 0; }
   .lesson-video-top-title h1 { margin: 4px 0 0; font-size: clamp(1.2rem,1.7vw,1.65rem); line-height: 1.25; overflow-wrap: anywhere; }
-  .lesson-video-topbar > .lesson-video-navigation { grid-column: 2; grid-row: 2; margin: 0; width: auto; gap: 10px; }
+  .lesson-video-topbar > .lesson-video-navigation { grid-column: 2; grid-row: 2; margin: 0; width: auto; max-width: min(42vw, 400px); gap: 10px; }
   .lesson-video-topbar .lesson-video-nav-button { min-width: 112px; }
   .lesson-video-topbar .lesson-video-position { min-width: 96px; }
   .lesson-video-summary-copy > .eyebrow { display: none; }
@@ -9844,3 +9844,13 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 }
 .session-switch-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
 .session-switch-actions .btn { min-height: 48px; white-space: normal; line-height: 1.4; }
+
+/* The lesson boundary shares the existing responsive video navigation. */
+.lesson-video-navigation { flex-wrap: wrap; }
+.lesson-video-boundary { flex: 1 0 100%; min-width: 0; grid-column: 1 / -1; }
+.lesson-video-boundary .btn { display: block; width: 100%; min-height: 48px; white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+.lesson-video-boundary-note { display: block; font-size: var(--text-sm); font-weight: 400; }
+@media (max-width: 700px) {
+  .lesson-video-navigation [data-video-nav="next"] { grid-column: 2; grid-row: 2; }
+  .lesson-video-boundary { grid-row: 3; }
+}
