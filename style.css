@@ -5922,11 +5922,31 @@ html[data-theme="dark"] .picker-selection-footer {
   box-shadow: var(--shadow-card);
 }
 
-.mobile-home-content .desktop-lesson-card-top strong {
-  font-size: 0.92rem;
+.mobile-home-content .desktop-lesson-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
 }
 
-.mobile-home-content .desktop-lesson-section,
+.mobile-home-content .desktop-lesson-section {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.23);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.mobile-home-content .desktop-lesson-title,
+.mobile-home-content .desktop-lesson-card-top strong {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
 .mobile-home-content .desktop-lesson-progress {
   display: none;
 }
@@ -6272,14 +6292,15 @@ html[data-theme="dark"] .picker-selection-footer {
     box-shadow: var(--shadow-card);
   }
 
-  .desktop-shell-home .desktop-lesson-card-top,
-  .desktop-shell-home .desktop-lesson-card-bottom {
+  .desktop-shell-home .desktop-lesson-card-top {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 8px;
+    width: 100%;
   }
 
+  .desktop-shell-home .desktop-lesson-title,
   .desktop-shell-home .desktop-lesson-card-top strong {
     font-size: .95rem;
     font-weight: 700;
@@ -6720,14 +6741,15 @@ html[data-theme="dark"] .picker-selection-footer {
     box-shadow: var(--shadow-lg);
   }
 
-  .desktop-lesson-card-top,
-  .desktop-lesson-card-bottom {
+  .desktop-lesson-card-top {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 10px;
+    width: 100%;
   }
 
+  .desktop-lesson-title,
   .desktop-lesson-card-top strong {
     min-width: 0;
     font-size: var(--text-md);
@@ -9880,9 +9902,12 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 .desktop-plan-summary { cursor: default; }
 .desktop-plan-summary:hover { transform: none; box-shadow: var(--shadow-card); }
 .desktop-lesson-card { cursor: default; }
-.desktop-lesson-open { display: flex; flex: 1; flex-direction: column; align-items: stretch; gap: 12px; min-width: 0; min-height: 44px; width: 100%; padding: 0; background: transparent; border: 0; color: inherit; text-align: left; cursor: pointer; font: inherit; }
-.desktop-lesson-details { align-self: flex-end; min-height: 44px; padding: 8px 4px; margin-top: 4px; background: transparent; border: 0; color: inherit; font: inherit; font-size: var(--text-sm); text-decoration: underline; cursor: pointer; }
+.desktop-lesson-open { display: flex; flex: 1; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 8px; min-width: 0; width: 100%; padding: 0; background: transparent; border: 0; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.desktop-lesson-info-btn { width: 32px; height: 32px; min-height: 32px; min-width: 32px; padding: 0; border-radius: var(--radius-full); background: rgba(255, 255, 255, 0.18); border: 1px solid rgba(255, 255, 255, 0.25); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: transform var(--duration-fast) ease, background var(--duration-fast) ease; }
+.desktop-lesson-info-btn:hover { background: rgba(255, 255, 255, 0.35); transform: scale(1.08); }
+.desktop-lesson-info-btn svg { display: block; }
 .desktop-lesson-card button:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; border-radius: 4px; }
+.desktop-lesson-info-btn:focus-visible { border-radius: var(--radius-full); }
 .session-switch-header { position: sticky; top: -24px; z-index: 1; display: flex; align-items: flex-start; gap: 12px; margin: -24px -24px 16px; padding: 24px 24px 12px; background: var(--surface); }
 .session-switch-header h2 { flex: 1; min-width: 0; margin: 0; }
 .session-switch-header .btn { flex-shrink: 0; min-height: 44px; }
@@ -9891,9 +9916,8 @@ html[data-theme="dark"] .practice-cover-tile.is-selected {
 .exam-summary-return .btn { min-height: 48px; }
 .storage-details summary { cursor: pointer; padding-block: 12px; }
 .account-message:empty { margin: 0; }
-.desktop-shell-home .desktop-lesson-card { gap: 4px; }
+.desktop-shell-home .desktop-lesson-card { gap: 8px; }
 .desktop-lesson-open { gap: 8px; }
-.desktop-lesson-details { margin-top: 0; }
 .study-pause-label { display: none; }
 @media (min-width: 701px) {
   .study-header .study-close-btn[data-act="pause-session"] { width: auto; gap: 8px; padding-inline: 14px; }

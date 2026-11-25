@@ -2287,11 +2287,19 @@
           var total = d.cards.length;
           var pct = total ? Math.round(100 * mastered / total) : 0;
           var gradient = 'deck-grad-' + (((sectionNum - 1) % 12) + 1);
-          return '<article class="desktop-lesson-card ' + gradient + '"><button type="button" class="desktop-lesson-open" data-act="open-chapter" data-id="' + d.id + '" aria-label="Open lesson ' + esc(parsed.topic) + '">' +
-            '<span class="desktop-lesson-card-top"><strong>' + esc(parsed.topic) + '</strong><span class="desktop-lesson-section">' + sectionNum + '/12</span></span>' +
-            '<span class="desktop-lesson-card-bottom"><span>' + plural(total, 'card') + '</span><strong>' + pct + '%</strong></span>' +
-            '<span class="desktop-lesson-progress" role="progressbar" aria-label="' + esc(parsed.topic) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></span>' +
-          '</button><button type="button" class="desktop-lesson-details" data-act="lesson-detail-open" data-id="' + d.id + '" aria-label="Details for ' + esc(parsed.topic) + '">Details</button></article>';
+          return '<article class="desktop-lesson-card ' + gradient + '">' +
+            '<div class="desktop-lesson-card-top">' +
+              '<span class="desktop-lesson-section">' + sectionNum + '/12</span>' +
+              '<button type="button" class="chapter-icon-btn chapter-info-btn desktop-lesson-info-btn" data-act="lesson-detail-open" data-id="' + d.id + '" aria-label="Details for ' + esc(parsed.topic) + '" title="View deck details">' +
+                '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' +
+              '</button>' +
+            '</div>' +
+            '<button type="button" class="desktop-lesson-open" data-act="open-chapter" data-id="' + d.id + '" aria-label="Open lesson ' + esc(parsed.topic) + '">' +
+              '<strong class="desktop-lesson-title">' + esc(parsed.topic) + '</strong>' +
+              '<span class="desktop-lesson-card-bottom"><span>' + plural(total, 'card') + '</span><strong>' + pct + '%</strong></span>' +
+              '<span class="desktop-lesson-progress" role="progressbar" aria-label="' + esc(parsed.topic) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></span>' +
+            '</button>' +
+          '</article>';
         }).join('') +
       '</div>' +
     '</section>';
