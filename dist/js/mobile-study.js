@@ -286,9 +286,10 @@
         id: 'weak',
         type: 'weak',
         title: 'No weak spots',
-        oneLine: 'Weak spots · 0 min',
+        oneLine: completedToday.weak ? 'Weak spots · Completed today' : 'Weak spots · Nothing to review',
         minuteEstimate: 0,
-        state: 'done',
+        state: completedToday.weak ? 'done' : 'empty',
+        statusText: completedToday.weak ? 'Completed today' : (allItems.some(function (item) { return item.record && item.record.attempts > 0; }) ? 'Nothing to review' : 'No missed answers yet'),
         action: 'weak',
         icon: 'target'
       });
@@ -348,8 +349,8 @@
       cards.push({
         id: 'exam',
         type: 'exam',
-        title: 'Challenge exam',
-        oneLine: 'Challenge exam · 15 min',
+        title: 'Comprehensive exam',
+        oneLine: 'Comprehensive exam · 15 min',
         minuteEstimate: 15,
         state: 'ready',
         action: 'exam',
@@ -447,7 +448,7 @@
       {
         id: 'flash',
         mode: 'flash',
-        title: 'Study Flashcards',
+        title: 'Flashcards',
         desc: 'Review concepts and Scripture references at your own pace',
         state: masteredCount === totalCards && totalCards > 0 ? 'complete' : (hasStudied ? 'in-progress' : 'unlocked'),
         action: 'setup',
@@ -457,7 +458,7 @@
       {
         id: 'quiz',
         mode: 'quiz',
-        title: 'Chapter Quiz',
+        title: 'Quiz',
         desc: 'Test your retention with instant feedback and explanations',
         state: progress && progress.best ? 'complete' : (quizUnlocked ? 'unlocked' : 'recommended-next'),
         action: 'setup',
@@ -467,21 +468,21 @@
       {
         id: 'weak',
         mode: 'weak',
-        title: 'Weak Spot Practice',
-        desc: weakCount > 0 ? 'Focus on questions you have previously missed' : 'Missed quiz questions will appear here for focused review.',
+        title: 'Weak spots',
+        desc: weakCount > 0 ? 'Focus on questions you have previously missed' : 'No missed answers yet. Study flashcards or take a quiz to build this list.',
         state: weakCount === 0 ? 'empty' : 'in-progress',
         action: 'chapter-weak',
-        meta: weakCount > 0 ? (weakCount + ' ' + (weakCount === 1 ? 'card' : 'cards') + ' to strengthen') : (attemptsCount > 0 ? 'No missed questions yet' : 'Quiz practice builds this list'),
+        meta: weakCount > 0 ? (weakCount + ' ' + (weakCount === 1 ? 'question' : 'questions') + ' to strengthen') : '',
         icon: 'target'
       },
       {
         id: 'exam',
         mode: 'exam',
-        title: 'Mastery Challenge',
-        desc: 'Comprehensive timed review for this chapter',
+        title: 'Timed exam',
+        desc: 'Comprehensive timed review for this lesson',
         state: masteredCount === totalCards && totalCards > 0 ? 'complete' : (examUnlocked ? 'unlocked' : 'unlocked'),
         action: 'chapter-exam',
-        meta: masteredCount >= totalCards && totalCards > 0 ? 'Chapter Mastered' : 'Open anytime',
+        meta: masteredCount >= totalCards && totalCards > 0 ? 'Lesson mastered' : 'Open anytime',
         icon: 'trophy'
       }
     ];
@@ -521,7 +522,7 @@
     } else {
       if (pct === 100) {
         title = 'Perfect Score!';
-        message = 'Flawless recall! Your knowledge of this discipleship chapter is rock solid.';
+        message = 'Flawless recall! Your knowledge of this discipleship lesson is rock solid.';
       } else if (pct >= 70) {
         title = 'Well done!';
         message = 'Terrific progress! You have a firm grasp of the core doctrines and teachings.';

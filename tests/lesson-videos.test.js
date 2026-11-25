@@ -275,11 +275,11 @@ test('only unambiguous, metadata-equivalent, or explicitly confirmed English SRT
 
 test('lesson video view clearly communicates chapter study scope and card counts', () => {
   const appSource = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
-  assert.match(appSource, /Chapter Flashcards \(' \+ d\.cards\.length \+ '\)/);
-  assert.match(appSource, /Chapter Quiz \(' \+ d\.cards\.length \+ '\)/);
-  assert.match(appSource, /aria-label="Study Chapter ' \+ section \+ ' \(/);
+  assert.match(appSource, /Lesson Flashcards \(' \+ d\.cards\.length \+ '\)/);
+  assert.match(appSource, /Lesson Quiz \(' \+ d\.cards\.length \+ '\)/);
+  assert.match(appSource, /aria-label="Study Lesson ' \+ section \+ ' \(/);
   assert.match(appSource, /aria-label="Practise this video"/);
-  assert.match(appSource, /aria-label="Whole chapter review"/);
+  assert.match(appSource, /aria-label="Whole lesson review"/);
   assert.match(appSource, /scopeNote = '<p class="note" style="margin-top:4px;margin-bottom:var\(--space-md\);">' \+/);
   assert.match(appSource, /Video Flashcards \(' \+ videoCards\.length \+ '\)/);
   assert.match(appSource, /Video Quiz \(' \+ videoCards\.length \+ '\)/);
@@ -777,8 +777,8 @@ test('hybrid video study scopes questions to active video and preserves Section 
   assert.equal((navigationMarkup.match(/data-video-nav="previous" disabled aria-label="Previous lesson · No adjacent lesson/g) || []).length, 1);
   assert.match(elements.app.innerHTML, /Video Flashcards \(1\)/);
   assert.match(elements.app.innerHTML, /Video Quiz \(1\)/);
-  assert.doesNotMatch(elements.app.innerHTML, /Chapter Flashcards/);
-  assert.doesNotMatch(elements.app.innerHTML, /Chapter Quiz/);
+  assert.doesNotMatch(elements.app.innerHTML, /Lesson Flashcards/);
+  assert.doesNotMatch(elements.app.innerHTML, /Lesson Quiz/);
 
   // 2. Final video (index 1): has both Video and Chapter buttons
   t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 1 });
@@ -786,21 +786,21 @@ test('hybrid video study scopes questions to active video and preserves Section 
   assert.equal((elements.app.innerHTML.match(/data-video-nav="next" disabled aria-label="Next lesson · No adjacent lesson/g) || []).length, 1, 'a custom deck without a curriculum destination has an explicit unavailable next lesson');
   assert.match(elements.app.innerHTML, /Video Flashcards \(1\)/);
   assert.match(elements.app.innerHTML, /Video Quiz \(1\)/);
-  assert.match(elements.app.innerHTML, /Chapter Flashcards \(2\)/);
-  assert.match(elements.app.innerHTML, /Chapter Quiz \(2\)/);
+  assert.match(elements.app.innerHTML, /Lesson Flashcards \(2\)/);
+  assert.match(elements.app.innerHTML, /Lesson Quiz \(2\)/);
 
   // 3. Intermediate video with 0 cards renders graceful fallback message
   testDeck.cards = [{ id: 'c2', question: 'Q2', ref: 'Part Two' }];
   t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 0 });
   t.render();
-  assert.match(elements.app.innerHTML, /Video practice questions in preparation · Chapter quiz available on the final lesson/);
+  assert.match(elements.app.innerHTML, /Video practice questions in preparation · Lesson quiz available on the final video/);
 
   // The final recording with no matching questions has only whole-chapter actions.
   testDeck.cards = [{ id: 'c1', question: 'Q1', ref: 'Part One' }];
   t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 1 });
   t.render();
   assert.doesNotMatch(elements.app.innerHTML, /aria-label="Practise this video"/);
-  assert.match(elements.app.innerHTML, /aria-label="Whole chapter review"/);
+  assert.match(elements.app.innerHTML, /aria-label="Whole lesson review"/);
 
   // Dynamic question count dropdown filtering
   // Roman numeral boundary matching: BAPTISM I must only match Part I, not II, III, IV, or V
@@ -826,7 +826,7 @@ test('hybrid video study scopes questions to active video and preserves Section 
   }
   testDeck.cards = cards27;
   t.setup('quiz', 'd-test', v1.id);
-  assert.match(elements.modal.innerHTML, /<option value="0">All cards \(27\)<\/option>/);
+  assert.match(elements.modal.innerHTML, /<option value="0">All 27 questions<\/option>/);
   assert.match(elements.modal.innerHTML, /<option value="10">10<\/option>/);
   assert.match(elements.modal.innerHTML, /<option value="20">20<\/option>/);
   assert.doesNotMatch(elements.modal.innerHTML, /<option value="30">30<\/option>/);
@@ -835,7 +835,7 @@ test('hybrid video study scopes questions to active video and preserves Section 
   // Case B: 8 questions (small count: offers 5, omits 10/20/30)
   testDeck.cards = cards27.slice(0, 8);
   t.setup('quiz', 'd-test', v1.id);
-  assert.match(elements.modal.innerHTML, /<option value="0">All cards \(8\)<\/option>/);
+  assert.match(elements.modal.innerHTML, /<option value="0">All 8 questions<\/option>/);
   assert.match(elements.modal.innerHTML, /<option value="5">5<\/option>/);
   assert.doesNotMatch(elements.modal.innerHTML, /<option value="10">10<\/option>/);
 
@@ -846,7 +846,7 @@ test('hybrid video study scopes questions to active video and preserves Section 
   }
   testDeck.cards = cards75;
   t.setup('quiz', 'd-test');
-  assert.match(elements.modal.innerHTML, /<option value="0">All cards \(75\)<\/option>/);
+  assert.match(elements.modal.innerHTML, /<option value="0">All 75 questions<\/option>/);
   assert.match(elements.modal.innerHTML, /<option value="10">10<\/option>/);
   assert.match(elements.modal.innerHTML, /<option value="20">20<\/option>/);
   assert.match(elements.modal.innerHTML, /<option value="30">30<\/option>/);

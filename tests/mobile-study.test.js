@@ -108,6 +108,7 @@ test('selectPlanCards marks cards as done when tasks are complete', () => {
   // All mastered so 3rd card suggests challenge exam
   assert.equal(plan[2].id, 'exam');
   assert.equal(plan[2].action, 'exam');
+  assert.equal(plan[2].title, 'Comprehensive exam');
 });
 
 test('calculateStreak accurately computes consecutive study days', () => {
@@ -185,7 +186,7 @@ test('getChapterSteps returns four study steps with soft unlock states', () => {
   assert.equal(inProgSteps[0].state, 'in-progress');
   assert.equal(inProgSteps[1].state, 'complete');
   assert.equal(inProgSteps[2].state, 'in-progress');
-  assert.match(inProgSteps[2].meta, /1 card to strengthen/);
+  assert.match(inProgSteps[2].meta, /1 question to strengthen/);
 
   // Case C: Fully mastered deck
   const masteredProgress = {
@@ -348,4 +349,14 @@ test('formatPickerDecks returns structured chapter metadata for lesson picker', 
   assert.equal(pickerDecks[1].totalCards, 2);
   assert.equal(pickerDecks[1].masteredCount, 0);
   assert.equal(pickerDecks[1].pct, 0);
+});
+
+test('empty weak-spots plans distinguish no history, an empty queue and a completed task', () => {
+  const options = { dueItems: [], weakItems: [], allItems: [{ deckId: 'd', card: { id: 'q' } }], decks: [], isMastered: () => false };
+  const weak = extra => MobileStudy.selectPlanCards({ ...options, ...extra }).find(item => item.id === 'weak');
+  assert.equal(weak().state, 'empty');
+  assert.equal(weak().statusText, 'No missed answers yet');
+  assert.equal(weak({ allItems: [{ ...options.allItems[0], record: { attempts: 1 } }] }).statusText, 'Nothing to review');
+  assert.equal(weak({ completedToday: { weak: true } }).statusText, 'Completed today');
+  assert.equal(weak({ completedToday: { weak: true } }).state, 'done');
 });

@@ -30,7 +30,7 @@ test('study headings distinguish video scope, whole chapter and older saved sess
   const video = ctx.lessonVideoStudyHeading({ name: 'flash', opts: { videoId: 'one' } }, 11, videos);
   assert.equal(video.title, 'Video 1 · Flashcards');
   assert.equal(video.subtitle, videos[0].title);
-  assert.equal(ctx.lessonVideoStudyHeading({ name: 'quiz', opts: { videoId: null } }, 11, videos).title, 'Chapter 11 Quiz');
+  assert.equal(ctx.lessonVideoStudyHeading({ name: 'quiz', opts: { videoId: null } }, 11, videos).title, 'Lesson 11 Quiz');
   const legacy = ctx.lessonVideoStudyHeading({ name: 'flash', opts: {} }, 11, videos);
   assert.equal(legacy.title, 'Flashcards');
   assert.match(legacy.subtitle, /Saved study session/);
@@ -176,7 +176,7 @@ test('a background video-page render preserves existing navigation focus', () =>
   Object.defineProperty(app, 'innerHTML', { set() { document.activeElement = document.body; } });
   const ctx = context({
     app, document, window: { scrollTo: () => {} }, MAIN_TABS: [], views: { 'lesson-video': () => '<section></section>' },
-    closeBiblePreview: () => {}, banner: () => '', animateRouteChange: false
+    closeBiblePreview: () => {}, banner: () => '', animateRouteChange: false, syncHomePlanActions: () => {}
   });
   const renderSource = source.slice(source.indexOf('  function render(keep)'), source.indexOf('  function viewToHash('));
   vm.runInContext(renderSource, ctx);
@@ -191,4 +191,29 @@ test('a background video-page render preserves existing navigation focus', () =>
   assert.equal(adjustments, 2);
   ctx.render(false);
   assert.equal(document.activeElement, document.body, 'an ordinary route render must not steal focus');
+});
+
+test('daily plan shortcuts return when the hero leaves view and never hide a focused action', () => {
+  let callback, disconnected = 0, blur;
+  const shortcut = { hidden: false, addEventListener(event, fn) { assert.equal(event, 'blur'); blur = fn; } };
+  const summary = { hidden: true }, hero = {};
+  const document = { activeElement: null };
+  const nodes = { '.desktop-home-content .desktop-today-action': hero, '[data-home-daily-shortcut]': shortcut, '[data-home-daily-summary]': summary };
+  const ctx = { V: { name: 'home' }, app: { querySelector: selector => nodes[selector] }, document,
+    window: { IntersectionObserver: function (fn) { callback = fn; this.observe = node => assert.equal(node, hero); this.disconnect = () => disconnected++; } } };
+  vm.createContext(ctx);
+  vm.runInContext(source.slice(source.indexOf('  var homePlanObserver ='), source.indexOf('  /* ---------- render ---------- */')), ctx);
+  ctx.syncHomePlanActions();
+  callback([{ isIntersecting: true, intersectionRatio: 1 }]);
+  assert.equal(shortcut.hidden, true);
+  assert.equal(summary.hidden, false);
+  callback([{ isIntersecting: false, intersectionRatio: 0 }]);
+  assert.equal(shortcut.hidden, false);
+  document.activeElement = shortcut;
+  callback([{ isIntersecting: true, intersectionRatio: 1 }]);
+  assert.equal(shortcut.hidden, false, 'focused shortcut stays keyboard accessible');
+  document.activeElement = null; blur();
+  assert.equal(shortcut.hidden, true);
+  ctx.V.name = 'chapter'; ctx.syncHomePlanActions();
+  assert.equal(disconnected, 1, 'the observer is released on navigation');
 });
