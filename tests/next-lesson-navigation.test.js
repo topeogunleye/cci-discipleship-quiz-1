@@ -31,7 +31,7 @@ function harness(signedIn = false) {
     window.testApp = {
       configure: function (starters, decks, videos, signedIn) { STARTER_DECKS = starters; S.decks = decks; LESSON_VIDEOS = videos; accountStatus = signedIn ? { user: { id: 'isolated-user' }, videoReady: true } : { user: null, videoReady: false }; },
       state: () => S, view: () => V, setView: view => { V = view; }, render,
-      nextLessonDestination, openNextLesson, rememberLessonVideoVisit, lessonVideoVisitRoute,
+      nextLessonDestination, previousLessonDestination, openNextLesson, openPreviousLesson, rememberLessonVideoVisit, lessonVideoVisitRoute,
       hashToView, handleLocationChange, focusDirection: () => focusDirection, writes: () => writes
     };
   `);
@@ -61,7 +61,8 @@ test('boundary action is available immediately only on the final recording, incl
     assert.equal(elements.app.innerHTML.includes('data-act="lesson-video-next-lesson"'), index === 2);
     if (index === 2) {
       assert.match(elements.app.innerHTML, /Next lesson: Second &amp; next/);
-      assert.match(elements.app.innerHTML, /data-video-nav="next"[^>]*disabled/);
+      assert.match(elements.app.innerHTML, /data-video-nav="next" data-act="lesson-video-next-lesson"/);
+      assert.doesNotMatch(elements.app.innerHTML, /lesson-video-boundary"><button[^>]*lesson-video-next-lesson/);
     }
   }
   app.configure(starters, decks, catalog.filter(v => v.deckId !== ids[0] || v.id === 'v00'), false);
@@ -82,7 +83,7 @@ for (const signedIn of [false, true]) test(`${signedIn ? 'signed-in' : 'guest'} 
   click('lesson-video-next-lesson');
   assert.deepEqual(plain(app.view()), { name: 'lesson-video', id: ids[1], videoIndex: 0, videoTime: 0 });
   assert.equal(player.paused, true);
-  assert.equal(app.focusDirection(), 'next');
+  assert.equal(app.focusDirection(), 'lesson');
   assert.equal(app.state().pausedSession, saved);
   assert.deepEqual(plain(app.state()), original);
   assert.equal(app.writes(), 0);
@@ -106,7 +107,7 @@ test('no-video and missing lessons are explicit and never skipped', () => {
   app.configure(starters, decks.filter(d => d.id !== ids[1]), catalog, false);
   app.setView({ name: 'lesson-video', id: ids[0], videoIndex: 2 });
   app.render();
-  assert.match(elements.app.innerHTML, /Next lesson: Second &amp; next is unavailable on this device/);
+  assert.match(elements.app.innerHTML, /Next lesson: Second &amp; next\. Unavailable on this device/);
   assert.doesNotMatch(elements.app.innerHTML, /data-act="lesson-video-next-lesson"/);
   app.openNextLesson();
   assert.equal(app.view().id, ids[0]);
@@ -184,4 +185,61 @@ test('real catalog transitions follow all twelve manifest lessons without changi
     }
     assert.deepEqual(videos.filter(v => v.deckId === d.id).map(v => v.id), recordingIds);
   });
+});
+
+test('previous lesson opens its final recording paused, independent of visit selection, without changing saved practice', () => {
+  const { app, click, elements, player } = harness();
+  app.rememberLessonVideoVisit(ids[0], catalog[0], 99);
+  const saved = { version: 1, name: 'flash', cards: [{ deckId: ids[1], cardId: 'q1' }], i: 0, marks: { q1: 'known' }, opts: {}, ids: [ids[1]] };
+  app.state().pausedSession = saved;
+  app.setView({ name: 'lesson-video', id: ids[1], videoIndex: 0 });
+  app.render();
+  assert.match(elements.app.innerHTML, /aria-label="Previous lesson: First"/);
+  click('lesson-video-previous-lesson');
+  assert.deepEqual(plain(app.view()), { name: 'lesson-video', id: ids[0], videoIndex: 2, videoTime: 0 });
+  assert.equal(player.paused, true);
+  assert.equal(app.state().pausedSession, saved);
+  assert.equal(app.focusDirection(), 'lesson');
+  assert.equal(app.writes(), 0);
+});
+
+test('single-video lessons expose both boundary directions without duplicate next actions', () => {
+  const { app, elements } = harness();
+  app.configure(starters, decks, catalog.filter(v => v.deckId !== ids[1] || v.id === 'v10'), false);
+  app.setView({ name: 'lesson-video', id: ids[1], videoIndex: 0 });
+  app.render();
+  assert.equal((elements.app.innerHTML.match(/data-act="lesson-video-next-lesson"/g) || []).length, 1);
+  assert.equal((elements.app.innerHTML.match(/data-act="lesson-video-previous-lesson"/g) || []).length, 1);
+  assert.match(elements.app.innerHTML, /id="lesson-video-navigation-context"[^>]*aria-label="Lesson 2: Second &amp; next\. Video 1 of 1/);
+});
+
+test('previous missing-video fallback opens that exact overview; missing chapters and curriculum start never wrap', () => {
+  const { app, click, elements } = harness();
+  app.configure(starters, decks, catalog.filter(v => v.deckId !== ids[0]), false);
+  app.setView({ name: 'lesson-video', id: ids[1], videoIndex: 0 });
+  app.render();
+  assert.match(elements.app.innerHTML, /Previous lesson: First\. No video available/);
+  click('lesson-video-previous-lesson');
+  assert.deepEqual(plain(app.view()), { name: 'chapter', id: ids[0] });
+  app.configure(starters, decks.filter(d => d.id !== ids[0]), catalog, false);
+  app.setView({ name: 'lesson-video', id: ids[1], videoIndex: 0 });
+  app.render();
+  assert.doesNotMatch(elements.app.innerHTML, /data-act="lesson-video-previous-lesson"/);
+  assert.match(elements.app.innerHTML, /Previous lesson: First\. Unavailable on this device/);
+  app.openPreviousLesson();
+  assert.equal(app.view().id, ids[1]);
+  assert.equal(app.previousLessonDestination(ids[0]).kind, 'first');
+});
+
+test('previous lesson is rejected inside a chapter and the first curriculum button is explicit', () => {
+  const { app, elements } = harness();
+  app.setView({ name: 'lesson-video', id: ids[1], videoIndex: 1 });
+  app.openPreviousLesson();
+  assert.equal(app.view().id, ids[1]);
+  assert.equal(app.view().videoIndex, 1);
+  app.setView({ name: 'lesson-video', id: ids[0], videoIndex: 0 });
+  app.render();
+  assert.match(elements.app.innerHTML, /data-video-nav="previous" disabled aria-label="Previous lesson · First lesson"/);
+  app.openPreviousLesson();
+  assert.equal(app.view().id, ids[0]);
 });

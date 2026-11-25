@@ -773,8 +773,8 @@ test('hybrid video study scopes questions to active video and preserves Section 
   assert.match(navigationMarkup, /role="group" aria-label="Practise this video"/);
   assert.equal((navigationMarkup.match(/class="lesson-video-navigation"/g) || []).length, 1, 'one navigation instance moves across breakpoints');
   assert.match(navigationMarkup, /lesson-video-navigation-slot/);
-  assert.match(navigationMarkup, /lesson-video-position" aria-live="polite">Video 1 of 2<\/span>/);
-  assert.equal((navigationMarkup.match(/data-index="0" disabled aria-label="Previous video/g) || []).length, 1);
+  assert.match(navigationMarkup, /<h2 class="lesson-video-position" id="lesson-video-navigation-context"[^>]*>Video 1 of 2<\/h2>/);
+  assert.equal((navigationMarkup.match(/data-video-nav="previous" disabled aria-label="Previous lesson · No adjacent lesson/g) || []).length, 1);
   assert.match(elements.app.innerHTML, /Video Flashcards \(1\)/);
   assert.match(elements.app.innerHTML, /Video Quiz \(1\)/);
   assert.doesNotMatch(elements.app.innerHTML, /Chapter Flashcards/);
@@ -783,7 +783,7 @@ test('hybrid video study scopes questions to active video and preserves Section 
   // 2. Final video (index 1): has both Video and Chapter buttons
   t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 1 });
   t.render();
-  assert.equal((elements.app.innerHTML.match(/data-index="1" disabled aria-label="Next video/g) || []).length, 1, 'Next is disabled on the final video');
+  assert.equal((elements.app.innerHTML.match(/data-video-nav="next" disabled aria-label="Next lesson · No adjacent lesson/g) || []).length, 1, 'a custom deck without a curriculum destination has an explicit unavailable next lesson');
   assert.match(elements.app.innerHTML, /Video Flashcards \(1\)/);
   assert.match(elements.app.innerHTML, /Video Quiz \(1\)/);
   assert.match(elements.app.innerHTML, /Chapter Flashcards \(2\)/);
