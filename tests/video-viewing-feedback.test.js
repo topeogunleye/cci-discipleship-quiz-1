@@ -78,6 +78,7 @@ test('a source-level failure offers retry even when the video has no MediaError'
 
 test('transcript seek confirms timestamp, offers return and preserves paused or playing state', () => {
   const f = fixture();
+  f.player.readyState = 1;
   const back = { hidden: true };
   const details = { querySelector: selector => selector === '.lesson-transcript-status' ? f.status : back };
   seekLessonTranscript(f.player, details, 56.6);
@@ -92,6 +93,21 @@ test('transcript seek confirms timestamp, offers return and preserves paused or 
   assert.equal(f.player.currentTime, 120);
   seekLessonTranscript(f.player, details, -1);
   assert.equal(f.player.currentTime, 120);
+});
+
+test('transcript seek does not claim success before media loads or after failure', () => {
+  const f = fixture();
+  const back = { hidden: true };
+  const details = { querySelector: selector => selector === '.lesson-transcript-status' ? f.status : back };
+  seekLessonTranscript(f.player, details, 90);
+  assert.equal(f.player.currentTime, 56);
+  assert.match(f.status.textContent, /not ready.*retry/);
+  assert.equal(back.hidden, false);
+  f.player.readyState = 1;
+  f.player.error = { code: 4 };
+  seekLessonTranscript(f.player, details, 90);
+  assert.equal(f.player.currentTime, 56);
+  assert.doesNotMatch(f.status.textContent, /Moved video/);
 });
 
 test('typing during transcript loading filters the results when the request resolves', async () => {
