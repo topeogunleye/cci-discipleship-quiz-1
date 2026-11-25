@@ -380,8 +380,8 @@ test('Home offers direct lesson entry and a separate Details button', () => {
   const articles = Array.from(html.matchAll(/<article class="desktop-lesson-card[\s\S]*?<\/article>/g), m => m[0]);
   assert.ok(articles.length);
   for (const article of articles) {
-    assert.match(article, /data-act="open-chapter"[^>]+aria-label="Open lesson /);
-    assert.match(article, /<\/button><button[^>]+data-act="lesson-detail-open"[^>]+aria-label="Details for /);
+    assert.match(article, /<button[^>]+data-act="open-chapter"[^>]+aria-label="Open lesson /);
+    assert.match(article, /<button[^>]+data-act="lesson-detail-open"[^>]+aria-label="Details for /);
     assert.equal((article.match(/<button /g) || []).length, 2);
   }
 });
