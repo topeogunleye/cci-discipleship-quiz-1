@@ -167,3 +167,30 @@ test('routes leave the primary main landmark to the persistent app container', (
   const shell = fs.readFileSync(require.resolve('../index.html'), 'utf8');
   assert.match(shell, /<main\b[^>]*id="app"/);
 });
+
+test('quiz feedback has one reading-order instance and preserves supporting references', () => {
+  const app = appUi();
+  const card = { id: 'one', question: 'Question?', options: ['Answer', 'Other'], answer: 'A', explanation: 'Reason for the answer.', bible: 'John 3:16' };
+  app.ui.state.decks = [{ id: 'lesson', title: 'Soteriology', cards: [card] }];
+  app.ui.setView({ name: 'quiz', cards: [{ deckId: 'lesson', card }], i: 0, picked: 1, opts: {} });
+  app.ui.render();
+  const html = app.html();
+  assert.equal((html.match(/aria-label="Answer feedback"/g) || []).length, 1);
+  assert.equal((html.match(/data-act="next"/g) || []).length, 1);
+  assert.ok(html.indexOf('aria-label="Answer feedback"') > html.indexOf('</article>'));
+  assert.match(html, /Reason for the answer\./);
+  assert.match(html, /<details class="study-references"><summary>Scripture and video references<\/summary>/);
+  assert.match(html, /John 3:16/);
+  assert.doesNotMatch(html, /quiz-feedback-resize-control|quiz-explanation-card/);
+});
+
+test('timed exam feedback never reveals the answer before submission', () => {
+  const app = appUi();
+  const card = { id: 'one', question: 'Question?', options: ['Answer', 'Other'], answer: 'A', explanation: 'Hidden explanation', bible: 'John 3:16' };
+  app.ui.state.decks = [{ id: 'lesson', title: 'Soteriology', cards: [card] }];
+  app.ui.setView({ name: 'exam', cards: [{ deckId: 'lesson', card }], i: 0, picked: 1, remaining: 60000, opts: {} });
+  app.ui.render();
+  assert.match(app.html(), /Answer recorded for review after submission/);
+  assert.match(app.html(), /Submit exam/);
+  assert.doesNotMatch(app.html(), /Hidden explanation|study-references|Correct\.|Not quite\./);
+});
