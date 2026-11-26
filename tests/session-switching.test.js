@@ -386,7 +386,7 @@ test('Home offers direct lesson entry and a separate Details button', () => {
   }
 });
 
-test('video results have one primary return while keeping review and retake distinct', () => {
+test('video results prioritize missed-answer review while retaining return and retake', () => {
   const { app } = appHarness();
   const result = { kind: 'quiz', score: 0, total: 3, all: cards, missed: cards, opts: {}, ids: ['chapter'], returnToVideo: { deckId: 'chapter', videoIndex: 0 } };
   app.setView({ name: 'lesson-video', videoStudy: { results: result } });
@@ -397,8 +397,25 @@ test('video results have one primary return while keeping review and retake dist
   assert.doesNotMatch(footer, /data-act="results-continue"/);
   assert.match(footer, /data-act="review">Review 3 missed questions/);
   assert.match(footer, /data-act="again">Retake quiz/);
+  assert.match(footer, /class="btn primary full" data-act="review"/);
+  assert.doesNotMatch(footer, /class="btn primary full video-study-return-btn"/);
+  const perfectFooter = app.results({ ...result, missed: [], score: 3 }).split('result-actions completion-actions-bar')[1];
+  assert.match(perfectFooter, /class="btn primary full video-study-return-btn"/);
   app.results(result);
   assert.deepEqual(json(app.state()), before, 'rendering or returning must not score another attempt');
+});
+
+test('Home curates three unmastered lessons while Journey keeps the full catalogue', () => {
+  const { app } = appHarness();
+  app.state().decks = Array.from({ length: 5 }, (_, i) => ({ id: 'lesson-' + i, title: 'Section ' + (i + 1) + ' Topic ' + i, cards: [{ id: 'q-' + i, question: 'Question', answer: 'A', options: ['A', 'B', 'C', 'D'] }] }));
+  app.state().progress['lesson-0'] = { cards: { 'q-0': { box: 2 } } };
+  const html = app.home();
+  const mobile = html.split('mobile-home-content')[1].split('desktop-home-content')[0];
+  assert.equal((mobile.match(/class="desktop-lesson-card /g) || []).length, 3);
+  assert.match(mobile, /data-tab="journey">View all lessons/);
+  assert.doesNotMatch(mobile, /data-id="lesson-0"/);
+  assert.match(mobile, /data-id="lesson-1"/);
+  assert.equal(app.state().decks.length, 5, 'curation must not remove catalogue data');
 });
 
 test('exam results offer the same Home destination before and after answer review', () => {

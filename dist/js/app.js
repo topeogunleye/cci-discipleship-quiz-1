@@ -7,7 +7,6 @@
   var STARTER_DECKS = [], DEVOTIONALS = [], LESSON_VIDEOS = [];
   var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, suppressBiblePreviewFocus = null, suppressBiblePreviewHover = null;
   var storageOk = true, storageMessage = '', storageBackend = 'loading', preserveStorage = false, saveQueue = Promise.resolve(), activeStorageOwnerId = null, requestedStorageOwnerId = null, guestProgressForImport = null, account = Account ? Account.create() : null, accountStatus = { configured: false, user: null, videoReady: false, videoSessionVersion: 0 }, accountBootReady = false, accountMessage = '', accountEmailDraft = '', accountBusy = false, accountSwitchQueue = Promise.resolve(), cloudSyncQueue = Promise.resolve(), cloudSyncTimer = null, lessonTranscriptCache = Object.create(null), lessonTranscriptRequests = Object.create(null), lastVideoSessionVersion = 0, V = { name: 'home' }, SEL = new Set(), pendingAsk = null, returnFocus = null, homeFilter = '', examTimer = null, waitingWorker = null, updateAvailable = false, updateDeferred = false, updateApplying = false, reloadForUpdate = false, rocketMenuOpen = false, IMP = { decks: [], errors: [], warnings: [], text: '', parsed: false, backup: null };
-  var quizFeedbackDrag = null, quizFeedbackIgnoreClick = false;
   var browserLocalStorage = null, browserIndexedDB = null, animateRouteChange = false;
   var lessonTranscriptGeneration = 0;
   try { browserLocalStorage = window.localStorage; } catch (e) {}
@@ -2223,7 +2222,7 @@
     '</section>';
 
     var desktopTopBar = '<header class="desktop-home-header">' +
-      '<h1>Study</h1>' +
+      '<h1>CCI Discipleship</h1>' +
       '<button class="start-practising-btn" type="button" data-act="toggle-rocket" aria-haspopup="menu" aria-expanded="' + (rocketMenuOpen ? 'true' : 'false') + '">' +
         '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 13h6l-1 8 11-12h-7l-1-6Z"/></svg><span>Study options</span>' +
       '</button>' +
@@ -2264,11 +2263,6 @@
         '<div class="desktop-today-actions"><button type="button" class="desktop-today-action" data-act="' + desktopHeroAction + '">' + desktopHeroButtonText + '</button>' +
         (S.pausedSession ? '<button type="button" class="desktop-today-action-secondary" data-act="discard-study">End session</button>' : '') + '</div>' +
       '</div>' +
-      '<svg class="desktop-today-landscape" viewBox="0 0 440 170" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">' +
-        '<circle cx="335" cy="48" r="30" fill="#FFE6A8"/>' +
-        '<path d="M0 116c65-42 119-57 175-31 63 30 106 42 164 17 38-16 70-39 101-61v129H0Z" fill="rgba(255,255,255,.22)"/>' +
-        '<path d="M0 135c73-38 127-43 188-19 53 21 102 36 159 11 32-14 62-34 93-58v102H0Z" fill="rgba(20,15,75,.25)"/>' +
-      '</svg>' +
     '</section>';
 
     var desktopStats = '<section class="desktop-home-stats" aria-label="Study statistics">' +
@@ -2277,12 +2271,16 @@
       '<div class="desktop-stat-card"><strong>' + totalCards.toLocaleString() + '</strong><span>In library</span></div>' +
     '</section>';
 
-    var desktopLessons = '<section class="desktop-lessons" aria-labelledby="desktop-lessons-title">' +
-      '<div class="desktop-section-heading"><h2 id="desktop-lessons-title">Lessons</h2><span>' + plural(S.decks.length, 'lesson') + '</span></div>' +
+    var nextLessons = S.decks.filter(function (d) {
+      return d.cards.some(function (c) { return !isMastered(d.id, c.id); });
+    });
+    if (!nextLessons.length) nextLessons = S.decks;
+    var desktopLessons = '<section class="desktop-lessons" aria-label="Your next lessons">' +
+      '<div class="desktop-section-heading"><h2>Your next lessons</h2><button type="button" class="home-view-all" data-act="nav-tab" data-tab="journey">View all lessons</button></div>' +
       '<div class="desktop-lesson-grid">' +
-        S.decks.map(function (d, index) {
+        nextLessons.slice(0, 3).map(function (d) {
           var parsed = MobileStudy.parseChapterTitle(d.title);
-          var sectionNum = parsed.sectionNum || (index + 1);
+          var sectionNum = parsed.sectionNum || (S.decks.indexOf(d) + 1);
           var mastered = d.cards.filter(function (c) { return isMastered(d.id, c.id); }).length;
           var total = d.cards.length;
           var pct = total ? Math.round(100 * mastered / total) : 0;
@@ -2317,8 +2315,8 @@
       });
     }
 
-    var desktopPlan = '<section class="desktop-plan-section" aria-labelledby="desktop-plan-title">' +
-      '<h2 id="desktop-plan-title">Your plan for today</h2>' +
+    var desktopPlan = '<details class="desktop-plan-section">' +
+      '<summary>Your plan for today</summary>' +
       '<div class="desktop-plan-list">' +
         desktopPlanCards.slice(0, 3).map(function (c, index) {
           var duplicateDailyAction = c.action === 'daily-study' && desktopHeroAction === 'daily-study';
@@ -2330,7 +2328,7 @@
             (duplicateDailyAction ? '<div class="desktop-plan-row desktop-plan-summary" data-home-daily-summary hidden>' + contents + '</div>' : '');
         }).join('') +
       '</div>' +
-    '</section>';
+    '</details>';
 
     var desktopDevotionFeature = todayDevotion && !isDevotionHiddenToday
       ? '<article class="desktop-featured-devotion">' +
@@ -2360,14 +2358,14 @@
       desktopTopBar +
       desktopBackupReminder +
       '<div class="desktop-home-columns">' +
-        '<div class="desktop-home-primary">' + desktopHero + desktopStats + desktopLessons + '</div>' +
+        '<div class="desktop-home-primary">' + desktopHero + desktopStats + '</div>' +
         '<aside class="desktop-home-rail" aria-label="Your daily study">' +
           desktopDevotionFeature + desktopPlan + desktopDevotionList +
         '</aside>' +
-      '</div>' +
+      '</div>' + desktopLessons +
     '</div>';
 
-    var mobileStudyHeader = '<header class="mobile-study-header"><h1>Study</h1>' +
+    var mobileStudyHeader = '<header class="mobile-study-header"><h1>CCI Discipleship</h1>' +
       '<button class="top-icon-btn" data-act="nav-tab" data-tab="settings" aria-label="Settings">' +
         tabIconSvg('settings') +
       '</button>' +
@@ -2521,12 +2519,8 @@
       var stateBadge = s.state === 'complete'
         ? '<span class="step-badge complete">Complete ✓</span>'
         : (s.state === 'in-progress' ? '<span class="step-badge in-progress">In progress</span>' : (s.state === 'empty' ? '<span class="step-badge empty">No weak spots yet</span>' : ''));
-      var stepActions = s.state === 'empty' && s.id === 'weak'
-        ? '<div class="timeline-step-empty-actions">' +
-            '<button class="btn sm primary" data-act="setup" data-mode="flash" data-id="' + d.id + '">Set up flashcards</button>' +
-            '<button class="btn sm" data-act="setup" data-mode="quiz" data-id="' + d.id + '">Set up quiz</button>' +
-          '</div>'
-        : '<button class="btn sm' + (s.state === 'complete' ? '' : ' primary') + '" data-act="' + s.action + '" data-mode="' + s.mode + '" data-id="' + d.id + '">' + (s.mode === 'flash' ? 'Set up flashcards' : s.mode === 'quiz' ? 'Set up quiz' : s.mode === 'exam' ? 'Set up exam' : 'Practise weak spots') + '</button>';
+      var stepActions = s.state === 'empty' && s.id === 'weak' ? ''
+        : '<button class="btn sm" data-act="' + s.action + '" data-mode="' + s.mode + '" data-id="' + d.id + '">' + (s.mode === 'flash' ? 'Set up flashcards' : s.mode === 'quiz' ? 'Set up quiz' : s.mode === 'exam' ? 'Set up exam' : 'Practise weak spots') + '</button>';
 
       return '<div class="timeline-step ' + stateClass + '">' +
         '<div class="timeline-node" aria-hidden="true">' +
@@ -2765,8 +2759,8 @@
   views.settings = function () {
     var theme = S.settings.theme;
     var showStreak = S.settings.showStreak !== false;
-    return '<header class="view-header">' +
-      '<h1>Settings</h1>' +
+    return '<section class="settings-view" aria-labelledby="settings-title"><header class="view-header">' +
+      '<h1 id="settings-title">Settings</h1>' +
       '<p class="view-sub">Preferences, backups, and app information</p>' +
     '</header>' +
     accountSettingsSection() +
@@ -2824,12 +2818,17 @@
       '<p class="meta">CCI Discipleship Quiz &amp; Study App · Offline PWA</p>' +
       '<details class="storage-details"><summary>Troubleshooting</summary><p class="meta">Storage engine: ' + esc(storageBackend) + '</p></details>' +
       '<p class="meta">Existing ESV quotations in study materials are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved. The ESV text may not be quoted in any publication made available to the public by a Creative Commons license. The ESV may not be translated into any other language. Users may not copy or download more than 500 verses of the ESV Bible or more than one half of any book of the ESV Bible. <a href="https://www.esv.org/" target="_blank" rel="noopener noreferrer">ESV.org</a></p>' +
-    '</div>';
+    '</div></section>';
   };
   function bar() {
     if (!SEL.size) return '';
     var n = 0; SEL.forEach(function (id) { var d = deck(id); if (d) n += d.cards.length; });
     return '<div class="barin"><span>' + plural(SEL.size, 'deck') + ' · ' + plural(n, 'card') + '</span><div class="row"><button class="btn sm" data-act="setup" data-mode="flash" data-id="*">Flashcards</button><button class="btn primary sm" data-act="setup" data-mode="quiz" data-id="*">Quiz</button></div></div>';
+  }
+
+  function studyReferences(card, deckId) {
+    var references = renderReferenceNote(card, deckId) + bibleNote(card);
+    return references ? '<details class="study-references"><summary>Scripture and video references</summary>' + references + '</details>' : '';
   }
 
   views.flash = function (session) {
@@ -2838,7 +2837,7 @@
     var title = s.opts && s.opts.daily ? 'Today’s Study' : (d ? d.title : 'Flashcards');
     var parsed = MobileStudy.parseChapterTitle(title);
     var displayTitle = parsed.topic || title;
-    var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + renderReferenceNote(c, it.deckId) + bibleNote(c);
+    var notes = (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') + studyReferences(c, it.deckId);
     var isLast = s.i === s.cards.length - 1;
     var savedRating = (s.marks || {})[c.id];
     var answerSummaryId = session ? 'video-flash-answer-summary' : 'flash-answer-summary';
@@ -2848,7 +2847,7 @@
             '<span class="card-face-top"><span class="tag">Answer · ' + c.answer + '</span><span class="face-index">' + (s.i + 1) + ' / ' + s.cards.length + '</span></span>' +
             '<span class="a" id="' + answerSummaryId + '">' + esc(c.options[ai]) + '</span>' +
             notes +
-            '<span class="qs">' + esc(c.question) + '</span>' +
+            '<details class="study-question-context"><summary>Review question</summary><p class="qs">' + esc(c.question) + '</p></details>' +
             '<button class="flip-cue flip-cue-button" data-act="flip" type="button" aria-label="Show question" aria-describedby="' + answerSummaryId + '"><span class="flip-cue-icon" aria-hidden="true">↻</span>Tap or Space to see question</button>' +
           '</div></div>' +
         '</div>'
@@ -2905,41 +2904,26 @@
       '</button>';
     }).join('');
 
-    var fbSheet = '';
-    var desktopFeedback = '';
+    var feedback = '';
     if (done) {
       var answerAt = order.indexOf(LET.indexOf(c.answer));
       if (isExam) {
-        fbSheet = '<div class="coaching-bottom-sheet exam-sheet" role="status">' +
-          '<div class="sheet-drag-handle" aria-hidden="true"></div>' +
+        feedback = '<aside class="quiz-answer-feedback exam-sheet" aria-label="Answer recorded">' +
           '<p class="exam-progress-note">Answer recorded for review after submission.</p>' +
           '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'Submit exam' : 'Next question') + '</button>' +
-        '</div>';
+        '</aside>';
       } else {
         var ok = picked === answerAt;
-        var feedbackContent = function () {
-          return '<div class="feedback-panel ' + (ok ? 'is-correct' : 'is-incorrect') + '">' +
+        feedback = '<aside class="quiz-answer-feedback ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '" aria-label="Answer feedback">' +
+            '<div class="feedback-panel ' + (ok ? 'is-correct' : 'is-incorrect') + '">' +
               '<div class="feedback-header">' +
                 '<span class="feedback-mark-icon" aria-hidden="true">' + (ok ? '✓' : '✗') + '</span>' +
-                '<p class="fb ' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'Correct.' : 'Not quite.') + '</p>' +
+                '<p class="fb ' + (ok ? 'ok' : 'bad') + '" role="status">' + (ok ? 'Correct.' : 'Not quite.') + '</p>' +
               '</div>' +
               (!ok ? '<p class="feedback-answer"><span class="feedback-answer-letter" aria-label="Correct option ' + LET[answerAt] + '">' + LET[answerAt] + '</span><span>' + esc(c.options[order[answerAt]]) + '</span></p>' : '') +
               (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') +
-              renderReferenceNote(c, it.deckId) +
-              bibleNote(c) +
-            '</div>';
-        };
-        fbSheet = '<div class="coaching-bottom-sheet quiz-feedback-sheet ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '">' +
-          '<button type="button" class="quiz-feedback-resize-control" data-act="quiz-feedback-toggle" aria-label="Collapse answer feedback panel" aria-expanded="true" aria-controls="quiz-feedback-content" title="Drag to resize; press to collapse or expand">' +
-            '<span class="sheet-drag-handle" aria-hidden="true"></span>' +
-          '</button>' +
-          '<div class="sheet-content quiz-feedback-content" id="quiz-feedback-content" role="status" aria-live="polite">' + feedbackContent() + '</div>' +
-          '<div class="quiz-feedback-actions">' +
-            '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Next question') + '</button>' +
-          '</div>' +
-        '</div>';
-        desktopFeedback = '<aside class="quiz-explanation-card ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '">' +
-          '<div class="quiz-explanation-content" role="status" aria-live="polite">' + feedbackContent() + '</div>' +
+              studyReferences(c, it.deckId) +
+            '</div>' +
           '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Next question') + '</button>' +
         '</aside>';
       }
@@ -2953,7 +2937,7 @@
     return '<section class="study-shell ' + (isExam ? 'exam-session' : 'quiz-session') + ' coaching-study-flow" aria-label="' + (isExam ? 'Timed exam' : 'Quiz') + '">' +
       sessionHead(sessionTitle, status, isExam) +
       progressBar(s.i + (done ? 1 : 0), s.cards.length) +
-      '<div class="quiz-question-layout' + (desktopFeedback ? ' has-feedback' : '') + '">' +
+      '<div class="quiz-question-layout' + (feedback ? ' has-feedback' : '') + '">' +
         '<article class="question-panel coaching-question-panel">' +
           '<div class="question-meta-row">' +
             '<span class="count">Question ' + (s.i + 1) + ' of ' + s.cards.length + '</span>' +
@@ -2961,9 +2945,8 @@
           '</div>' +
           '<h2 class="qtext coaching-question-text" id="question-prompt" tabindex="-1">' + esc(c.question) + '</h2>' +
           '<div class="opts coaching-opts-group" role="group" aria-labelledby="question-prompt">' + opts + '</div>' +
-          (done ? fbSheet : '') +
         '</article>' +
-        desktopFeedback +
+        feedback +
       '</div>' +
       '<p class="study-shortcuts">Choose A–D or 1–4' + (done ? '' : ' · Enter a selection to continue') + '</p>' +
     '</section>';
@@ -3075,7 +3058,7 @@
       '</div>' +
       '<div class="result-actions completion-actions-bar">' +
         (miss.length ? '<button class="btn primary full" data-act="review">Review ' + plural(miss.length, R.kind === 'quiz' ? 'missed question' : 'card') + '</button>' : '<p class="note result-note">' + (R.kind === 'quiz' ? 'No missed questions. Outstanding work!' : 'Nothing left marked as still learning.') + '</p>') +
-        (R.returnToVideo ? '<button class="btn ' + (V.videoStudy ? 'primary ' : '') + 'full video-study-return-btn" data-act="results-return-video">Return to video</button>' : '') +
+        (R.returnToVideo ? '<button class="btn ' + (miss.length ? '' : 'primary ') + 'full video-study-return-btn" data-act="results-return-video">Return to video</button>' : '') +
         '<button class="btn full" data-act="again">' + (R.kind === 'quiz' ? 'Retake quiz' : 'Study again') + '</button>' +
         (!V.videoStudy ? '<button class="btn full ghost btn-continue" data-act="results-continue">' + (R.isFirstSessionToday && S.settings.showStreak !== false ? 'Continue' : 'Back to study') + '</button>' : '') +
       '</div>' +
@@ -4294,7 +4277,7 @@
         if (q) q.focus({ preventScroll: true });
       }
     } else {
-      var retBtn = modal.querySelector('.video-study-return-btn');
+      var retBtn = modal.querySelector('.completion-actions-bar .btn.primary, .video-study-return-btn');
       if (retBtn) retBtn.focus();
     }
   }
@@ -4587,43 +4570,6 @@
   document.addEventListener('pointerdown', function (e) {
     if (activeBiblePreview && !isWithinActiveBiblePreview(e.target)) closeBiblePreview(false, true);
   });
-  function setQuizFeedbackExpanded(control, expanded) {
-    if (!control) return;
-    var sheet = control.closest('.quiz-feedback-sheet');
-    if (!sheet) return;
-    sheet.classList.toggle('is-compact', !expanded);
-    control.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-    control.setAttribute('aria-label', expanded ? 'Collapse answer feedback panel' : 'Expand answer feedback panel');
-    control.title = expanded ? 'Drag down to reduce; press to collapse' : 'Drag up to expand; press to expand';
-  }
-
-  document.addEventListener('pointerdown', function (e) {
-    var control = e.target.closest('.quiz-feedback-resize-control');
-    if (!control || e.button !== 0 || window.matchMedia('(min-width: 901px)').matches) return;
-    quizFeedbackDrag = { control: control, pointerId: e.pointerId, startY: e.clientY, lastY: e.clientY, moved: false };
-    control.focus({ preventScroll: true });
-    try { control.setPointerCapture(e.pointerId); } catch (error) {}
-    e.preventDefault();
-  }, true);
-  document.addEventListener('pointermove', function (e) {
-    if (!quizFeedbackDrag || e.pointerId !== quizFeedbackDrag.pointerId) return;
-    quizFeedbackDrag.lastY = e.clientY;
-    if (Math.abs(e.clientY - quizFeedbackDrag.startY) > 8) quizFeedbackDrag.moved = true;
-  }, true);
-  document.addEventListener('pointerup', function (e) {
-    if (!quizFeedbackDrag || e.pointerId !== quizFeedbackDrag.pointerId) return;
-    var drag = quizFeedbackDrag;
-    quizFeedbackDrag = null;
-    var delta = drag.lastY - drag.startY;
-    if (drag.moved && Math.abs(delta) >= 28) {
-      setQuizFeedbackExpanded(drag.control, delta < 0);
-      quizFeedbackIgnoreClick = true;
-      window.setTimeout(function () { quizFeedbackIgnoreClick = false; }, 0);
-    }
-  }, true);
-  document.addEventListener('pointercancel', function (e) {
-    if (quizFeedbackDrag && e.pointerId === quizFeedbackDrag.pointerId) quizFeedbackDrag = null;
-  }, true);
 
   document.addEventListener('click', function (e) {
     var target = e.target && e.target.closest ? e.target : null;
@@ -4649,7 +4595,7 @@
   document.addEventListener('click', function (e) {
     if (e.target.closest('.bible-reference-wrap')) return;
     var flipSurface = e.target.closest('[data-flip-surface]');
-    if (flipSurface && !e.target.closest('a, button, input, select, textarea, [contenteditable="true"]')) {
+    if (flipSurface && !e.target.closest('a, button, input, select, textarea, details, [contenteditable="true"]')) {
       if (V.videoStudy) {
         V.videoStudy.flipped = false;
         S.pausedSession = MobileStudy.snapshot(V.videoStudy);
@@ -4663,12 +4609,8 @@
       return;
     }
     var t = e.target.closest('[data-act]'); if (!t) return;
-    if (quizFeedbackIgnoreClick && t.matches('.quiz-feedback-resize-control')) { quizFeedbackIgnoreClick = false; e.preventDefault(); return; }
     var a = t.dataset.act, d;
     switch (a) {
-      case 'quiz-feedback-toggle':
-        setQuizFeedbackExpanded(t, t.getAttribute('aria-expanded') !== 'true');
-        break;
       case 'home': closeModal(); go({ name: 'home' }); break;
       case 'open-chapter': go({ name: 'chapter', id: t.dataset.id }); break;
       case 'lesson-detail-open': openLessonDetailSheet(t.dataset.id); break;
@@ -5317,12 +5259,6 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && activeBiblePreview) {
       e.preventDefault(); closeBiblePreview(isWithinActiveBiblePreview(document.activeElement), true); return;
-    }
-    var feedbackResizeControl = e.target && e.target.closest ? e.target.closest('.quiz-feedback-resize-control') : null;
-    if (feedbackResizeControl && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-      e.preventDefault();
-      setQuizFeedbackExpanded(feedbackResizeControl, e.key === 'ArrowUp');
-      return;
     }
     if (rocketMenuOpen) {
       if (e.key === 'Escape') {

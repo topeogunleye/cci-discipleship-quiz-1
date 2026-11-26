@@ -8,10 +8,11 @@ const test = require('node:test');
 const css = fs.readFileSync(path.join(__dirname, '..', 'style.css'), 'utf8');
 
 test('navigation and sidebar use the approved independent breakpoints', () => {
-  const desktop = css.slice(css.lastIndexOf('@media (min-width: 1024px) {'), css.lastIndexOf('@media (min-width: 1280px) {'));
+  const desktopStart = css.lastIndexOf('@media (min-width: 1024px) {');
+  const desktop = css.slice(desktopStart, css.indexOf('@media (min-width: 1280px) {', desktopStart));
   assert.match(desktop, /\.lesson-video-topbar > \.lesson-video-navigation/);
   assert.match(desktop, /grid-column: 2; grid-row: 2/);
-  const sidebar = css.slice(css.lastIndexOf('@media (min-width: 1280px) {'));
+  const sidebar = css.match(/@media \(min-width: 1280px\) \{\s*\.lesson-video-content\s*\{[^}]+\}/)?.[0] || '';
   assert.match(sidebar, /grid-template-columns: minmax\(0,1fr\) 340px/);
   assert.doesNotMatch(css, /lesson-video-navigation--(?:top|below)/, 'no hidden duplicate controls');
 });
