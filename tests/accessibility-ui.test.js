@@ -47,7 +47,10 @@ function appUi() {
   const source = fs.readFileSync(require.resolve('../js/app.js'), 'utf8').replace('  boot();', `
     window.ui = {
       state: S, settings: views.settings, nav: renderTabBar, render: render,
+      practice: views.practice,
       setView: function (view) { V = view; },
+      setPracticeMode: function (mode) { V.practiceMode = mode; },
+      setPracticeSelection: function (ids, mixed) { SEL = new Set(ids || []); V.practiceMixed = !!mixed; },
       interceptSteps: function (fn) { step = fn; stepVideoStudy = fn; }
     };
   `);
@@ -143,6 +146,43 @@ test('mobile navigation exposes the current destination with a supported state',
     assert.ok(buttons.find(s => s.includes(`data-tab="${page}"`)).includes('aria-current="page"'));
     assert.doesNotMatch(html, /aria-selected/);
   }
+});
+
+test('Practice summaries track mode, exact coverage, and unavailable mixed exams', () => {
+  const { ui } = appUi();
+  ui.state.decks = [
+    { id: 'lesson-one', title: '(Section 1) Soteriology', cards: [{ id: 'q1' }, { id: 'q2' }] },
+    { id: 'custom-deck', title: 'A very long custom deck name that remains available', cards: [{ id: 'q3' }] }
+  ];
+
+  let html = ui.practice();
+  const modes = [...html.matchAll(/<button[^>]*data-act="practice-mode"[^>]*>/g)].map(match => match[0]);
+  assert.equal(modes.length, 4);
+  assert.equal(modes.filter(button => button.includes('aria-pressed="true"')).length, 1);
+  assert.ok(modes.find(button => button.includes('data-mode="quiz"')).includes('aria-pressed="true"'));
+  assert.match(html, /Fixed round from due, weak and new cards/);
+  assert.match(html, /Custom deck · A very long custom deck name that remains available/);
+  assert.match(html, /Choose a lesson, All lessons, or Mixed practice before continuing\./);
+  assert.match(html, /data-act="practice-start"[^>]* disabled/);
+
+  ui.setPracticeSelection(['lesson-one']);
+  html = ui.practice();
+  assert.match(html, /<dt>Coverage<\/dt><dd>Lesson 1 · Soteriology<\/dd>/);
+  assert.match(html, /<dt>Questions<\/dt><dd>2 questions available · choose a limit in setup<\/dd>/);
+  assert.doesNotMatch(html, /data-act="practice-start"[^>]* disabled/);
+
+  ui.setPracticeSelection(['lesson-one', 'custom-deck']);
+  html = ui.practice();
+  assert.match(html, /class="practice-cover-tile cover-all is-selected"[^>]*aria-pressed="true"/);
+  assert.match(html, /<dt>Coverage<\/dt><dd>All lessons<\/dd>/);
+
+  ui.setPracticeSelection([], true);
+  ui.setPracticeMode('exam');
+  html = ui.practice();
+  assert.match(html, /Due and weak questions/);
+  assert.match(html, /No due or weak questions available yet/);
+  assert.match(html, /Answer some questions first so a mixed exam has due or weak questions\./);
+  assert.match(html, /data-act="practice-start"[^>]* disabled/);
 });
 
 test('routes leave the primary main landmark to the persistent app container', () => {

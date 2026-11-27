@@ -2518,7 +2518,8 @@
       var stateClass = 'step-' + s.state;
       var stateBadge = s.state === 'complete'
         ? '<span class="step-badge complete">Complete ✓</span>'
-        : (s.state === 'in-progress' ? '<span class="step-badge in-progress">In progress</span>' : (s.state === 'empty' ? '<span class="step-badge empty">No weak spots yet</span>' : ''));
+        : (s.state === 'attempted' ? '<span class="step-badge attempted">Quiz attempted</span>'
+          : (s.state === 'in-progress' ? '<span class="step-badge in-progress">In progress</span>' : (s.state === 'empty' ? '<span class="step-badge empty">No weak spots yet</span>' : '')));
       var stepActions = s.state === 'empty' && s.id === 'weak' ? ''
         : '<button class="btn sm" data-act="' + s.action + '" data-mode="' + s.mode + '" data-id="' + d.id + '">' + (s.mode === 'flash' ? 'Set up flashcards' : s.mode === 'quiz' ? 'Set up quiz' : s.mode === 'exam' ? 'Set up exam' : 'Practise weak spots') + '</button>';
 
@@ -2654,61 +2655,164 @@
     var mode = V.practiceMode || 'quiz';
     var multi = V.practiceMulti !== false;
     var all = allCardItems();
-    var weakCount = StudyLogic.weakSpots(all, 10).length;
+    var now = Date.now();
+    var weakItems = StudyLogic.weakSpots(all, 10);
+    var dueItems = dueReviewItems(all, now);
     var totalCards = all.length;
-    var allSelected = S.decks.length > 0 && S.decks.every(function (d) { return SEL.has(d.id); });
-    var selectedCount = SEL.size + (V.practiceMixed ? 1 : 0);
+    var selectedDecks = S.decks.filter(function (d) { return SEL.has(d.id); });
+    var selectedCardCount = selectedDecks.reduce(function (count, d) { return count + d.cards.length; }, 0);
+    var allSelected = S.decks.length > 0 && selectedDecks.length === S.decks.length;
+    var mixedSelected = !!V.practiceMixed;
+    var mixedExamItems = [];
+    var mixedExamKeys = new Set();
+    dueItems.concat(weakItems).forEach(function (item) {
+      var key = JSON.stringify([item.deckId, item.card.id]);
+      if (!mixedExamKeys.has(key)) {
+        mixedExamKeys.add(key);
+        mixedExamItems.push(item);
+      }
+    });
+    var challengeScope = mixedSelected || (mode === 'challenge' && !selectedDecks.length)
+      ? all
+      : all.filter(function (item) { return SEL.has(item.deckId); });
+    var challengeItems = MobileStudy.selectChallengeItems(
+      dueReviewItems(challengeScope, now),
+      StudyLogic.weakSpots(challengeScope, 10),
+      challengeScope,
+      function (item) { return isMastered(item.deckId, item.card.id); },
+      10
+    );
+    var coverageCardCount = mixedSelected
+      ? (mode === 'exam' ? mixedExamItems.length : challengeItems.length)
+      : (mode === 'challenge' && !selectedDecks.length ? challengeItems.length : selectedCardCount);
+    var coverageReady = mixedSelected
+      ? (mode === 'exam' ? mixedExamItems.length > 0 : challengeItems.length > 0)
+      : (mode === 'challenge' ? challengeItems.length > 0 : selectedDecks.length > 0 && selectedCardCount > 0);
+    var deckLabels = S.decks.map(function (d, index) {
+      var parsed = MobileStudy.parseChapterTitle(d.title);
+      var section = parsed.sectionNum || index + 1;
+      var displayTopic = section === 11 && parsed.topic === "Believers' Authority/Charisma" ? 'Authority & Charisma' : parsed.topic;
+      return {
+        deck: d,
+        section: section,
+        topic: displayTopic,
+        label: parsed.sectionNum ? 'Lesson ' + section + ' · ' + displayTopic : d.title,
+        isLesson: !!parsed.sectionNum
+      };
+    });
+    var selectedLabels = deckLabels.filter(function (entry) { return SEL.has(entry.deck.id); }).map(function (entry) { return entry.label; });
+    var coverageLabel = mixedSelected
+      ? 'Mixed practice'
+      : allSelected
+        ? 'All lessons'
+        : selectedLabels.length
+          ? selectedLabels.slice(0, 2).join(', ') + (selectedLabels.length > 2 ? ' +' + (selectedLabels.length - 2) + ' more' : '')
+          : mode === 'challenge' ? 'All lessons (default)' : 'Not selected';
+    var modeTitle = { challenge: 'Challenge', exam: 'Timed exam', quiz: 'Quiz', flash: 'Flashcards' }[mode] || 'Quiz';
+    var mixedDescription = mode === 'exam' ? 'Due and weak questions' : 'Due, missed and new questions';
+    var questionSummary;
+    if (mode === 'challenge') {
+      questionSummary = plural(coverageCardCount, 'question') + ' · about ' + Math.max(1, Math.ceil(coverageCardCount / 2)) + ' min';
+    } else if (mode === 'exam') {
+      questionSummary = mixedSelected && !coverageCardCount
+        ? 'No due or weak questions available yet'
+        : plural(coverageCardCount, 'question') + ' available · choose count and time in setup (30 min default)';
+    } else if (mixedSelected) {
+      questionSummary = plural(coverageCardCount, mode === 'flash' ? 'card' : 'question') + ' · mixed round, up to 10';
+    } else if (mode === 'flash') {
+      questionSummary = plural(coverageCardCount, 'card') + ' · no timer';
+    } else {
+      questionSummary = plural(coverageCardCount, 'question') + ' available · choose a limit in setup';
+    }
+    var startText = mode === 'challenge' ? 'Start challenge'
+      : mode === 'exam' ? 'Set up timed exam'
+        : mixedSelected ? (mode === 'flash' ? 'Start mixed flashcards' : 'Start mixed quiz')
+          : mode === 'flash' ? 'Set up flashcards' : 'Set up quiz';
+    var startHint = coverageReady
+      ? modeTitle + ' selected · ' + coverageLabel + ' · ' + questionSummary
+      : mixedSelected
+        ? (mode === 'exam'
+          ? 'Answer some questions first so a mixed exam has due or weak questions.'
+          : 'No questions are available in this mixed set yet.')
+        : selectedDecks.length
+          ? 'This selection has no questions yet. Choose another lesson or Mixed practice.'
+          : 'Choose a lesson, All lessons, or Mixed practice before continuing.';
     var modeTiles = [
-      { id: 'challenge', title: 'Challenge', description: '10-question quiz · about 5 min', icon: 'practice-challenge' },
-      { id: 'exam', title: 'Timed exam', description: 'Choose questions and time', icon: 'practice-exam' },
-      { id: 'quiz', title: 'Quiz', description: 'Multiple choice', icon: 'practice-quiz' },
-      { id: 'flash', title: 'Flashcards', description: 'Flip and recall', icon: 'practice-flash' }
+      { id: 'challenge', title: 'Challenge', description: 'Fixed round from due, weak and new cards', icon: 'practice-challenge' },
+      { id: 'exam', title: 'Timed exam', description: 'Choose question count and time', icon: 'practice-exam' },
+      { id: 'quiz', title: 'Quiz', description: 'Choose a question limit; review as you go', icon: 'practice-quiz' },
+      { id: 'flash', title: 'Flashcards', description: 'Recall answers at your own pace', icon: 'practice-flash' }
     ].map(function (item) {
       var selected = mode === item.id;
       return '<button type="button" class="practice-mode-tile' + (selected ? ' is-selected' : '') + '" data-act="practice-mode" data-mode="' + item.id + '" aria-pressed="' + selected + '">' +
         '<span class="practice-mode-icon" aria-hidden="true">' + getStepIconSvg(item.icon) + '</span>' +
         '<span class="practice-mode-copy"><strong>' + item.title + '</strong><small>' + item.description + '</small></span>' +
+        (selected ? '<span class="practice-mode-check" aria-hidden="true">✓</span>' : '') +
       '</button>';
     }).join('');
-    var deckTiles = S.decks.map(function (d, index) {
-      var parsed = MobileStudy.parseChapterTitle(d.title);
-      var section = parsed.sectionNum || index + 1;
-      var displayTopic = section === 11 && parsed.topic === "Believers' Authority/Charisma" ? 'Authority & Charisma' : parsed.topic;
+    var deckTiles = deckLabels.map(function (entry) {
+      var d = entry.deck;
+      var section = entry.section;
       var mastered = d.cards.filter(function (card) { return isMastered(d.id, card.id); }).length;
       var pct = d.cards.length ? Math.round(100 * mastered / d.cards.length) : 0;
       var selected = SEL.has(d.id);
-      return '<button type="button" class="practice-cover-tile deck-grad-' + (((section - 1) % 12) + 1) + (selected ? ' is-selected' : '') + '" data-act="practice-cover" data-id="' + esc(d.id) + '" aria-pressed="' + selected + '" aria-label="Lesson ' + section + ', ' + esc(displayTopic) + ', ' + d.cards.length + ' cards, ' + pct + ' percent mastered">' +
-        '<span class="practice-cover-title">Lesson ' + section + ' · ' + esc(displayTopic) + '</span>' +
+      var accessibleName = entry.isLesson
+        ? 'Lesson ' + section + ', ' + entry.topic
+        : 'Custom deck, ' + d.title;
+      return '<button type="button" class="practice-cover-tile deck-grad-' + (((section - 1) % 12) + 1) + (selected ? ' is-selected' : '') + '" data-act="practice-cover" data-id="' + esc(d.id) + '" aria-pressed="' + selected + '" aria-label="' + esc(accessibleName) + ', ' + d.cards.length + ' cards, ' + pct + ' percent mastered">' +
+        '<span class="practice-cover-title">' + (entry.isLesson ? 'Lesson ' + section + ' · ' + esc(entry.topic) : 'Custom deck · ' + esc(d.title)) + '</span>' +
         '<span class="practice-cover-stats">' + d.cards.length + ' cards · ' + pct + '%</span>' +
         (selected ? '<span class="practice-cover-check" aria-hidden="true">✓</span>' : '') +
       '</button>';
     }).join('');
-    var startText = mode === 'challenge' ? 'Start challenge' : mode === 'exam' ? 'Set up exam' : V.practiceMixed ? (mode === 'flash' ? 'Start mixed flashcards' : 'Start mixed practice') : 'Set up ' + (mode === 'flash' ? 'flashcards' : 'quiz');
-    var startDisabled = !selectedCount && mode !== 'challenge';
+    var selectionHelp = multi
+      ? 'Choose any number of lessons. Switching to one lesson keeps the most recently selected.'
+      : 'Choosing a lesson replaces the previous lesson. All lessons and Mixed practice remain available.';
     return '<section class="practice-selection-view" aria-labelledby="practice-title">' +
       '<header class="view-header practice-view-header">' +
         '<h1 id="practice-title">Practice</h1>' +
         '<p class="view-sub">Pick how you want to practice, then choose what to cover.</p>' +
       '</header>' +
-      '<div class="practice-mode-grid" role="group" aria-label="Choose a practice mode">' + modeTiles + '</div>' +
-      '<section class="practice-cover-section" aria-labelledby="practice-cover-title">' +
-        '<div class="practice-cover-heading">' +
-          '<h2 id="practice-cover-title">What to cover</h2>' +
-          '<button type="button" class="practice-multi-toggle' + (multi ? ' is-on' : '') + '" data-act="practice-multi" aria-pressed="' + multi + '"><span>Select several</span><i aria-hidden="true"></i></button>' +
+      '<section class="practice-choice-section practice-mode-section" aria-labelledby="practice-mode-title">' +
+        '<div class="practice-section-heading">' +
+          '<span class="practice-section-number" aria-hidden="true">01</span>' +
+          '<div><h2 id="practice-mode-title">Choose a practice mode</h2><p>One mode for this session.</p></div>' +
         '</div>' +
-        '<div class="practice-cover-grid" role="group" aria-label="Lessons to cover">' +
-          '<button type="button" class="practice-cover-tile cover-all' + (allSelected ? ' is-selected' : '') + '" data-act="practice-cover" data-id="__all__" aria-pressed="' + allSelected + '">' +
+        '<div class="practice-mode-grid" role="group" aria-label="Choose one practice mode">' + modeTiles + '</div>' +
+      '</section>' +
+      '<section class="practice-choice-section practice-cover-section" aria-labelledby="practice-cover-title">' +
+        '<div class="practice-section-heading practice-cover-heading">' +
+          '<span class="practice-section-number" aria-hidden="true">02</span>' +
+          '<div class="practice-cover-heading-copy"><h2 id="practice-cover-title">Choose coverage</h2><p>Pick one lesson, several, all, or a mixed set.</p></div>' +
+          '<button type="button" class="practice-multi-toggle' + (multi ? ' is-on' : '') + '" data-act="practice-multi" aria-label="Allow selecting multiple lessons" aria-pressed="' + multi + '" aria-describedby="practice-selection-help">' +
+            '<span>Select several</span><i aria-hidden="true"></i>' +
+          '</button>' +
+        '</div>' +
+        '<p class="practice-selection-help" id="practice-selection-help">' + selectionHelp + '</p>' +
+        '<div class="practice-cover-specials" role="group" aria-label="Whole-library practice choices">' +
+          '<button type="button" class="practice-cover-tile cover-all' + (allSelected ? ' is-selected' : '') + '" data-act="practice-cover" data-id="__all__" aria-pressed="' + allSelected + '" aria-label="All lessons, ' + totalCards + ' cards">' +
             '<span class="practice-cover-title">All lessons</span><span class="practice-cover-stats">' + totalCards + ' cards</span>' + (allSelected ? '<span class="practice-cover-check" aria-hidden="true">✓</span>' : '') +
           '</button>' +
-          '<button type="button" class="practice-cover-tile cover-mixed' + (V.practiceMixed ? ' is-selected' : '') + '" data-act="practice-cover" data-id="__mixed__" aria-pressed="' + !!V.practiceMixed + '">' +
-            '<span class="practice-cover-title">Mixed practice</span><span class="practice-cover-stats">Due, missed and new questions</span>' + (V.practiceMixed ? '<span class="practice-cover-check" aria-hidden="true">✓</span>' : '') +
-          '</button>' + deckTiles +
+          '<button type="button" class="practice-cover-tile cover-mixed' + (mixedSelected ? ' is-selected' : '') + '" data-act="practice-cover" data-id="__mixed__" aria-pressed="' + mixedSelected + '" aria-label="Mixed practice, ' + esc(mixedDescription) + '">' +
+            '<span class="practice-cover-title">Mixed practice</span><span class="practice-cover-stats">' + esc(mixedDescription) + '</span>' + (mixedSelected ? '<span class="practice-cover-check" aria-hidden="true">✓</span>' : '') +
+          '</button>' +
+        '</div>' +
+        '<div class="practice-cover-grid" role="group" aria-label="Lessons to cover">' +
+          deckTiles +
         '</div>' +
       '</section>' +
-      '<div class="practice-start-bar" aria-live="polite">' +
-        '<span>' + (selectedCount ? selectedCount + ' ' + (selectedCount === 1 ? 'selection' : 'selections') + ' ready' : 'Choose what to cover') + '</span>' +
-        '<button type="button" class="btn primary practice-start-button" data-act="practice-start" data-mode="' + mode + '"' + (startDisabled ? ' disabled aria-disabled="true"' : '') + '>' + startText + '</button>' +
-      '</div>' +
+      '<aside class="practice-session-summary" aria-labelledby="practice-summary-title">' +
+        '<div class="practice-summary-copy">' +
+          '<h2 id="practice-summary-title">Session summary</h2>' +
+          '<dl class="practice-summary-details">' +
+            '<div><dt>Mode</dt><dd>' + modeTitle + '</dd></div>' +
+            '<div><dt>Coverage</dt><dd>' + esc(coverageLabel) + '</dd></div>' +
+            '<div><dt>Questions</dt><dd>' + esc(questionSummary) + '</dd></div>' +
+          '</dl>' +
+          '<p class="practice-start-hint" role="status" aria-live="polite" aria-atomic="true">' + esc(startHint) + '</p>' +
+        '</div>' +
+        '<button type="button" class="btn primary practice-start-button" data-act="practice-start" data-mode="' + mode + '"' + (coverageReady ? '' : ' disabled') + '>' + startText + '</button>' +
+      '</aside>' +
     '</section>';
   };
 
