@@ -184,7 +184,7 @@ test('getChapterSteps returns four study steps with soft unlock states', () => {
   };
   const inProgSteps = MobileStudy.getChapterSteps(deck, inProgProgress);
   assert.equal(inProgSteps[0].state, 'in-progress');
-  assert.equal(inProgSteps[1].state, 'complete');
+  assert.equal(inProgSteps[1].state, 'attempted');
   assert.equal(inProgSteps[2].state, 'in-progress');
   assert.match(inProgSteps[2].meta, /1 question to strengthen/);
 
@@ -199,9 +199,22 @@ test('getChapterSteps returns four study steps with soft unlock states', () => {
   };
   const masteredSteps = MobileStudy.getChapterSteps(deck, masteredProgress);
   assert.equal(masteredSteps[0].state, 'complete');
-  assert.equal(masteredSteps[1].state, 'complete');
+  assert.equal(masteredSteps[1].state, 'attempted');
   assert.equal(masteredSteps[2].state, 'empty');
   assert.equal(masteredSteps[3].state, 'complete');
+});
+
+test('a quiz attempt is distinct from mastery at every recorded score', () => {
+  const deck = { id: 'lesson', cards: [{ id: 'q1' }] };
+  for (const pct of [0, 40, 100]) {
+    const progress = { best: { pct }, cards: {} };
+    const before = JSON.stringify(progress);
+    const steps = MobileStudy.getChapterSteps(deck, progress);
+    assert.equal(steps.find(step => step.id === 'quiz').state, 'attempted');
+    assert.equal(steps.find(step => step.id === 'quiz').meta, `Best score: ${pct}%`);
+    assert.equal(steps.find(step => step.id === 'flash').state, 'unlocked');
+    assert.equal(JSON.stringify(progress), before, 'rendering must preserve existing learner records');
+  }
 });
 
 test('formatCompletionFeedback generates positive coaching titles and stats', () => {

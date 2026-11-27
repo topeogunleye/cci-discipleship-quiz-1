@@ -460,7 +460,7 @@
         mode: 'quiz',
         title: 'Quiz',
         desc: 'Test your retention with instant feedback and explanations',
-        state: progress && progress.best ? 'complete' : (quizUnlocked ? 'unlocked' : 'recommended-next'),
+        state: progress && progress.best ? 'attempted' : (quizUnlocked ? 'unlocked' : 'recommended-next'),
         action: 'setup',
         meta: progress && progress.best ? ('Best score: ' + progress.best.pct + '%') : (quizUnlocked ? 'Ready to test' : 'Study flashcards first (optional)'),
         icon: 'quiz'
