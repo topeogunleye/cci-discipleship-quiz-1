@@ -571,6 +571,24 @@
     };
   }
 
+  // Device-local playback positions are distinct from mastery and course completion.
+  function normalizeWatchHistory(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    var result = {};
+    Object.keys(raw).filter(function (id) {
+      var item = raw[id];
+      return ['__proto__', 'constructor', 'prototype'].indexOf(id) < 0 && /^[a-zA-Z0-9._-]{1,180}$/.test(id) && item && typeof item === 'object' && !Array.isArray(item) &&
+        typeof item.deckId === 'string' && /^[a-zA-Z0-9._-]{1,120}$/.test(item.deckId) &&
+        Number.isFinite(item.time) && item.time > 0 && item.time <= 86400 &&
+        Number.isFinite(item.updatedAt) && item.updatedAt > 0;
+    }).sort(function (a, b) { return raw[b].updatedAt - raw[a].updatedAt; }).slice(0, 200).forEach(function (id) {
+      var item = raw[id];
+      var duration = Number.isFinite(item.duration) && item.duration > 0 && item.duration <= 86400 ? item.duration : null;
+      result[id] = { deckId: item.deckId, time: duration ? Math.min(item.time, duration) : item.time, duration: duration, updatedAt: item.updatedAt };
+    });
+    return result;
+  }
+
   function normalizeStreak(raw) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       return { lastStreakDate: null };
@@ -609,6 +627,7 @@
     defaultOnboarding: defaultOnboarding,
     normalizeOnboarding: normalizeOnboarding,
     normalizeStreak: normalizeStreak,
+    normalizeWatchHistory: normalizeWatchHistory,
     formatCompletionFeedback: formatCompletionFeedback,
     parseChapterTitle: parseChapterTitle,
     getChapterSteps: getChapterSteps,

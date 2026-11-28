@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync(require.resolve('../js/app.js'), 'utf8');
 const helpers = source.slice(source.indexOf('  var lessonVideoVisits ='), source.indexOf('  function lessonVideoGroups('));
 function context(extra = {}) {
-  const ctx = { V: { name: 'lesson-video' }, ...extra };
+  const ctx = { V: { name: 'lesson-video' }, S: { watchHistory: {} }, MobileStudy: require('../js/mobile-study.js'), ...extra };
   vm.createContext(ctx);
   vm.runInContext(helpers, ctx);
   return ctx;
@@ -36,7 +36,7 @@ test('study headings distinguish video scope, whole chapter and older saved sess
   assert.match(legacy.subtitle, /Saved study session/);
   assert.equal(ctx.lessonVideoStudyHeading({ name: 'quiz', opts: { videoId: 'removed' } }, 11, videos).title, 'Quiz');
 });
-test('breakpoint changes move existing controls and retain focus', () => {
+test('breakpoint changes retain the same recording navigation and keyboard focus', () => {
   function node() {
     return {
       children: [], parentNode: null,
@@ -60,7 +60,7 @@ test('breakpoint changes move existing controls and retain focus', () => {
   const query = { matches: true, addEventListener(event, callback) { assert.equal(event, 'change'); change = callback; } };
   const ctx = context({ app: { querySelector: () => page }, document, window: { matchMedia: () => query } });
   ctx.syncLessonVideoLayout();
-  assert.equal(nav.parentNode, topbar);
+  assert.equal(nav.parentNode, slot);
   query.matches = false; change();
   assert.equal(nav.parentNode, slot);
   assert.equal(summary.children[0], title);
@@ -176,7 +176,7 @@ test('a background video-page render preserves existing navigation focus', () =>
   Object.defineProperty(app, 'innerHTML', { set() { document.activeElement = document.body; } });
   const ctx = context({
     app, document, window: { scrollTo: () => {} }, MAIN_TABS: [], views: { 'lesson-video': () => '<section></section>' },
-    closeBiblePreview: () => {}, banner: () => '', animateRouteChange: false, syncHomePlanActions: () => {}
+    closeBiblePreview: () => {}, banner: () => '', animateRouteChange: false, syncHomePlanActions: () => {}, renderDesktopSidebar: () => ''
   });
   const renderSource = source.slice(source.indexOf('  function render(keep)'), source.indexOf('  function viewToHash('));
   vm.runInContext(renderSource, ctx);

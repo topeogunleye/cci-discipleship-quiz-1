@@ -1,7 +1,7 @@
 'use strict';
 
 const CACHE_PREFIX = 'cci-study-pwa-';
-const CACHE_NAME = CACHE_PREFIX + 'v96';
+const CACHE_NAME = CACHE_PREFIX + 'v116';
 const CORE_FILES = [
   './',
   'app/',
@@ -12,6 +12,18 @@ const CORE_FILES = [
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/apple-touch-icon.png',
+  'icons/ui/copy.svg',
+  'icons/ui/play-circle.svg',
+  'icons/ui/file-text.svg',
+  'icons/ui/list.svg',
+  'icons/ui/check-square.svg',
+  'icons/ui/clock.svg',
+  'icons/ui/target.svg',
+  'icons/ui/menu.svg',
+  'icons/ui/chevron-left.svg',
+  'icons/ui/chevron-right.svg',
+  'icons/ui/check-circle.svg',
+  'icons/ui/x-circle.svg',
   'style.css',
   'brand.css',
   'js/parser.js',

@@ -45,7 +45,8 @@ function normalizeTextFiles(directory) {
 normalizeTextFile(path.join(root, 'js/supabase.bundle.js'));
 
 html = replaceOnce(html, '<link rel="stylesheet" href="brand.css">', `<style>\n${read('brand.css')}\n</style>`);
-html = replaceOnce(html, '<link rel="stylesheet" href="style.css">', `<style>\n${read('style.css')}\n</style>`);
+// The shared stylesheet is already copied into web/native packages and the
+// offline core cache. Keep it external instead of duplicating it in the shell.
 // Keep starter-fallback lightweight in dist/index.html to save 1.09 MB of payload bloat
 // Decks are loaded dynamically via decks/manifest.json and decks/starter-decks.js
 // html = replaceOnce(html, '<script type="application/json" id="starter-fallback">""</script>', `<script type="application/json" id="starter-fallback">${inlineJson}</script>`);
