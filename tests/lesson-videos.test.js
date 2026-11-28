@@ -278,11 +278,11 @@ test('lesson video view clearly communicates chapter study scope and card counts
   assert.match(appSource, /Lesson Flashcards \(' \+ d\.cards\.length \+ '\)/);
   assert.match(appSource, /Lesson Quiz \(' \+ d\.cards\.length \+ '\)/);
   assert.match(appSource, /aria-label="Study Lesson ' \+ section \+ ' \(/);
-  assert.match(appSource, /aria-label="Practise this video"/);
+  assert.match(appSource, /aria-label="Practise this recording"/);
   assert.match(appSource, /aria-label="Whole lesson review"/);
   assert.match(appSource, /scopeNote = '<p class="note" style="margin-top:4px;margin-bottom:var\(--space-md\);">' \+/);
-  assert.match(appSource, /Video Flashcards \(' \+ videoCards\.length \+ '\)/);
-  assert.match(appSource, /Video Quiz \(' \+ videoCards\.length \+ '\)/);
+  assert.match(appSource, /aria-label="Flashcards for this recording,/);
+  assert.match(appSource, /aria-label="Quiz for this recording,/);
 });
 
 test('lesson video study modal launches overlay without unmounting player, pauses video, and auto-saves progress', () => {
@@ -769,14 +769,17 @@ test('hybrid video study scopes questions to active video and preserves Section 
   t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 0 });
   t.render();
   const navigationMarkup = elements.app.innerHTML;
-  assert.ok(navigationMarkup.indexOf('id="lesson-video-title"') < navigationMarkup.indexOf('aria-label="Lesson video player"'), 'the recording title precedes the player in reading order');
-  assert.match(navigationMarkup, /role="group" aria-label="Practise this video"/);
+  assert.ok(navigationMarkup.indexOf('id="lesson-video-title"') > navigationMarkup.indexOf('aria-label="Lesson video player"'), 'the mobile reading order puts recording context immediately after the player');
+  assert.match(navigationMarkup, /role="group" aria-label="Practise this recording"/);
   assert.equal((navigationMarkup.match(/class="lesson-video-navigation"/g) || []).length, 1, 'one navigation instance moves across breakpoints');
   assert.match(navigationMarkup, /lesson-video-navigation-slot/);
   assert.match(navigationMarkup, /<h2 class="lesson-video-position" id="lesson-video-navigation-context"[^>]*>Video 1 of 2<\/h2>/);
   assert.equal((navigationMarkup.match(/data-video-nav="previous" disabled aria-label="Previous lesson · No adjacent lesson/g) || []).length, 1);
-  assert.match(elements.app.innerHTML, /Video Flashcards \(1\)/);
-  assert.match(elements.app.innerHTML, /Video Quiz \(1\)/);
+  assert.match(elements.app.innerHTML, /aria-label="Flashcards for this recording, 1 card"/);
+  assert.match(elements.app.innerHTML, /aria-label="Quiz for this recording, 1 question"/);
+  const visiblePracticeLabels = [...navigationMarkup.matchAll(/<button\b[^>]*data-act="setup"[^>]*data-video-id="[^"]+"[^>]*>([\s\S]*?)<\/button>/g)]
+    .map(match => match[1].replace(/<[^>]+>/g, '').trim());
+  assert.deepEqual(visiblePracticeLabels, ['Flashcards', 'Quiz'], 'visible labels must match the selected concept without prefixes or counts');
   assert.doesNotMatch(elements.app.innerHTML, /Lesson Flashcards/);
   assert.doesNotMatch(elements.app.innerHTML, /Lesson Quiz/);
 
@@ -784,8 +787,8 @@ test('hybrid video study scopes questions to active video and preserves Section 
   t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 1 });
   t.render();
   assert.equal((elements.app.innerHTML.match(/data-video-nav="next" disabled aria-label="Next lesson · No adjacent lesson/g) || []).length, 1, 'a custom deck without a curriculum destination has an explicit unavailable next lesson');
-  assert.match(elements.app.innerHTML, /Video Flashcards \(1\)/);
-  assert.match(elements.app.innerHTML, /Video Quiz \(1\)/);
+  assert.match(elements.app.innerHTML, /aria-label="Flashcards for this recording, 1 card"/);
+  assert.match(elements.app.innerHTML, /aria-label="Quiz for this recording, 1 question"/);
   assert.match(elements.app.innerHTML, /Lesson Flashcards \(2\)/);
   assert.match(elements.app.innerHTML, /Lesson Quiz \(2\)/);
 
@@ -799,7 +802,7 @@ test('hybrid video study scopes questions to active video and preserves Section 
   testDeck.cards = [{ id: 'c1', question: 'Q1', ref: 'Part One' }];
   t.setV({ name: 'lesson-video', id: 'd-test', videoIndex: 1 });
   t.render();
-  assert.doesNotMatch(elements.app.innerHTML, /aria-label="Practise this video"/);
+  assert.doesNotMatch(elements.app.innerHTML, /aria-label="Practise this recording"/);
   assert.match(elements.app.innerHTML, /aria-label="Whole lesson review"/);
 
   // Dynamic question count dropdown filtering

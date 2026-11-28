@@ -14,20 +14,26 @@ test('reordering preserves every original video field and section assignment', (
 
 test('group headings preserve global video indices, active selection and escaping', () => {
   const source = fs.readFileSync(require.resolve('../js/app.js'), 'utf8');
-  const helper = source.slice(source.indexOf('  function lessonVideoGroups('), source.indexOf('  function cardMatchesVideo('));
+  const helper = source.slice(source.indexOf('  function playbackClock('), source.indexOf('  function adjacentLessonDestination(')) +
+    source.slice(source.indexOf('  function lessonVideoGroups('), source.indexOf('  function cardMatchesVideo('));
   const esc = value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-  const render = vm.runInNewContext(helper + ';lessonVideoGroups', { esc });
+  const render = vm.runInNewContext(helper + ';lessonVideoGroups', { esc, S: { watchHistory: {} } });
   const videos = [{ title: 'One', group: 'First & next' }, { title: 'Two', group: 'First & next' }, { title: '<Three>', group: 'Last' }];
   const html = render(videos, 2);
   assert.equal((html.match(/<h3/g) || []).length, 2);
   assert.deepEqual([...html.matchAll(/data-index="(\d+)"/g)].map(match => Number(match[1])), [0, 1, 2]);
   assert.match(html, /data-index="2" aria-current="true"/);
   assert.match(html, /First &amp; next/);
-  assert.match(html, /3\. &lt;Three&gt;/);
+  assert.match(html, /<strong>&lt;Three&gt;<\/strong>/);
   assert.equal((html.match(/<details /g) || []).length, 2);
   assert.equal((html.match(/class="lesson-video-group" open/g) || []).length, 1);
   assert.match(html, /<details class="lesson-video-group" open><summary><h3>Last/);
-  assert.match(html, /lesson-video-current-label">Current/);
+  assert.match(html, /recording-row-status">Current/);
+  const chapterHtml = render(videos, 0, true);
+  assert.equal((chapterHtml.match(/data-act="open-lesson-video"/g) || []).length, 3);
+  assert.equal((chapterHtml.match(/class="lesson-video-group" open/g) || []).length, 1);
+  assert.match(chapterHtml, /aria-current="step"/, 'chapter browsing identifies the selected sequence step');
+  assert.doesNotMatch(chapterHtml, /aria-current="true"|Current group/, 'chapter selection must not imply a recording is playing');
   assert.doesNotMatch(render(videos.map(({ title }) => ({ title })), 0), /<h3|lesson-video-group/);
 });
 

@@ -47,14 +47,14 @@ function appHarness() {
       switchStorageOwner, setAdapter: value => { storageAdapter = value; },
       saved: () => recorded, studied: () => studied,
       setVideos: value => { LESSON_VIDEOS = value; },
-      flash: views.flash, results: views.results, home: views.home, settings: views.settings, syncVideoStudyResume
+      flash: views.flash, results: views.results, home: views.home, settings: views.settings, chapter: views.chapter, rememberLessonVideoVisit, syncVideoStudyResume
     };
   `);
   vm.runInNewContext(wrapped, { window, document, URL, setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {} });
   const app = window.testApp;
   app.state().decks = json(decks);
-  const click = act => {
-    const target = { dataset: { act, v: 'known' }, matches: () => false, closest: selector => selector === '[data-act]' ? target : null };
+  const click = (act, data = {}) => {
+    const target = { dataset: { act, v: 'known', ...data }, matches: () => false, closest: selector => selector === '[data-act]' ? target : null };
     handlers.click.forEach(fn => fn({ target }));
   };
   const key = (value, shiftKey = false) => {
@@ -64,6 +64,38 @@ function appHarness() {
   };
   return { app, elements, click, key, focus: () => focus, document };
 }
+
+test('chapter Current selection follows a recording visit without claiming watched progress', () => {
+  const { app } = appHarness();
+  const videos = [{ id: 'video-one', deckId: 'chapter', title: 'First' }, { id: 'video-two', deckId: 'chapter', title: 'Second' }];
+  app.setVideos(videos);
+  app.setView({ name: 'chapter', id: 'chapter' });
+  app.state().pausedSession = MobileStudy.snapshot(session('flash'));
+  const saved = json(app.state().pausedSession);
+  app.rememberLessonVideoVisit('chapter', videos[1], 0);
+  const markup = app.chapter();
+  assert.match(markup, /data-index="1" aria-current="step" aria-label="Second, Current selection"/);
+  assert.doesNotMatch(markup, /data-index="0" aria-current/);
+  assert.deepEqual(json(app.state().pausedSession), saved);
+  assert.deepEqual(json(app.state().watchHistory), {});
+});
+
+test('Home continuation opens the saved recording position without replacing unfinished practice or autoplaying', () => {
+  const { app, click } = appHarness();
+  const saved = MobileStudy.snapshot(session('flash'));
+  app.state().pausedSession = saved;
+  app.state().watchHistory = { 'video-one': { deckId: 'chapter', time: 35, duration: 100, updatedAt: Date.now() } };
+  app.setVideos([{ id: 'video-one', deckId: 'chapter', title: 'Recording & context', videoUrl: '/api/videos/video-one' }]);
+  const markup = app.home();
+  assert.match(markup, /Continue flashcards/);
+  assert.match(markup, /Continue watching: Recording &amp; context · 0:35/);
+  assert.match(markup, /data-act="resume-study"/);
+  click('continue-watching', { id: 'chapter', index: '0', time: '35' });
+  assert.equal(app.view().name, 'lesson-video');
+  assert.equal(app.view().videoTime, 35);
+  assert.equal(app.view().autoPlayVideo, undefined);
+  assert.equal(app.state().pausedSession, saved);
+});
 
 test('session identity includes video, question pool, source, mode, chapters and settings; ignores randomized ordering', () => {
   const opts = session().opts;
@@ -449,12 +481,12 @@ test('closing video practice refreshes only its Resume control, preserving playe
     insertAdjacentHTML(where, html) { assert.equal(where, 'afterbegin'); markup = html; }
   };
   elements.app.querySelector = selector => {
-    assert.equal(selector, '.lesson-video-study-actions', 'never query or reconstruct the player');
+    assert.equal(selector, '.watch-saved-session', 'only refresh the saved-session disclosure, never reconstruct the player');
     return actions;
   };
   app.syncVideoStudyResume();
   assert.equal(removed, 1);
-  assert.match(markup, /Resume saved session \(2 of 3\)/);
+  assert.match(markup, /aria-label="Resume study:[^"]* · 2 of 3">Resume study/);
   assert.deepEqual(json(app.state()), before);
   app.state().pausedSession = null;
   app.syncVideoStudyResume();
@@ -463,13 +495,13 @@ test('closing video practice refreshes only its Resume control, preserving playe
 });
 
 
-test('refreshing Resume retains focus or returns it to the first practice action', () => {
+test('refreshing Resume retains focus or returns it to navigation when saved work is removed', () => {
   const { app, elements, document } = appHarness();
   const practice = { focus() { document.activeElement = practice; } };
   const makeResume = () => ({ remove() { current = null; document.activeElement = null; }, focus() { document.activeElement = current; } });
   let current = makeResume();
   document.activeElement = current;
-  elements.app.querySelector = () => ({
+  elements.app.querySelector = selector => selector === '.study-page-navigation > summary' ? practice : ({
     querySelector(selector) { return selector === '.resume-study-btn' ? current : practice; },
     insertAdjacentHTML(where, html) { current = html ? makeResume() : null; }
   });

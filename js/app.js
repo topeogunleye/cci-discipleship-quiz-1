@@ -2,7 +2,7 @@
   'use strict';
   var P = window.DeckParser, StudyLogic = window.StudyLogic, Storage = window.StudyStorage, MobileStudy = window.MobileStudy, ProgressSync = window.CCIProgressSync, Account = window.CCIAccount, TranscriptTools = window.CCITranscripts, LET = P.LETTERS, KEY = 'flashdecks.v1', DATA_VERSION = 14;
   var app = document.getElementById('app'), modal = document.getElementById('modal'), toastEl = document.getElementById('toast');
-  function defaultStudyState() { return { decks: [], progress: {}, settings: { theme: 'auto', bibleVersion: 'APIBIBLE_NKJV', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, cloudSyncDeviceId: null, seeded: false, dataVersion: 0, pausedSession: null }; }
+  function defaultStudyState() { return { decks: [], progress: {}, watchHistory: {}, settings: { theme: 'auto', bibleVersion: 'APIBIBLE_NKJV', shuffle: false, showStreak: true, showDraftDevotionals: false }, onboarding: { completed: false, goal: 'habit', dailyMinutes: 10, startingTopic: 'soteriology', preferredTime: 'anytime', committed: false }, streak: { lastStreakDate: null }, devotions: { read: {}, saved: {}, carouselHiddenOn: null }, completedToday: {}, cloudSyncDeviceId: null, seeded: false, dataVersion: 0, pausedSession: null }; }
   var S = defaultStudyState();
   var STARTER_DECKS = [], DEVOTIONALS = [], LESSON_VIDEOS = [];
   var activeBiblePreview = null, biblePreviewCloseTimer = null, biblePreviewSequence = 0, biblePreviewRequestSequence = 0, biblePreviewRequest = null, suppressBiblePreviewFocus = null, suppressBiblePreviewHover = null;
@@ -681,6 +681,7 @@
   }
   // Visit-only selection; deliberately separate from persisted learner progress.
   var lessonVideoVisits = Object.create(null);
+  var activePlaybackCheckpoint = null;
   var lessonVideoLayoutQuery = null;
   var lessonVideoLayoutListening = false;
   function rememberLessonVideoVisit(deckId, video, time) {
@@ -693,8 +694,107 @@
   }
   function lessonVideoVisitRoute(deckId, videos) {
     var visit = lessonVideoVisits[deckId];
+    if (!visit) {
+      var recent = recentWatching(deckId);
+      if (recent) visit = { videoId: recent.video.id, time: recent.time };
+    }
     var index = visit ? videos.findIndex(function (video) { return video.id === visit.videoId; }) : -1;
     return { name: 'lesson-video', id: deckId, videoIndex: index < 0 ? 0 : index, videoTime: index < 0 ? 0 : visit.time };
+  }
+  function playbackClock(seconds) {
+    seconds = Math.max(0, Math.floor(seconds || 0));
+    return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
+  }
+  function recordingPosition(video) {
+    var record = S.watchHistory && S.watchHistory[video.id];
+    return record && record.deckId === video.deckId ? record : null;
+  }
+  function resumeTime(record) {
+    return record && !(record.duration && record.time >= record.duration - 2) ? record.time : 0;
+  }
+  function recentWatching(deckId) {
+    var history = S.watchHistory || {};
+    var ids = Object.keys(history).sort(function (a, b) { return history[b].updatedAt - history[a].updatedAt; });
+    for (var i = 0; i < ids.length; i++) {
+      var record = history[ids[i]], d = deck(record.deckId);
+      if (!d || (deckId && deckId !== d.id)) continue;
+      var videos = lessonVideosForDeck(d.id);
+      var index = videos.findIndex(function (video) { return video.id === ids[i]; });
+      if (index >= 0) return { deck: d, video: videos[index], index: index, time: resumeTime(record), record: record };
+    }
+    return null;
+  }
+  function savePlaybackPosition(deckId, video, player, owner) {
+    if (!video || owner !== activeStorageOwnerId || requestedStorageOwnerId !== owner ||
+        !Number.isFinite(player.currentTime) || player.currentTime <= 0 || player.currentTime > 86400) return false;
+    var duration = Number.isFinite(player.duration) && player.duration > 0 ? player.duration : null;
+    S.watchHistory = MobileStudy.normalizeWatchHistory(Object.assign({}, S.watchHistory, {
+      [video.id]: { deckId: deckId, time: player.currentTime, duration: duration, updatedAt: Date.now() }
+    }));
+    return true;
+  }
+  function checkpointPlayback(force) {
+    if (activePlaybackCheckpoint) activePlaybackCheckpoint(!!force);
+  }
+  function studyIcon(name, extraClass) {
+    return '<img class="study-icon icon-' + name + (extraClass ? ' ' + extraClass : '') + '" src="icons/ui/' + name + '.svg" width="22" height="22" alt="" aria-hidden="true">';
+  }
+  function recordingTitle(value) {
+    var title = String(value || '');
+    if (title !== title.toUpperCase()) return title;
+    return title.replace(/\b[A-Z][A-Z']*\b/g, function (word) {
+      return /^(?:I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XX|CCI|ESV|NKJV|KJV|NIV|AMP|MSG|RCCG|DNA)$/.test(word)
+        ? word : word.charAt(0) + word.slice(1).toLowerCase();
+    });
+  }
+  function recordingRow(video, index, selected, deckId, chapter) {
+    var record = recordingPosition(video), time = resumeTime(record);
+    var status = selected ? 'Current' : (record ? (time ? 'Resume at ' + playbackClock(time) : 'Replay') : 'Available');
+    var duration = record && record.duration ? playbackClock(record.duration) : 'Duration unavailable';
+    return '<button type="button" class="lesson-video-segment recording-row' + (selected ? ' is-active' : '') + '" data-act="' + (chapter ? 'open-lesson-video' : 'lesson-video-select') + '" data-id="' + esc(deckId) + '" data-index="' + index + '"' + (selected ? ' aria-current="' + (chapter ? 'step' : 'true') + '"' : '') + ' aria-label="' + esc(recordingTitle(video.title) + ', ' + status + (selected && chapter ? ' selection' : '')) + '">' +
+      '<span class="recording-row-number" aria-hidden="true">' + studyIcon('play-circle') + '</span><span class="recording-row-copy"><strong>' + esc(recordingTitle(video.title)) + '</strong><small>' + esc(duration) + '</small></span><span class="recording-row-status">' + esc(status) + '</span></button>';
+  }
+  function studyPageHeader(backDeckId, extra) {
+    return '<header class="concept-header">' + (backDeckId ? '<button type="button" class="concept-back" data-act="' + (V.name === 'lesson-video' ? 'lesson-video-back' : 'nav-tab') + '" data-tab="journey" data-id="' + esc(backDeckId) + '" aria-label="' + (V.name === 'lesson-video' ? 'Back to lesson' : 'Back to Journey') + '">' + studyIcon('chevron-left') + '</button>' : '') +
+      (backDeckId ? '<strong>CCI Discipleship</strong>' : '<h1>CCI Discipleship</h1>') +
+      '<details class="study-page-navigation"><summary aria-label="Open navigation">' + studyIcon('menu') + '</summary><div class="study-page-navigation-panel"><nav aria-label="Study navigation">' +
+      ['home', 'journey', 'practice', 'progress', 'settings'].map(function (tab) {
+        var active = V.name === tab || (tab === 'journey' && (V.name === 'chapter' || V.name === 'lesson-video'));
+        return '<button type="button" data-act="nav-tab" data-tab="' + tab + '"' + (active ? ' aria-current="page"' : '') + '>' + tab.charAt(0).toUpperCase() + tab.slice(1) + '</button>';
+      }).join('') + '</nav>' + (extra || '') + '</div></details></header>';
+  }
+  function compactSessionContext(session) {
+    if (!session) return '';
+    var ids = session.ids || [], d = deck(ids[0] || (session.cards && session.cards[0] && session.cards[0].deckId));
+    var label = ids.length > 1 ? ids.length + ' lessons' : (d ? MobileStudy.parseChapterTitle(d.title).topic : 'Saved study session');
+    var videoId = session.opts && session.opts.videoId;
+    var video = d && videoId ? lessonVideosForDeck(d.id).find(function (item) { return item.id === videoId; }) : null;
+    return label + (video ? ' · ' + recordingTitle(video.title) : '');
+  }
+  function nextRecordingChoices(watching) {
+    var choices = [];
+    S.decks.forEach(function (d) {
+      lessonVideosForDeck(d.id).forEach(function (video, index) { choices.push({ deck: d, video: video, index: index }); });
+    });
+    var current = watching ? choices.findIndex(function (item) { return item.deck.id === watching.deck.id && item.video.id === watching.video.id; }) : -1;
+    return choices.slice(current + 1, current + 4);
+  }
+  function selectWatchTool(tool, focus) {
+    if (V.name !== 'lesson-video' || ['transcript', 'recordings'].indexOf(tool) < 0) return;
+    var side = app.querySelector('.lesson-video-side');
+    if (!side) return;
+    var requestedTab = side.querySelector('[data-act="watch-tool"][data-tool="' + tool + '"]');
+    if (!requestedTab || requestedTab.disabled) return;
+    V.watchTool = tool;
+    side.dataset.watchTool = tool;
+    side.querySelectorAll('[data-act="watch-tool"]').forEach(function (tab) {
+      var active = tab.dataset.tool === tool;
+      tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      tab.tabIndex = active ? 0 : -1;
+      if (active && focus) tab.focus();
+    });
+    var panel = side.querySelector('#watch-' + tool + '-panel');
+    if (panel) panel.open = true;
   }
   function adjacentLessonDestination(deckId, direction) {
     // Use the curriculum order, including missing lessons; never skip to a later recording.
@@ -739,7 +839,7 @@
     var boundary = !videos.length || (previous ? index === 0 : index === videos.length - 1);
     if (!boundary) {
       var target = index + (previous ? -1 : 1);
-      return '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-video-nav="' + direction + '" data-index="' + target + '" aria-label="' + label + ' video: ' + esc(videos[target].title) + '">' + (previous ? '‹ ' : '') + label + ' video' + (previous ? '' : ' ›') + '</button>';
+      return '<button type="button" class="btn lesson-video-nav-button" data-act="lesson-video-select" data-video-nav="' + direction + '" data-index="' + target + '" aria-label="' + label + ' recording: ' + esc(recordingTitle(videos[target].title)) + '">' + (previous ? '‹ ' : '') + label + ' recording: ' + esc(recordingTitle(videos[target].title)) + (previous ? '' : ' ›') + '</button>';
     }
     var adjacent = adjacentLessonDestination(deckId, direction), available = adjacent.kind === 'video' || adjacent.kind === 'chapter';
     var title = adjacent.title || (adjacent.kind === 'first' ? 'First lesson' : adjacent.kind === 'last' ? 'Final lesson' : 'No adjacent lesson');
@@ -780,9 +880,10 @@
       if (lessonVideoLayoutQuery.addEventListener) lessonVideoLayoutQuery.addEventListener('change', syncLessonVideoLayout);
       else if (lessonVideoLayoutQuery.addListener) lessonVideoLayoutQuery.addListener(syncLessonVideoLayout);
     }
-    var wide = lessonVideoLayoutQuery ? lessonVideoLayoutQuery.matches : window.innerWidth >= 1024;
     var navigation = page.querySelector('.lesson-video-navigation');
-    var navigationTarget = page.querySelector(wide ? '.lesson-video-topbar' : '.lesson-video-navigation-slot');
+    var navigationTarget = page.querySelector('.lesson-video-navigation-slot');
+    var watchingTools = page.querySelector('.lesson-video-side');
+    if (watchingTools && watchingTools.dataset && window.innerWidth >= 1024) selectWatchTool(watchingTools.dataset.watchTool || 'transcript', false);
     var focused = document.activeElement;
     if (navigation && navigationTarget && navigation.parentNode !== navigationTarget) navigationTarget.appendChild(navigation);
     var frame = page.querySelector('.lesson-video-frame');
@@ -804,7 +905,7 @@
     if (Object.prototype.hasOwnProperty.call(options, 'videoId') && options.videoId === null) return { title: 'Lesson ' + section + ' ' + mode, subtitle: 'All lesson study material' };
     return { title: mode, subtitle: 'Lesson ' + section + ' · Saved study session' };
   }
-  function lessonVideoGroups(videos, selectedIndex) {
+  function lessonVideoGroups(videos, selectedIndex, chapter) {
     var groups = [];
     videos.forEach(function (item, itemIndex) {
       var name = item.group || '';
@@ -812,13 +913,13 @@
       groups[groups.length - 1].items.push(item);
     });
     var selected = videos[selectedIndex];
-    var html = selected && selected.group ? '<p class="lesson-video-current-group">Current group: <strong>' + esc(selected.group) + '</strong></p>' : '';
+    var html = !chapter && selected && selected.group ? '<p class="lesson-video-current-group">Current group: <strong>' + esc(selected.group) + '</strong></p>' : '';
     groups.forEach(function (group) {
       var isCurrent = selectedIndex >= group.start && selectedIndex < group.start + group.items.length;
-      if (group.name) html += '<details class="lesson-video-group"' + (isCurrent ? ' open' : '') + '><summary><h3>' + esc(group.name) + '</h3><span class="lesson-video-group-count">' + group.items.length + ' videos' + (isCurrent ? ' · Current group' : '') + '</span></summary><div class="lesson-video-group-buttons">';
+      if (group.name) html += '<details class="lesson-video-group"' + (isCurrent ? ' open' : '') + '><summary><h3>' + esc(group.name) + '</h3><span class="lesson-video-group-count">' + group.items.length + ' videos' + (isCurrent && !chapter ? ' · Current group' : '') + '</span></summary><div class="lesson-video-group-buttons">';
       group.items.forEach(function (item, offset) {
         var itemIndex = group.start + offset, active = itemIndex === selectedIndex;
-        html += '<button type="button" class="lesson-video-segment' + (active ? ' is-active' : '') + '" data-act="lesson-video-select" data-index="' + itemIndex + '" aria-current="' + (active ? 'true' : 'false') + '">' + (itemIndex + 1) + '. ' + esc(item.title) + (active ? '<span class="lesson-video-current-label">Current</span>' : '') + '</button>';
+        html += recordingRow(item, itemIndex, active, item.deckId, chapter);
       });
       if (group.name) html += '</div></details>';
     });
@@ -1134,6 +1235,7 @@
       S.dataVersion = Number.isInteger(o.dataVersion) && o.dataVersion >= 0 ? o.dataVersion : 0;
       S.backupReminder = o.backupReminder;
       S.pausedSession = o.pausedSession && typeof o.pausedSession === 'object' && !Array.isArray(o.pausedSession) ? o.pausedSession : null;
+      S.watchHistory = MobileStudy.normalizeWatchHistory(o.watchHistory);
     } catch (e) { preserveStorage = true; storageOk = false; storageMessage = 'Saved study data could not be read. To protect it, this app will not overwrite browser storage automatically. Export what you can before deciding whether to clear site data.'; }
   }
   function applyStorageResult(result) {
@@ -1234,6 +1336,8 @@
   function switchStorageOwner(owner) {
     owner = typeof owner === 'string' && owner ? owner : null;
     if (owner === requestedStorageOwnerId) return accountSwitchQueue;
+    checkpointPlayback(true);
+    activePlaybackCheckpoint = null;
     // Finish saving under the old owner before opening another local profile.
     if (activeStorageOwnerId === requestedStorageOwnerId && (isStudySession(V.name) || V.videoStudy)) {
       if (V.name === 'exam' && V.deadline) V.remaining = Math.max(0, V.deadline - Date.now());
@@ -1501,17 +1605,17 @@
   function isStudySession(name) { return name === 'flash' || name === 'quiz' || name === 'exam'; }
   function savedSessionResumeButton() {
     return S.pausedSession && S.pausedSession.cards && S.pausedSession.cards.length
-      ? '<button type="button" class="btn resume-study-btn" data-act="resume-paused-study">Resume saved session (' + (Math.min((S.pausedSession.i || 0) + 1, S.pausedSession.cards.length)) + ' of ' + S.pausedSession.cards.length + ') · ' + esc(sessionScopeLabel(S.pausedSession)) + '</button>'
+      ? '<button type="button" class="btn resume-study-btn" data-act="resume-paused-study" aria-label="Resume study: ' + esc(sessionScopeLabel(S.pausedSession)) + ' · ' + Math.min((S.pausedSession.i || 0) + 1, S.pausedSession.cards.length) + ' of ' + S.pausedSession.cards.length + '">Resume study</button>'
       : '';
   }
   function syncVideoStudyResume() {
-    var actions = app.querySelector('.lesson-video-study-actions');
+    var actions = app.querySelector('.watch-saved-session');
     if (!actions || typeof actions.insertAdjacentHTML !== 'function') return;
     var previous = actions.querySelector('.resume-study-btn');
     var restoreFocus = previous && document.activeElement === previous;
     if (previous) previous.remove();
     actions.insertAdjacentHTML('afterbegin', savedSessionResumeButton());
-    var replacement = restoreFocus && (actions.querySelector('.resume-study-btn') || actions.querySelector('[data-act="setup"]'));
+    var replacement = restoreFocus && (actions.querySelector('.resume-study-btn') || app.querySelector('.study-page-navigation > summary'));
     if (replacement) replacement.focus({ preventScroll: true });
   }
   function saveActiveSession() {
@@ -2056,10 +2160,7 @@
     ];
     var activeTab = currentTab === 'chapter' ? 'journey' : currentTab;
     return '<aside class="desktop-sidebar">' +
-      '<div class="desktop-logo">' +
-        '<span class="desktop-logo-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><rect x="2" y="2" width="36" height="36" rx="13" fill="#4B35C5"/><circle cx="27" cy="13" r="4" fill="#FFE6A8"/><path d="M3 27c6-7 11-11 17-8 5 3 9 8 17 1v18H3V27Z" fill="#7A3FD0"/></svg></span>' +
-        '<span class="desktop-logo-name">Study</span>' +
-      '</div>' +
+      '<div class="desktop-logo"><span class="desktop-logo-name">CCI<br>Discipleship</span></div>' +
       '<nav class="desktop-nav" aria-label="Main navigation">' +
         tabs.map(function (tab) {
           var isActive = tab.id === activeTab;
@@ -2116,7 +2217,7 @@
         '<h2 class="hero-card-title">Pick up where you left off</h2>' +
         '<p class="hero-card-desc">' + esc(sessionScopeLabel(S.pausedSession)) + '</p>' +
         '<div class="hero-card-actions">' +
-          '<button class="btn primary full" data-act="resume-study">Resume Study</button>' +
+          '<button class="btn primary full" data-act="resume-study">Resume study</button>' +
           '<button class="btn sm ghost" data-act="discard-study">End session</button>' +
         '</div>' +
       '</section>';
@@ -2243,25 +2344,34 @@
       : '';
 
     var dailyAction = totalCards > 0 && totalKnown >= totalCards ? 'exam' : 'daily-study';
+    var watching = recentWatching();
+    if (!watching && S.pausedSession && S.pausedSession.returnToVideo) {
+      var savedVideo = S.pausedSession.returnToVideo;
+      var savedDeck = deck(savedVideo.deckId), savedVideos = lessonVideosForDeck(savedVideo.deckId);
+      if (savedDeck && savedVideos[savedVideo.videoIndex]) watching = { deck: savedDeck, video: savedVideos[savedVideo.videoIndex], index: savedVideo.videoIndex, time: savedVideo.currentTime || 0 };
+    }
+    var watchingButton = watching ? '<button type="button" class="home-continue-watching" data-act="continue-watching" data-id="' + esc(watching.deck.id) + '" data-index="' + watching.index + '" data-time="' + watching.time + '" aria-label="Continue watching: ' + esc(recordingTitle(watching.video.title)) + (watching.time ? ' · ' + playbackClock(watching.time) : '') + '">Continue watching</button>' : '';
     var desktopHeroTitle = S.pausedSession
-      ? 'Continue · ' + Math.min((S.pausedSession.i || 0) + 1, (S.pausedSession.cards || []).length) + ' of ' + S.pausedSession.cards.length + ' cards'
+      ? 'Continue ' + (S.pausedSession.name === 'flash' ? 'flashcards' : S.pausedSession.name === 'exam' ? 'timed exam' : 'quiz')
       : (dueCount ? 'Your next step: ' + plural(dailyFocusCount, 'card') : (unmasteredCount > 0 ? 'Start your ' + dailyFocusCount + '-card daily focus' : 'You’ve mastered every card'));
     var desktopHeroDescription = S.pausedSession
-      ? sessionScopeLabel(S.pausedSession)
+      ? compactSessionContext(S.pausedSession)
       : (dueCount
         ? plural(dueCount, 'card') + ' scheduled for review today. Start with your ' + dailyFocusCount + '-card focus.'
         : (unmasteredCount > 0
           ? 'A ' + dailyFocusCount + '-card session from your library.'
           : 'Nothing is scheduled for review today. Your study library is complete.'));
     var desktopHeroAction = S.pausedSession ? 'resume-study' : dailyAction;
-    var desktopHeroButtonText = S.pausedSession ? 'Resume Study' : (dailyAction === 'exam' ? 'Take Comprehensive Exam' : (dueCount ? 'Review Today’s Focus' : 'Study ' + dailyFocusCount + ' Cards'));
+    var desktopHeroButtonText = S.pausedSession ? 'Resume study' : (dailyAction === 'exam' ? 'Take Comprehensive Exam' : (dueCount ? 'Review Today’s Focus' : 'Study ' + dailyFocusCount + ' Cards'));
     var desktopHero = '<section class="desktop-today-card" aria-label="Today’s study">' +
       '<div class="desktop-today-copy">' +
-        '<p class="desktop-today-eyebrow">Today’s study</p>' +
-        '<h2>' + esc(desktopHeroTitle) + '</h2>' +
-        '<p>' + esc(desktopHeroDescription) + '</p>' +
-        '<div class="desktop-today-actions"><button type="button" class="desktop-today-action" data-act="' + desktopHeroAction + '">' + desktopHeroButtonText + '</button>' +
-        (S.pausedSession ? '<button type="button" class="desktop-today-action-secondary" data-act="discard-study">End session</button>' : '') + '</div>' +
+        '<div class="home-resume-heading">' + (S.pausedSession ? studyIcon(S.pausedSession.name === 'flash' ? 'copy' : S.pausedSession.name === 'exam' ? 'clock' : 'check-square', 'home-session-icon') : '') +
+          '<div class="home-resume-text"><h2>' + esc(desktopHeroTitle) + '</h2>' +
+          '<p>' + esc(desktopHeroDescription) + '</p>' +
+          (S.pausedSession ? '<p class="study-resume-position">' + (S.pausedSession.name === 'flash' ? 'Card ' : 'Question ') + Math.min((S.pausedSession.i || 0) + 1, S.pausedSession.cards.length) + ' of ' + S.pausedSession.cards.length + '</p>' : '') + '</div>' +
+        '</div>' +
+        '<div class="desktop-today-actions"><button type="button" class="desktop-today-action" data-act="' + desktopHeroAction + '"' + (S.pausedSession ? ' aria-label="Resume study: ' + esc(sessionScopeLabel(S.pausedSession)) + '"' : '') + '>' + desktopHeroButtonText + '</button></div>' +
+        watchingButton +
       '</div>' +
     '</section>';
 
@@ -2275,8 +2385,8 @@
       return d.cards.some(function (c) { return !isMastered(d.id, c.id); });
     });
     if (!nextLessons.length) nextLessons = S.decks;
-    var desktopLessons = '<section class="desktop-lessons" aria-label="Your next lessons">' +
-      '<div class="desktop-section-heading"><h2>Your next lessons</h2><button type="button" class="home-view-all" data-act="nav-tab" data-tab="journey">View all lessons</button></div>' +
+    var desktopLessons = '<section class="desktop-lessons" aria-label="Next lessons">' +
+      '<div class="desktop-section-heading"><h2>Next lessons</h2><button type="button" class="home-view-all" data-act="nav-tab" data-tab="journey">View all lessons</button></div>' +
       '<div class="desktop-lesson-grid">' +
         nextLessons.slice(0, 3).map(function (d) {
           var parsed = MobileStudy.parseChapterTitle(d.title);
@@ -2293,15 +2403,25 @@
               '</button>' +
             '</div>' +
             '<button type="button" class="desktop-lesson-open" data-act="open-chapter" data-id="' + d.id + '" aria-label="Open lesson ' + esc(parsed.topic) + '">' +
+              studyIcon(lessonVideosForDeck(d.id).length ? 'play-circle' : 'copy', 'home-lesson-icon') +
+              '<span class="home-lesson-text">' +
               '<strong class="desktop-lesson-title">' + esc(parsed.topic) + '</strong>' +
-              '<span class="desktop-lesson-card-bottom"><span>' + plural(total, 'card') + '</span> <strong>' + pct + '%</strong></span>' +
+              '<span class="desktop-lesson-card-bottom"><span>' + (lessonVideosForDeck(d.id).length ? plural(lessonVideosForDeck(d.id).length, 'recording') + ' · ' : '') + plural(total, 'card') + '</span> <strong>' + pct + '%</strong></span>' +
               '<span class="desktop-lesson-progress" role="progressbar" aria-label="' + esc(parsed.topic) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></span>' +
+              '</span>' +
             '</button>' +
           '</article>';
         }).join('') +
       '</div>' +
     '</section>';
 
+    var nextRecordings = nextRecordingChoices(watching);
+    if (nextRecordings.length) {
+      desktopLessons = '<section class="desktop-lessons next-recordings" aria-label="Next lessons"><h2>Next lessons</h2><div class="next-recording-list">' + nextRecordings.map(function (item) {
+        var topic = MobileStudy.parseChapterTitle(item.deck.title).topic;
+        return '<button type="button" class="next-recording-row" data-act="open-lesson-video" data-id="' + esc(item.deck.id) + '" data-index="' + item.index + '" aria-label="Watch ' + esc(topic + ': ' + recordingTitle(item.video.title)) + '">' + studyIcon('play-circle') + '<span><strong>' + esc(topic) + '</strong><small>' + esc(recordingTitle(item.video.title)) + '</small></span>' + studyIcon('chevron-right') + '</button>';
+      }).join('') + '</div></section>';
+    }
     var desktopPlanCards = [];
     var devotionalTask = planCards.filter(function (c) { return c.type === 'devotion'; })[0];
     var reviewTask = planCards.filter(function (c) { return c.type === 'review'; })[0];
@@ -2358,18 +2478,14 @@
       desktopTopBar +
       desktopBackupReminder +
       '<div class="desktop-home-columns">' +
-        '<div class="desktop-home-primary">' + desktopHero + desktopStats + '</div>' +
+        '<div class="desktop-home-primary">' + desktopHero + '</div>' +
         '<aside class="desktop-home-rail" aria-label="Your daily study">' +
           desktopDevotionFeature + desktopPlan + desktopDevotionList +
         '</aside>' +
-      '</div>' + desktopLessons +
+      '</div>' + desktopLessons + '<details class="home-extra-details"><summary>Study details</summary>' + desktopStats + (S.pausedSession ? '<button type="button" class="btn" data-act="discard-study">End session</button>' : '') + '</details>' +
     '</div>';
 
-    var mobileStudyHeader = '<header class="mobile-study-header"><h1>CCI Discipleship</h1>' +
-      '<button class="top-icon-btn" data-act="nav-tab" data-tab="settings" aria-label="Settings">' +
-        tabIconSvg('settings') +
-      '</button>' +
-    '</header>';
+    var mobileStudyHeader = studyPageHeader('', '<details class="home-extra-details"><summary>Study details</summary>' + desktopStats + '</details>' + (S.pausedSession ? '<button type="button" class="btn" data-act="discard-study">End session</button>' : ''));
 
     var milestoneCard = S.decks.length ? '<section class="home-milestone-card">' +
       '<div class="milestone-content">' +
@@ -2384,7 +2500,7 @@
     '</section>' : '';
 
     return '<div class="home-view">' +
-      '<div class="mobile-home-content">' + mobileStudyHeader + backupReminder + desktopHero + desktopStats + desktopLessons + devotionSection + '</div>' +
+      '<div class="mobile-home-content">' + mobileStudyHeader + backupReminder + desktopHero + desktopLessons + devotionSection + '</div>' +
       desktopHome +
     '</div>';
   };
@@ -2523,57 +2639,49 @@
       var stepActions = s.state === 'empty' && s.id === 'weak' ? ''
         : '<button class="btn sm" data-act="' + s.action + '" data-mode="' + s.mode + '" data-id="' + d.id + '">' + (s.mode === 'flash' ? 'Set up flashcards' : s.mode === 'quiz' ? 'Set up quiz' : s.mode === 'exam' ? 'Set up exam' : 'Practise weak spots') + '</button>';
 
-      return '<div class="timeline-step ' + stateClass + '">' +
+      return (s.id === 'exam' ? '<details class="chapter-extra-practice"><summary>Timed exam</summary>' : '') + '<div class="timeline-step ' + stateClass + '">' +
         '<div class="timeline-node" aria-hidden="true">' +
           '<div class="node-circle">' + (s.state === 'complete' ? '✓' : (idx + 1)) + '</div>' +
           (idx < steps.length - 1 ? '<div class="node-line"></div>' : '') +
         '</div>' +
         '<div class="timeline-card">' +
           '<div class="timeline-card-head">' +
-            '<div class="timeline-step-icon">' + getStepIconSvg(s.icon) + '</div>' +
+            '<div class="timeline-step-icon">' + studyIcon(s.mode === 'flash' ? 'copy' : s.mode === 'quiz' ? 'check-square' : s.mode === 'weak' ? 'target' : 'clock') + '</div>' +
             '<div class="timeline-step-info">' +
               '<h3 class="timeline-step-title">' + esc(s.title) + '</h3>' +
               '<p class="timeline-step-meta">' + esc(s.meta) + '</p>' +
             '</div>' +
             stateBadge +
           '</div>' +
-          '<p class="timeline-step-desc">' + esc(s.desc) + '</p>' +
+          '<details class="chapter-practice-description"><summary>About ' + esc(s.title.toLowerCase()) + '</summary><p class="timeline-step-desc">' + esc(s.desc) + '</p></details>' +
           '<div class="timeline-step-act' + (s.state === 'empty' && s.id === 'weak' ? ' timeline-step-act-empty' : '') + '">' + stepActions + '</div>' +
         '</div>' +
-      '</div>';
+      '</div>' + (s.id === 'exam' ? '</details>' : '');
     }).join('');
 
-    return '<header class="chapter-view-header ' + gradClass + '">' +
-      '<div class="chapter-view-top">' +
-        '<button class="btn sm ghost" data-act="nav-tab" data-tab="journey">‹ Journey</button>' +
-        '<div class="row">' +
-          '<button class="chapter-icon-btn chapter-info-btn" data-act="chapter-info" data-id="' + d.id + '" aria-label="Lesson info" title="Lesson details">' +
-            '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' +
-          '</button>' +
-          '<button class="chapter-icon-btn" data-act="chapter-menu" data-id="' + d.id + '" aria-label="Lesson menu">' +
-            '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>' +
-          '</button>' +
-        '</div>' +
-      '</div>' +
+    var flashStep = steps.find(function (step) { return step.mode === 'flash'; });
+    var weakStep = steps.find(function (step) { return step.id === 'weak'; });
+    var compactPractice = '<section class="chapter-practice-summary" aria-label="Lesson practice"><button type="button" class="chapter-practice-entry" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '">' + studyIcon('copy') + '<span><strong>Flashcards</strong><small>' + esc(flashStep ? flashStep.meta : '') + '</small></span>' + studyIcon('chevron-right') + '</button>' +
+      '<button type="button" class="review-weak-spots" data-act="chapter-weak" data-id="' + esc(d.id) + '"' + (weakStep && weakStep.state === 'empty' ? ' disabled aria-describedby="chapter-weak-empty"' : '') + '>Review weak spots</button>' + (weakStep && weakStep.state === 'empty' ? '<p id="chapter-weak-empty" class="sr-only">No weak spots yet. Attempt a quiz to identify questions to review.</p>' : '') + '</section>';
+    var chapterHeader = studyPageHeader(d.id, '<button type="button" class="btn" data-act="chapter-info" data-id="' + esc(d.id) + '">Lesson information</button><button type="button" class="btn" data-act="chapter-menu" data-id="' + esc(d.id) + '">Manage lesson</button><p>' + total + ' questions · ' + mastered + ' mastered (' + pct + '%)</p>');
+    return chapterHeader + '<header class="chapter-view-header ' + gradClass + '">' +
       '<div class="chapter-view-hero">' +
-        '<span class="chapter-sec-pill">' + secNum + '/12</span>' +
         '<h1 class="chapter-view-title">' + esc(parsed.topic) + '</h1>' +
-        '<p class="chapter-view-sub">' + plural(total, 'question') + ' · ' + mastered + ' mastered (' + pct + '%)</p>' +
-        '<div class="deck-progress chapter-progress-bar" role="progressbar" aria-label="' + esc(parsed.topic) + ' mastery" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
+        '<p class="chapter-view-sub">' + plural(lessonVideosForDeck(d.id).length, 'recording') + '</p>' +
       '</div>' +
       chapterSvgIllustration(secNum) +
     '</header>' +
-    '<section class="chapter-video-entry" aria-labelledby="chapter-video-title">' +
-      '<div class="chapter-video-copy"><span class="eyebrow">VIDEO LESSON</span><h2 id="chapter-video-title">Watch this lesson</h2><p>' + (lessonVideosForDeck(d.id).length ? plural(lessonVideosForDeck(d.id).length, 'recording') + ' available. Watch, then reinforce the lesson with flashcards or a quiz.' : 'No recording is linked yet. You can still study with flashcards or take the lesson quiz.') + '</p></div>' +
-      '<button type="button" class="btn primary" data-act="open-lesson-video" data-id="' + esc(d.id) + '">Open video lesson</button>' +
+    '<section class="chapter-recordings" aria-labelledby="chapter-video-title">' +
+      '<h2 class="sr-only" id="chapter-video-title">Recordings</h2>' +
+      (lessonVideosForDeck(d.id).length ? '<div class="chapter-recording-list">' + lessonVideoGroups(lessonVideosForDeck(d.id), lessonVideoVisitRoute(d.id, lessonVideosForDeck(d.id)).videoIndex, true) + '</div><p class="sr-only">Current identifies the selected recording, separately from playback and mastery. Watching positions are saved on this device.</p>' : '<p class="meta">No recording is linked yet. You can still study with flashcards or take the lesson quiz.</p>') +
     '</section>' +
-    '<section class="chapter-timeline-section" aria-label="Study Steps">' +
+    compactPractice + '<details class="chapter-more-practice"><summary>More practice</summary><section class="chapter-timeline-section" aria-label="Study Steps">' +
       '<div class="timeline-intro">' +
-        '<h2>Study Timeline</h2>' +
+        '<h2>Practise this lesson</h2>' +
         '<p class="meta">Choose a study mode. You can start anywhere.</p>' +
       '</div>' +
       '<div class="chapter-timeline">' + timelineHtml + '</div>' +
-    '</section>';
+    '</section></details>';
   };
 
   views['lesson-video'] = function () {
@@ -2581,14 +2689,13 @@
     if (!d) return '<div class="lesson-video-page"><p class="lesson-video-alert" role="status">This lesson is unavailable.</p><button type="button" class="btn" data-act="nav-tab" data-tab="journey">Back to Journey</button></div>';
     var parsed = MobileStudy.parseChapterTitle(d.title), section = parsed.sectionNum || 1;
     var videos = lessonVideosForDeck(d.id), index = Math.max(0, Math.min(Number.isInteger(V.videoIndex) ? V.videoIndex : 0, videos.length - 1));
-    var video = videos[index] || null, title = video ? video.title : parsed.topic + ' video lesson';
+    var video = videos[index] || null, title = video ? recordingTitle(video.title) : parsed.topic + ' video lesson';
     rememberLessonVideoVisit(d.id, video, V.videoTime);
     var adjacentNext = nextLessonDestination(d.id), adjacentPrevious = previousLessonDestination(d.id);
     var showJourney = !videos.length || (index === videos.length - 1 && ['last', 'missing', 'unknown'].indexOf(adjacentNext.kind) >= 0) || (index === 0 && ['missing', 'unknown'].indexOf(adjacentPrevious.kind) >= 0);
     var contextLabel = 'Lesson ' + section + ': ' + parsed.topic + '. ' + (video ? 'Video ' + (index + 1) + ' of ' + videos.length + ': ' + title : 'No recordings available');
     var videoNavigation = '<nav class="lesson-video-navigation" aria-label="Video and lesson navigation">' +
       lessonVideoDirectionButton('previous', videos, index, d.id) +
-      '<h2 class="lesson-video-position" id="lesson-video-navigation-context" data-video-nav="lesson" tabindex="-1" aria-live="polite" aria-label="' + esc(contextLabel) + '">' + (video ? 'Video ' + (index + 1) + ' of ' + videos.length : 'No recordings') + '</h2>' +
       lessonVideoDirectionButton('next', videos, index, d.id) +
       (showJourney ? '<div class="lesson-video-boundary"><button type="button" class="btn" data-act="nav-tab" data-tab="journey">' + (adjacentNext.kind === 'last' && index === videos.length - 1 ? 'Final lesson · ' : '') + 'Back to Journey</button></div>' : '') + '</nav>';
     var canWatchVideo = !!(accountStatus.user && accountStatus.videoReady);
@@ -2616,37 +2723,37 @@
       : '<div class="lesson-video-unavailable" role="status"><strong>Lesson video not available yet</strong><p>The ' + esc(parsed.topic) + ' video has not been added yet. Use Flashcards or Take quiz below.</p></div>';
     var transcriptPanel = video && transcriptSourceUrl
       ? (canWatchVideo
-          ? '<details class="lesson-transcript" data-video-id="' + esc(video.id) + '" data-transcript-url="' + esc(transcriptSourceUrl) + '"><summary>Search transcript</summary><div class="lesson-transcript-body"><label for="lesson-transcript-search">Find a word or phrase</label><input id="lesson-transcript-search" type="search" autocomplete="off" aria-controls="lesson-transcript-cues"><p class="lesson-transcript-status" role="status" aria-live="polite">Open to load transcript segments.</p><button type="button" class="btn sm lesson-transcript-back" data-act="lesson-video-return" hidden>Back to video</button><ol class="lesson-transcript-cues" id="lesson-transcript-cues" hidden></ol></div></details>'
-          : '<p class="lesson-transcript-note">Captions and transcript available after sign-in.</p>')
+          ? '<details class="lesson-transcript" id="watch-transcript-panel" role="tabpanel" aria-labelledby="watch-transcript-tab"' + (window.innerWidth >= 1024 ? ' open' : '') + ' data-video-id="' + esc(video.id) + '" data-transcript-url="' + esc(transcriptSourceUrl) + '"><summary>' + studyIcon('file-text') + 'Transcript</summary><div class="lesson-transcript-body"><label for="lesson-transcript-search">Search transcript</label><input id="lesson-transcript-search" type="search" placeholder="Search transcript" autocomplete="off" aria-controls="lesson-transcript-cues"><p class="lesson-transcript-status" role="status" aria-live="polite">Open to load transcript segments.</p><button type="button" class="btn sm lesson-transcript-back" data-act="lesson-video-return" hidden>Back to video</button><ol class="lesson-transcript-cues" id="lesson-transcript-cues" hidden></ol></div></details>'
+          : '<details class="lesson-transcript-gate" id="watch-transcript-panel" role="tabpanel" aria-labelledby="watch-transcript-tab"' + (window.innerWidth >= 1024 ? ' open' : '') + '><summary>' + studyIcon('file-text') + 'Transcript</summary><p class="lesson-transcript-note">Captions and transcript available after sign-in. Open navigation to sign in through Settings.</p></details>')
       : (video && canStartPlayback ? '<p class="lesson-transcript-note">Captions and a searchable transcript are not available for this recording yet.</p>' : '');
-    var videoNav = videos.length > 1
-      ? '<nav class="lesson-video-segments" aria-label="Videos in this lesson">' + lessonVideoGroups(videos, index) + '</nav>'
-      : '<div class="lesson-video-progress" aria-label="Lesson ' + section + ' of ' + S.decks.length + '"><span>Lesson ' + section + ' of ' + S.decks.length + '</span><progress value="' + section + '" max="' + S.decks.length + '">Lesson ' + section + ' of ' + S.decks.length + '</progress></div>';
+    var videoNav = videos.length ? '<details class="lesson-recordings" id="watch-recordings-panel" role="tabpanel" aria-labelledby="watch-recordings-tab"' + (window.innerWidth >= 1024 ? ' open' : '') + '><summary>' + studyIcon('list') + 'Recordings<span class="recording-count sr-only">, ' + videos.length + ' recordings</span></summary><nav class="lesson-video-segments" aria-label="Videos in this lesson">' + lessonVideoGroups(videos, index) + '</nav></details>' : '';
+    var watchTool = V.watchTool === 'recordings' || !transcriptSourceUrl ? 'recordings' : 'transcript';
+    var toolTabs = '<div class="watch-tool-tabs" role="tablist" aria-label="Watching tools">' + ['transcript', 'recordings'].map(function (tool) {
+      return '<button type="button" role="tab" id="watch-' + tool + '-tab" data-act="watch-tool" data-tool="' + tool + '" aria-controls="watch-' + tool + '-panel" aria-selected="' + (watchTool === tool ? 'true' : 'false') + '" tabindex="' + (watchTool === tool ? '0' : '-1') + '"' + (tool === 'transcript' && !transcriptSourceUrl ? ' disabled' : '') + '>' + (tool === 'transcript' ? 'Transcript' : 'Recordings') + '</button>';
+    }).join('') + '</div>';
     return '<section class="lesson-video-page" aria-labelledby="lesson-video-title">' +
-      '<header class="lesson-video-topbar"><button type="button" class="btn sm ghost" data-act="lesson-video-back" data-id="' + esc(d.id) + '">‹ Back to lesson</button><div class="lesson-video-top-title"><span>CCI · DISCIPLESHIP</span><strong>' + esc(parsed.topic) + '</strong><h1 id="lesson-video-title" tabindex="-1">' + esc(title) + '</h1></div><span class="lesson-video-section-count">' + section + ' / ' + S.decks.length + '</span></header>' +
+      studyPageHeader(d.id, '<div class="watch-saved-session">' + savedSessionResumeButton() + '</div>') +
       '<div class="lesson-video-content"><div class="lesson-video-main">' +
       '<section class="lesson-video-frame' + (video && canStartPlayback ? '' : ' is-unavailable') + '" aria-label="Lesson video player">' + player + '</section>' +
+      '<header class="lesson-video-topbar watch-title-block"><h1 id="lesson-video-title" tabindex="-1"><span class="watch-lesson-context">' + esc(parsed.topic) + ' / </span>' + esc(title) + '</h1><h2 class="lesson-video-position" id="lesson-video-navigation-context" data-video-nav="lesson" tabindex="-1" aria-live="polite" aria-label="' + esc(contextLabel) + '">' + (video ? 'Video ' + (index + 1) + ' of ' + videos.length : 'No recordings') + '</h2></header>' +
       (video && canStartPlayback ? '<div class="lesson-video-feedback"><p role="status" aria-live="polite" aria-atomic="true"></p><button type="button" class="btn sm" hidden>Retry video</button></div>' : '') +
-      (canStartPlayback ? '<section class="lesson-video-summary"><div class="lesson-video-summary-copy"><p>Watch this recording, then practise below.</p></div><button type="button" class="btn primary lesson-video-continue" data-act="lesson-video-play">' + (V.videoTime > 0 ? 'Resume lesson' : 'Play lesson') + '</button></section>' : '') +
-      '<div class="lesson-video-navigation-slot">' + videoNavigation + '</div>' +
+      (canStartPlayback ? '<details class="watch-playback-options"><summary>Playback options</summary><section class="lesson-video-summary"><div class="lesson-video-summary-copy"><p>Positions saved on this device</p></div><button type="button" class="btn lesson-video-continue" data-act="lesson-video-play">' + (V.videoTime > 0 ? 'Resume lesson' : 'Play lesson') + '</button></section></details>' : '') +
+      '<aside class="lesson-video-side" aria-label="Videos and transcript" data-watch-tool="' + watchTool + '">' + toolTabs + transcriptPanel + videoNav + '</aside>' +
       (function () {
         var videoCards = video ? cardsForVideo(d, video) : [];
         var isLastVideo = !videos.length || index >= videos.length - 1;
-        var resumePausedBtn = savedSessionResumeButton();
         var videoStudyButtons = videoCards.length
-          ? '<button type="button" class="btn" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" data-video-id="' + esc(video.id) + '" aria-label="Study Video Flashcards, ' + videoCards.length + ' cards">Video Flashcards (' + videoCards.length + ')</button>' +
-            '<button type="button" class="btn" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" data-video-id="' + esc(video.id) + '" aria-label="Take Video Quiz, ' + videoCards.length + ' questions">Video Quiz (' + videoCards.length + ')</button>'
+          ? '<button type="button" class="btn primary" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" data-video-id="' + esc(video.id) + '" data-count="' + videoCards.length + '" aria-label="Flashcards for this recording, ' + plural(videoCards.length, 'card') + '">' + studyIcon('copy') + '<span>Flashcards</span></button>' +
+            '<button type="button" class="btn" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" data-video-id="' + esc(video.id) + '" data-count="' + videoCards.length + '" aria-label="Quiz for this recording, ' + plural(videoCards.length, 'question') + '">' + studyIcon('check-square') + '<span>Quiz</span></button>'
           : (isLastVideo ? '' : '<p class="note" style="margin:var(--space-xs) 0;">Video practice questions in preparation · Lesson quiz available on the final video</p>');
         var chapterStudyButtons = isLastVideo
           ? '<button type="button" class="btn' + (videoCards.length ? ' ghost sm' : '') + '" data-act="setup" data-mode="flash" data-id="' + esc(d.id) + '" aria-label="Study Lesson ' + section + ' (' + esc(parsed.topic) + ') Flashcards, ' + d.cards.length + ' cards">Lesson Flashcards (' + d.cards.length + ')</button>' +
             '<button type="button" class="btn' + (videoCards.length ? ' ghost sm' : '') + '" data-act="setup" data-mode="quiz" data-id="' + esc(d.id) + '" aria-label="Take Lesson ' + section + ' (' + esc(parsed.topic) + ') Quiz, ' + d.cards.length + ' questions">Lesson Quiz (' + d.cards.length + ')</button>'
           : '';
-        return '<div class="lesson-video-study-actions" role="group" aria-label="Study Lesson ' + section + ' (' + esc(parsed.topic) + ')">' + resumePausedBtn + (videoStudyButtons ? '<div class="lesson-video-practice-group" role="group" aria-label="Practise this video"><h2>Practise this video</h2>' + videoStudyButtons + '</div>' : '') + (chapterStudyButtons ? '<div class="lesson-video-practice-group lesson-video-chapter-practice" role="group" aria-label="Whole lesson review"><h2>Whole lesson review</h2>' + chapterStudyButtons + '</div>' : '') + '</div>';
+        return '<div class="lesson-video-study-actions" role="group" aria-label="Study Lesson ' + section + ' (' + esc(parsed.topic) + ')">' + (videoStudyButtons ? '<div class="lesson-video-practice-group" role="group" aria-label="Practise this recording"><h2>Practise this recording</h2>' + videoStudyButtons + '</div>' : '') + (chapterStudyButtons ? '<details class="lesson-video-chapter-options"><summary>Whole lesson review</summary><div class="lesson-video-practice-group lesson-video-chapter-practice" role="group" aria-label="Whole lesson review"><h2 class="sr-only">Whole lesson review</h2>' + chapterStudyButtons + '</div></details>' : '') + '</div>';
       })() +
-      '</div><aside class="lesson-video-side" aria-label="Videos and transcript">' +
-      transcriptPanel +
-      videoNav +
-      '</aside></div>' +
+      '<div class="lesson-video-navigation-slot">' + videoNavigation + '</div>' +
+      '</div></div>' +
     '</section>';
   };
 
@@ -2964,7 +3071,7 @@
         '</button>';
 
     return '<section class="study-shell flash-session coaching-study-flow" aria-label="Flashcard study session">' +
-      sessionHead(displayTitle, (s.i + 1) + ' / ' + s.cards.length) +
+      sessionHead(displayTitle, (s.i + 1) + ' / ' + s.cards.length, false, 'Flashcards') +
       progressBar(s.i + 1, s.cards.length) +
       '<div class="coaching-question-container">' + cardFace + '</div>' +
       (s.flipped && savedRating ? '<p class="note" role="status">Rating saved: ' + (savedRating === 'known' ? 'I know it' : 'Still learning') + '. Use Next to continue.</p>' : '') +
@@ -3014,22 +3121,20 @@
       if (isExam) {
         feedback = '<aside class="quiz-answer-feedback exam-sheet" aria-label="Answer recorded">' +
           '<p class="exam-progress-note">Answer recorded for review after submission.</p>' +
-          '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'Submit exam' : 'Next question') + '</button>' +
-        '</aside>';
+        '</aside>' + '<button class="btn primary btn-continue quiz-next-action" data-act="next">' + (isLast ? 'Submit exam' : 'Next question') + '</button>';
       } else {
         var ok = picked === answerAt;
         feedback = '<aside class="quiz-answer-feedback ' + (ok ? 'sheet-correct' : 'sheet-incorrect') + '" aria-label="Answer feedback">' +
             '<div class="feedback-panel ' + (ok ? 'is-correct' : 'is-incorrect') + '">' +
               '<div class="feedback-header">' +
-                '<span class="feedback-mark-icon" aria-hidden="true">' + (ok ? '✓' : '✗') + '</span>' +
-                '<p class="fb ' + (ok ? 'ok' : 'bad') + '" role="status">' + (ok ? 'Correct.' : 'Not quite.') + '</p>' +
+                '<span class="feedback-mark-icon" aria-hidden="true">' + studyIcon(ok ? 'check-circle' : 'x-circle') + '</span>' +
+                '<p class="fb ' + (ok ? 'ok' : 'bad') + '" role="status"><span class="sr-only">' + (ok ? 'Correct. ' : 'Not quite. ') + '</span>Answer feedback</p>' +
               '</div>' +
               (!ok ? '<p class="feedback-answer"><span class="feedback-answer-letter" aria-label="Correct option ' + LET[answerAt] + '">' + LET[answerAt] + '</span><span>' + esc(c.options[order[answerAt]]) + '</span></p>' : '') +
               (c.explanation ? '<p class="card-note"><strong>Explanation:</strong> ' + esc(c.explanation) + '</p>' : '') +
               studyReferences(c, it.deckId) +
             '</div>' +
-          '<button class="btn primary full btn-continue" data-act="next">' + (isLast ? 'See results' : 'Next question') + '</button>' +
-        '</aside>';
+        '</aside>' + '<button class="btn primary btn-continue quiz-next-action" data-act="next">' + (isLast ? 'See results' : 'Next question') + '</button>';
       }
     }
 
@@ -3039,7 +3144,7 @@
       : '<span class="score-inline" aria-label="Question ' + (s.i + 1) + ' of ' + s.cards.length + '">' + (s.i + 1) + '<span aria-hidden="true"> / </span><span class="sr-only">of</span>' + s.cards.length + '</span>';
 
     return '<section class="study-shell ' + (isExam ? 'exam-session' : 'quiz-session') + ' coaching-study-flow" aria-label="' + (isExam ? 'Timed exam' : 'Quiz') + '">' +
-      sessionHead(sessionTitle, status, isExam) +
+      sessionHead(sessionTitle, status, isExam, isExam ? 'Timed exam' : 'Quiz') +
       progressBar(s.i + (done ? 1 : 0), s.cards.length) +
       '<div class="quiz-question-layout' + (feedback ? ' has-feedback' : '') + '">' +
         '<article class="question-panel coaching-question-panel">' +
@@ -3698,17 +3803,17 @@
     } catch (e) {}
   }
 
-  function sessionHead(t, right, isExam) {
+  function sessionHead(t, right, isExam, mode) {
     return '<header class="top study-header coaching-study-header">' +
-      '<button class="study-close-btn" data-act="' + (V.returnToVideo ? 'study-return-video' : 'pause-session') + '" aria-label="' + (V.returnToVideo ? 'Return to video' : 'Pause session') + '" title="' + (V.returnToVideo ? 'Return to video' : 'Pause session') + '">' +
+      '<button class="study-close-btn" data-act="' + (V.returnToVideo ? 'study-return-video' : 'pause-session') + '" aria-label="' + (V.returnToVideo ? 'Return to video' : 'Close and save session') + '" title="' + (V.returnToVideo ? 'Return to video' : 'Close and save session') + '">' +
         (V.returnToVideo
           ? '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>'
           : '<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>') +
-      (!V.returnToVideo ? '<span class="study-pause-label">Pause</span>' : '') +
+      (!V.returnToVideo ? '<span class="study-pause-label">Close</span>' : '') +
       '</button>' +
       '<div class="study-heading">' +
         '<span class="eyebrow">CCI · DISCIPLESHIP</span>' +
-        '<h1>' + esc(t) + '</h1>' +
+        '<h1>' + esc(t) + (mode ? '<span class="study-mode-label"> · ' + esc(mode) + '</span>' : '') + '</h1>' +
       '</div>' +
       '<div class="session-status' + (isExam ? ' is-timer' : '') + '">' + right + '</div>' +
     '</header>';
@@ -3817,15 +3922,15 @@
     closeBiblePreview(false);
     if (!views[V.name] && V.name !== 'exam') V = { name: 'home' };
     var isMainTab = MAIN_TABS.indexOf(V.name) >= 0;
-    var hasDesktopSidebar = isMainTab || V.name === 'devotional';
+    var hasDesktopSidebar = isMainTab || V.name === 'devotional' || V.name === 'lesson-video';
     var view = (V.name === 'exam' ? views.quiz : views[V.name]);
     if (typeof view !== 'function') view = views.home;
     var tabBarHtml = isMainTab ? renderTabBar(V.name) : '';
     var showRocket = (V.name === 'home');
     var rocketHtml = showRocket ? renderRocketFab() : '';
     app.innerHTML = banner() +
-      '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + (animateRouteChange ? ' app-screen-enter' : '') + '">' +
-        (hasDesktopSidebar ? renderDesktopSidebar(V.name === 'devotional' ? 'home' : V.name) : '') +
+      '<div class="desktop-shell' + (hasDesktopSidebar ? '' : ' desktop-shell-full') + (V.name === 'home' ? ' desktop-shell-home' : '') + (V.name === 'lesson-video' ? ' desktop-shell-watching' : '') + (animateRouteChange ? ' app-screen-enter' : '') + '">' +
+        (hasDesktopSidebar ? renderDesktopSidebar(V.name === 'devotional' ? 'home' : V.name === 'lesson-video' ? 'journey' : V.name) : '') +
         '<div class="desktop-main">' + view() + tabBarHtml + rocketHtml + '</div>' +
       '</div>';
     animateRouteChange = false;
@@ -3833,6 +3938,17 @@
     syncHomePlanActions();
     var renderedVideo = document.getElementById('lesson-video-player');
     if (renderedVideo) {
+      var playbackOwner = activeStorageOwnerId, playbackDeckId = V.id;
+      var playbackVideo = lessonVideosForDeck(V.id)[Number.isInteger(V.videoIndex) ? V.videoIndex : 0];
+      var lastPlaybackWrite = 0;
+      activePlaybackCheckpoint = function (force) {
+        if (document.getElementById('lesson-video-player') !== renderedVideo || V.name !== 'lesson-video' || V.id !== playbackDeckId) return;
+        if (savePlaybackPosition(playbackDeckId, playbackVideo, renderedVideo, playbackOwner) && (force || Date.now() - lastPlaybackWrite >= 15000)) {
+          lastPlaybackWrite = Date.now();
+          save(true);
+        }
+      };
+      ['pause', 'ended'].forEach(function (name) { renderedVideo.addEventListener(name, function () { checkpointPlayback(true); }); });
       bindLessonVideoFeedback(renderedVideo, app.querySelector('.lesson-video-feedback'));
       var videoAction = app.querySelector('.lesson-video-continue');
       var syncVideoAction = function () {
@@ -3847,6 +3963,7 @@
         if (V.name !== 'lesson-video' || document.getElementById('lesson-video-player') !== renderedVideo) return;
         var selected = lessonVideosForDeck(V.id)[Number.isInteger(V.videoIndex) ? V.videoIndex : 0];
         rememberLessonVideoVisit(V.id, selected, renderedVideo.currentTime);
+        checkpointPlayback(false);
       });
       var seekTime = Number(V.videoTime);
       if (Number.isFinite(seekTime) && seekTime >= 0 && (seekTime > 0 || V.autoPlayVideo)) {
@@ -4044,6 +4161,7 @@
   }
 
   function go(v, replace) {
+    checkpointPlayback(true);
     if (V.name === 'exam' && v.name !== 'exam') stopExamTimer();
     rocketMenuOpen = false;
     var prev = V;
@@ -4724,8 +4842,15 @@
         closeModal();
         go({ name: 'chapter', id: t.dataset.id });
         break;
+      case 'continue-watching':
+        var continueVideos = lessonVideosForDeck(t.dataset.id), continueIndex = Number(t.dataset.index);
+        if (Number.isInteger(continueIndex) && continueVideos[continueIndex]) go({ name: 'lesson-video', id: t.dataset.id, videoIndex: continueIndex, videoTime: Math.max(0, Number(t.dataset.time) || 0) });
+        break;
       case 'open-lesson-video':
-        go(lessonVideoVisitRoute(t.dataset.id, lessonVideosForDeck(t.dataset.id)));
+        var chapterVideos = lessonVideosForDeck(t.dataset.id), chapterVideoIndex = Number(t.dataset.index);
+        go(t.dataset.index !== undefined && Number.isInteger(chapterVideoIndex) && chapterVideos[chapterVideoIndex]
+          ? { name: 'lesson-video', id: t.dataset.id, videoIndex: chapterVideoIndex, videoTime: resumeTime(recordingPosition(chapterVideos[chapterVideoIndex])) }
+          : lessonVideoVisitRoute(t.dataset.id, chapterVideos));
         break;
       case 'lesson-video-back':
         var leavingVideo = document.getElementById('lesson-video-player');
@@ -4739,7 +4864,7 @@
           var currentLessonPlayer = document.getElementById('lesson-video-player');
           if (currentLessonPlayer) currentLessonPlayer.pause();
           V.videoIndex = +t.dataset.index;
-          V.videoTime = 0;
+          V.videoTime = resumeTime(recordingPosition(lessonVideosForDeck(V.id)[V.videoIndex]));
           syncHashWithView(V, false);
           render(true);
           restoreLessonVideoSelectionFocus(videoNavigationDirection);
@@ -4750,6 +4875,9 @@
         break;
       case 'lesson-video-next-lesson':
         openNextLesson();
+        break;
+      case 'watch-tool':
+        selectWatchTool(t.dataset.tool, false);
         break;
       case 'lesson-video-play':
         var lessonVideoElement = document.getElementById('lesson-video-player');
@@ -5361,6 +5489,19 @@
     });
   }, true);
   document.addEventListener('keydown', function (e) {
+    var watchTab = e.target && e.target.closest ? e.target.closest('[role="tab"][data-act="watch-tool"]') : null;
+    if (watchTab && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) >= 0) {
+      e.preventDefault();
+      selectWatchTool(e.key === 'Home' ? 'transcript' : e.key === 'End' ? 'recordings' : (watchTab.dataset.tool === 'transcript' ? 'recordings' : 'transcript'), true);
+      return;
+    }
+    if (e.key === 'Escape') {
+      var navigationMenu = app.querySelector('.study-page-navigation[open]');
+      if (navigationMenu && navigationMenu.open) {
+        e.preventDefault(); navigationMenu.open = false;
+        navigationMenu.querySelector('summary').focus(); return;
+      }
+    }
     if (e.key === 'Escape' && activeBiblePreview) {
       e.preventDefault(); closeBiblePreview(isWithinActiveBiblePreview(document.activeElement), true); return;
     }
@@ -5567,9 +5708,11 @@
       if (accountStatus.user) syncCloudProgress();
     });
     window.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') checkpointPlayback(true);
       if (document.visibilityState === 'hidden' && cloudSyncTimer) syncCloudProgress();
     });
     window.addEventListener('pagehide', function () {
+      checkpointPlayback(true);
       if (cloudSyncTimer) syncCloudProgress();
     });
   }
